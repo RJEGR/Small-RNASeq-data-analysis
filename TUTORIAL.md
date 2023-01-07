@@ -42,9 +42,20 @@ multiqc -v
 
 
 
-**trimmomatic**
+**mirTrace**
 
-...
+miRTrace is a QC(quality control) tool for small RNA sequencing data (sRNA-Seq). Each sample is characterized by profiling sequencing quality, read length, sequencing depth and miRNA complexity and also the amounts of miRNAs versus undesirable sequences (derived from tRNAs, rRNAs and sequencing artifacts). In addition to these routine QC analyses, miRTrace can accurately and sensitively resolve taxonomic origins of small RNA-Seq data based on the composition of clade-specific miRNAs.
+
+```bash
+conda install -c bioconda mirtrace
+
+mirtrace -v # 1.0.1
+
+mirtrace --help
+
+```
+
+
 
 **cutadapt** via python
 
@@ -197,53 +208,64 @@ seqkit stat *fastq.gz
 
 # Pipeline
 
+### Download and backup data
+
+```bash
+# Decompress file: gzip -d gz_file -c .
+# Compress file: gzip file
+# also compress and backup raw data
+tar -czvf usftp21.novogene.com.tar.gz usftp21.novogene.com
+
+# backup at
+/LUSTRE/bioinformatica_data/genomica_funcional/rgomez/novogene_hr_20230105/usftp21.novogene.com.tar.gz
+
+```
+
+
+
 ### Preprocesing
 
 Check the quality of libraries
 
 ```bash
-seqkit stat *fastq.gz
-file                format  type    num_seqs        sum_len  min_len  avg_len  max_len
-SRR7145593_1.fastq  FASTQ   DNA   26,865,638  1,370,147,538       51       51       51
-SRR7145594_1.fastq  FASTQ   DNA   27,317,373  1,393,186,023       51       51       51
-SRR7145595_1.fastq  FASTQ   DNA   28,387,740  1,447,774,740       51       51       51
-SRR7145596_1.fastq  FASTQ   DNA   26,807,946  1,367,205,246       51       51       51
-SRR7145597_1.fastq  FASTQ   DNA   29,018,010  1,479,918,510       51       51       51
-
-# After trimming and filtering
-
-file                     format  type    num_seqs      sum_len  min_len  avg_len  max_len
-SRR7145593_1_trimmed.fq  FASTQ   DNA   25,291,734  650,054,731       18     25.7       51
-SRR7145594_1_trimmed.fq  FASTQ   DNA   25,787,594  683,537,844       18     26.5       51
-SRR7145595_1_trimmed.fq  FASTQ   DNA   21,239,371  529,021,718       18     24.9       51
-SRR7145596_1_trimmed.fq  FASTQ   DNA   21,594,261  528,528,837       18     24.5       51
-SRR7145597_1_trimmed.fq  FASTQ   DNA   20,419,886  500,004,179       18     24.5       51
+# 
+seqkit stat 00.CleanData/HR*/*gz
+# Source	File	format	type	num_seqs	sum_len	min_len	avg_len	max_len
+# 00.CleanData	HR110761	FASTA	DNA	16,637,068	270,665,973	10	16.3	42
+# 00.CleanData	HR110762	FASTA	DNA	17,159,495	309,349,165	10	18	42
+# ....
 ```
 
-Then check the quality and find adapter
+Also check the quality and find adapter from raw data (`01.RawData`)
 
 ```bash
+# 0) Prepare work space
+
+mkdir RAW_INPUT && cd RAW_INPUT
+
+ln -s /Users/cigom/Documents/MIRNA_HALIOTIS/RAW_DATA/usftp21.novogene.com/01.RawData/HR*/*gz .
+
 # 1) fastqc *fastq.gz
 
 mkdir -p fastqc
 
-fastqc *fastq.gz -t 1 --nogroup -o ./fastqc
+# usftp21.novogene.com/00.CleanData/HR*/*gz
+
+fastqc *gz -t 1 --nogroup -o ./fastqc
 
 # 2)
-multiqc ./*zip -o ./multiqc
+multiqc ./fastqc/*zip -o ./multiqc
 
 ```
 
-After detect sequence adapter, procesed to mapper.pl or cutadapter. Also check https://www.biostars.org/p/328246/ or check what is the actual Illumina small rna seq 3' sequence adapter (https://www.biostars.org/p/69245/)
+After detect sequence adapter, procesed to cutadapter.
 
+## Trimming adapter sequences and filtering quality reads (from raw reads)
 
-
-## Trimming adapter sequences and filtering quality reads
-
-> Recordar que la ineficiencia de la ligacion (3' o 5') resulta en una baja complejidad de la bibliotecas de secuenciacion.
+> Recordar que la ineficiencia de la ligacion (3' o 5') resulta en una baja complejidad de la bibliotecas de secuenciacion. Para algunas bibliotecas se pierde (usando los datos filtrados de novogene) mas del 40% de las lecturas debido a errores en los adaptores. Por lo anterior, intentaremos hacer una limpieza personal de los datos crudos usando los siguientes pasos:
 
 ```bash
-Small RNA adapte sequences used for the Haliotis rufescence larvae sequencing:
+# Small RNA adapte sequences used for the Haliotis rufescence larvae sequencing:
 
 RNA 5’ Adapter (RA5), part:
 5'-GTTCAGAGTTCTACAGTCCGACGATC-3'
@@ -251,14 +273,90 @@ RNA 3' Adapter (RA3), part:
 5'-AGATCGGAAGAGCACACGTCT-3'
 ```
 
-Run trimGalone
+1) Run trimGalone to confirm the presence of the adapters in the raw libraries
 
 ```bash
 # ./trim_galore SRR7145597_1.fastq
 
 mkdir filtered_data && cd filtered_data
 
-for i in $(ls ../*.fastq); do ../trim_galore $i ; done
+for i in $(ls ../*.gz); do ../../trim_galore $i ; done
+
+# Automatic adapter sequences detection
+for i in $(ls ../*.gz); do ../../trim_galore $i ; done
+
+#  choosing specific adapter sequences:
+# wd: /Users/cigom/Documents/MIRNA_HALIOTIS/RAW_INPUT/filtered_and_trimmed_AGATCGGAAGAGCACACGTCT
+
+for i in $(ls ../*.gz); do ../../trim_galore $i -a AGATCGGAAGAGCACACGTCT --length 18 --max_length 30 -o filtered_data; done
+```
+
+TrimGalone detecta automaticamente el siguiente fragment `AGATCGGAAGAGC` en 12 las bibliotecas de secuencacion, ese fragmento corresponde a un fragmento del adaptor RNA 3' Adapter (RA3):
+
+5'- AGATCGGAAGAGC - - - - - - - - -3'# dejando 8 nucleotidos sin flanquear
+
+5'-AGATCGGAAGAGCACACGTCT-3' 
+
+> Por lo tanto, deciframos que el fragmento del adaptor sRNA 3' es el que se encuentra presente en casi todas las bibliotecas secuenciadas. Revisar los archivos idividuales de fastqc para identificar que todas las `Overrepresented sequences` son variaciones de este adaptor `AGATCGGAAGAGCACACGTCT`
+
+
+
+Instad of trimgalone use directly cutadapt (better)
+
+```bash
+for i in $(ls ../*.gz); do cutadapt $i -a AGATCGGAAGAGCACACGTCT --length 18 --max_length 30 -o filtered_data; done
+
+for i in $(ls ../*.gz); do cutadapt $i -a AGATCGGAAGAGCACACGTCT --length 18 --max_length 30 -o filtered_data; done
+
+for i in $(ls *.fq.gz); do cutadapt -a AGATCGGAAGAGCACACGTCT -m 18 -M 30 -o filtered_and_trimmed_AGATCGGAAGAGCACACGTCT/${i%.fq.gz}_trimmed.fq.gz $i; done
+ 
+# --untrimmed-output FILE
+# --minimum-length LENGTH or -m LENGTH: Discard processed reads that are shorter than LENGTH.
+# --maximum-length LENGTH or -M LENGTH: Discard processed reads that are longer than LENGTH
+```
+
+
+
+2. Also we check the presence of adapter by running **global** aligment with maft
+
+```bash
+# /Users/cigom/Documents/MIRNA_HALIOTIS/RAW_INPUT/filtered_and_trimmed_AGATCGGAAGAGCACACGTCT
+cp ../HR11082.fq.gz .
+gzip -d HR11082.fq.gz
+
+# seqkit sample -p 0.1 HR110763.fq| seqkit head -n 1000 > output.fa
+
+# /Users/cigom/Documents/Tools/mirdeep2-master/bin/fastq2fasta.pl
+fastq2fasta.pl HR11082.fq > HR11082.fa
+
+seqkit sample -p 0.1 HR11082.fa | seqkit head -n 1000 > HR11082_subset.fa
+
+mafft --globalpair HR11082_subset.fa > HR11082_subset.afa
+
+clustalo -i HR110763.fa -o HR110763.afa
+```
+
+> To inhouse convertion to fastq2fasta lets: `python3 -c "from Bio import SeqIO;SeqIO.convert('file.fq', 'file.fa', 'fasta')"`
+
+
+
+3. Then, run mitrare in order to screening  the sRNA composition from the libraries as well as sanity check the adapter trimming
+
+`qc` Quality control mode (full set of reports). --species must be given.
+
+`--species`  (miRBase encoding). EXAMPLE: "hsa" for Homo sapiens. "meta_species_all" for <All species concatenated together>
+
+`w` Write QC-passed reads and unknown reads (as defined in the RNA type plot) to the output folder. Identical reads are collapsed. Entries are sorted by abundance.
+
+```bash
+# Input: Fastq files
+mirtrace --help
+
+mirtrace qc -s hsa -a AGATCGGAAGAGCACACGTCT -w *fq.gz
+
+mirtrace qc -s meta_species_all -w *trimmed.fq.gz
+
+# Then check the mirrace-report.html
 ```
 
 
@@ -274,10 +372,27 @@ bowtie-build rna.fna rna
 
 ## miRNA analysis
 
-According to mirdeep2
+
+
+If test with CLEANED libraries ()
 
 ```bash
-~/Documents/Tools/mirdeep2-master/tutorial_dir/run_tut.sh
+mkdir CLEAN_INPUT
+
+cp /Users/cigom/Documents/MIRNA_HALIOTIS/RAW_DATA/usftp21.novogene.com/00.CleanData/HR*/*.gz . 
+
+gzip -d *gz
+
+# Parse format
+
+sanity_check_reads_ready_file.pl HR110761.clean.fa
+
+# You could run remove_white_space_in_id.pl file.fa > newfile 
+# This will remove everything from the id line after the first whitespac
+
+for i in $(ls *.clean.fa); do remove_white_space_in_id.pl $i > ${i%.fa}.whitespac.fa; done
+
+# processed w/ mapper.pl
 ```
 
 Elaboramos los metadatos sobre las bibliotecas de lecturas preprocesadas. **Field 1 must be contain exactly three alphabet letters**
@@ -285,16 +400,15 @@ Elaboramos los metadatos sobre las bibliotecas de lecturas preprocesadas. **Fiel
 ```bash
 # Create config.txt file
 
-ls *gz* | grep fastq | sort > f2.tmp && cut -d '.' -f 1 f2.tmp > f1.tmp
+ls * | grep whitespac.fa | sort > f2.tmp && cut -d '.' -f 1 f2.tmp > f1.tmp
 
 paste f1.tmp f2.tmp | column -t > config.txt && rm *tmp
 
 #  vi config.txt
-S93  SRR7145593_1.fastq
-S94  SRR7145594_1.fastq
-S95  SRR7145595_1.fastq
-S96  SRR7145596_1.fastq
-S97  SRR7145597_1.fastq
+HR1  HR110761.clean.fa.gz
+HR2  HR110762.clean.fa.gz
+HR3  HR110763.clean.fa.gz
+...
 ```
 
 #### 1. Mapper module
@@ -329,7 +443,7 @@ Considerando los siguientes flags y parametros, ejecutamos el primer modulo del 
 ```bash
 #!/bin/bash
 # If neither trimming and filtering were made:
-mapper.pl config.txt -d -e -j -h -k TCGTATGCCGTCTTCTGCTTGT -m -p rna -s reads_collapsed.fa 
+mapper.pl config.txt -d -e -j -h -l 18 -k TCGTATGCCGTCTTCTGCTTGT -m -p rna -s reads_collapsed.fa 
 -t reads_collapsed_vs_genome.arf -v 2> mapper.log
 
 # 5 files in ~ 7 Gb in size (single-end 50 bp, 26,865,638 reads)
@@ -337,11 +451,18 @@ mapper.pl config.txt -d -e -j -h -k TCGTATGCCGTCTTCTGCTTGT -m -p rna -s reads_co
 # Hora final 8:15 p.m
 
 # Otherwise:
+
 # -v              outputs progress report
-mapper.pl config.txt -d -e -j -h -m -p rna -s reads_collapsed.fa -t reads_collapsed_vs_genome.arf -v 2> mapper.log
+mapper.pl config.txt -d -e -j -h -l 18 -m -p rna -s reads_collapsed.fa -t reads_collapsed_vs_genome.arf -v 2> mapper.log
+
+# If fasta format
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435/
+
+mapper.pl config.txt -d -c -j -l 18 -m -p $index_path/rna -s reads_collapsed.fa -t reads_collapsed_vs_genome.arf -v 2> mapper.log
+
 
 # Hora de inicio 3:55 p.m
-# Hora final 8:15 p.m
+# Hora final 4:15 p.m
 
 ```
 
@@ -353,15 +474,93 @@ This will result in final output with name `miRNAs_expressed_all_samples*.csv`
 	-m mature.fa     miRNA sequences from miRBase
 
 ```bash
-quantifier.pl -p MIRBASE_20230102/hairpin.fa -m MIRBASE_20230102/mature.fa -r reads_collapsed.fa
+quantifier.pl -p ../MIRBASE_20230102/hairpin.fa -m ../MIRBASE_20230102/mature.fa -r reads_collapsed.fa
 ```
 
-#### 3 (Optional) miRDeep2.pl
+Then create the `Differential expression` workdirectory and link the `miRNAs_expressed_all_samples*` file there wich is an tsv file.
+
+#### 3 (Optional) miRDeep2.pl (to detect novel miRNA candidates)
+
+Basic functions to run mirdeep2 module
+
+> miRDeep runtime:
+>
+> started: 22:1:58 
+> ended: 9:31:23
+> total:11h:29m:25s
 
 ```bash
-miRDeep2.pl reads_collapsed.fa rna.fa reads_collapsed_vs_genome.arf mature_ref_this_species.fa mature_ref_other_species.fa precursors_ref_this_species.fa 2> report.log
 
-miRDeep2.pl reads_collapsed.fa rna.fa reads_collapsed_vs_genome.arf MIRBASE_20230102/hairpin.fa MIRBASE_20230102/mature.fa 2> report.log
+miRDeep2.pl reads_collapsed.fa index.fa reads_collapsed_vs_genome.arf none none none 2> report.log
+
+# Istead of "none" file Note that there it will in practice always improve miRDeep2 performance if miRNAs from some related species is input, even if it is not closely related.
+
+**********
+The first three arguments to miRDeep2.pl must be files while arguments 4-6 can be files or must be designated as 'none'. Examples:
+
+miRDeep2.pl reads.fa genome.fa reads_vs_genome.arf mautre_ref_miRNAs.fa mature_other_miRNAs.fa  hairpin_ref_miRNAs
+
+or
+
+miRDeep2.pl reads.fa genome.fa reads_vs_genome.arf none none none
+
+
+reads         deep sequences in fasta format. The identifier should contain a prefix, a running
+              number and a '_x' to indicate the number of reads that have this sequence.
+              There should be no redundancy in the sequences.
+genome        genome contigs in fasta format. The identifiers should be unique.
+mappings      file_reads mapped against file_genome. The mappings should be in arf format.
+              For details on the format see the documentation.
+miRNAs_ref    miRBase miRNA sequences in fasta format. These should be the known mature
+              sequences for the species being analyzed.
+miRNAs_other  miRBase miRNA sequences in fasta format. These should be the pooled known
+              mature sequences for 1-5 species closely related to the species being
+              analyzed.
+
+precursors    miRBase miRNA precursor sequences in fasta format. These should be the known precursor
+              sequences for the species being analyzed.
+
+```
+
+mirdeep2 runs the follow steps:
+
+```bash
+#Starting miRDeep2
+
+#testing input files
+#parsing genome mappings
+#excising precursors
+#preparing signature
+#folding precursors
+#computing randfold p-values
+#running miRDeep core algorithm
+#running permuted controls
+
+#doing survey of accuracy
+#producing graphic results
+
+```
+
+
+
+Additional function for the module
+
+```bash
+# Using c. elegans as reference
+
+extract_miRNAs.pl mature.fa cel mature > mature_cel_sp.fa
+
+# extract_miRNAs.pl hairpin.fa ref_specie > hairpin_ref_specie.fa
+
+miRDeep2.pl reads_collapsed.fa rna.fa reads_collapsed_vs_genome.arf mature_cel_sp.fa mature.fa precursor.fa -t C.elegans
+
+# miRDeep2.pl reads_collapsed.fa rna.fa reads_collapsed_vs_genome.arf mature_ref_this_species.fa mature_ref_other_species.fa precursors_ref_this_species.fa 2> report.log
+
+
+#../../MIRBASE_20230102/mature_cel_sp.fa ../MIRBASE_20230102/mature.fa MIRBASE_20230102/hairpin.fa 2> report.log
+
+
+
 ```
 
 
@@ -370,7 +569,6 @@ Hay que definir que estrategia de miRNAs conocidos podemos analizar para la etpa
 
 ```bash
 
-miRDeep2.pl reads_collapsed.fa rna.fa reads_collapsed_vs_genome.arf mature_ref_this_species.fa mature_ref_other_species.fa precursors_ref_this_species.fa -t C.elegans
 
 #ec=`echo $?`
 #if [ $ec != 0 ];then
@@ -378,10 +576,22 @@ miRDeep2.pl reads_collapsed.fa rna.fa reads_collapsed_vs_genome.arf mature_ref_t
 #fi
 
 
-[rgomez@ixachi~]$: extract_miRNAs.pl mature.fa ref_specie mature >mature_ref_specie.fa
-&& extract_miRNAs.pl hairpin.fa ref_specie >hairpin_ref_specie.fa
-[rgomez@ixachi~]$: quantifier.pl -p precursors_ref_this_species.fa -m
-mature_ref_this_species.fa -p precursos_ref_this_species.fa -r reads_collapsed.fa –t hsa -y
-now
+extract_miRNAs.pl mature.fa ref_specie mature > mature_ref_specie.fa && extract_miRNAs.pl hairpin.fa ref_specie > hairpin_ref_specie.fa
 ```
 
+## Differential Expression Analysis
+
+
+
+```R
+library(tidyverse)
+
+path <- '~/Documents/MIRNA_HALIOTIS/CLEAN_INPUT/'
+
+mtd <- read_tsv(list.files(path = path, pattern = 'METADATA', full.names = T))
+
+fileName <- list.files(path = path, pattern = 'miRNAs_expressed_all_samples', full.names = T)
+
+count <- read_tsv(file = fileName)
+
+```
