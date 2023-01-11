@@ -19,10 +19,6 @@ fileName <- list.files(path = subdir, pattern = 'clean.fa.gz', full.names = T)
 
 seqs1 <- readDNAStringSet(fileName[1], format="fasta")
 
-# widths <- sort(width(seqs1))
-# widths <- as.data.frame(table(widths))
-# widths$fileName <-  basename(fileName[1])
-
 count_widths <- function(fileName) {
   
   seqs <- readDNAStringSet(fileName, format="fasta")
