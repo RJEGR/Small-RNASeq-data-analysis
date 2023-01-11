@@ -313,6 +313,31 @@ for i in $(ls *.fq.gz); do cutadapt -a AGATCGGAAGAGCACACGTCT -m 18 -M 30 -o filt
 # --untrimmed-output FILE
 # --minimum-length LENGTH or -m LENGTH: Discard processed reads that are shorter than LENGTH.
 # --maximum-length LENGTH or -M LENGTH: Discard processed reads that are longer than LENGTH
+
+# Using different conf m and M
+
+for i in $(ls *.fq.gz); do cutadapt -a AGATCGGAAGAGCACACGTCT -m 15 -M 30 -o filtered_and_trimmed_AGATCGGAAGAGCACACGTCT/${i%.fq.gz}_trimmed.fq.gz $i; done &> cutadapt.log
+```
+
+Concat summary stats as follow
+
+```bash
+# to awk dynamic regexp for slash "/" use "\/"
+grep 'Command line parameters:'  m_18_M_30_filter/cutadapt.log | awk '{gsub(/[filtered_and_trimmed_AGATCGGAAGAGCACACGTCT\/,fq.gz]/, "", $11); print $11}'
+
+# get stats
+grep -A16 '=== Summary ===' m_18_M_30_filter/cutadapt.log > m_18_M_30.summary
+
+grep 'Total reads processed:' m_18_M_30.summary | awk '{print $4}'
+grep 'Reads with adapters' m_18_M_30.summary | awk '{print $4}'
+
+grep 'Reads that were too short:' m_18_M_30.summary | awk '{print $6}'
+grep 'Reads that were too long:' m_18_M_30.summary | awk '{print $6}'
+grep 'Reads written (passing filters):' m_18_M_30.summary | awk '{print $5}'
+
+grep 'Total basepairs processed:' m_18_M_30.summary | awk '{print $4}'
+grep 'Total written (filtered):' m_18_M_30.summary | awk '{print $4}'
+ 
 ```
 
 
@@ -327,13 +352,19 @@ gzip -d HR11082.fq.gz
 # seqkit sample -p 0.1 HR110763.fq| seqkit head -n 1000 > output.fa
 
 # /Users/cigom/Documents/Tools/mirdeep2-master/bin/fastq2fasta.pl
+
 fastq2fasta.pl HR11082.fq > HR11082.fa
 
 seqkit sample -p 0.1 HR11082.fa | seqkit head -n 1000 > HR11082_subset.fa
 
 mafft --globalpair HR11082_subset.fa > HR11082_subset.afa
 
-clustalo -i HR110763.fa -o HR110763.afa
+# clustalo -i HR110763.fa -o HR110763.afa
+
+#
+
+seqkit sample -p 0.1 HR11082.clean.fa | seqkit head -n 1000 > HR11082.clean_subset.fa
+mafft --globalpair HR11082.clean_subset.fa > HR11082.clean_subset.afa
 ```
 
 > To inhouse convertion to fastq2fasta lets: `python3 -c "from Bio import SeqIO;SeqIO.convert('file.fq', 'file.fa', 'fasta')"`
@@ -352,11 +383,13 @@ clustalo -i HR110763.fa -o HR110763.afa
 # Input: Fastq files
 mirtrace --help
 
-mirtrace qc -s hsa -a AGATCGGAAGAGCACACGTCT -w *fq.gz
-
-mirtrace qc -s meta_species_all -w *trimmed.fq.gz
+# mirtrace qc -s meta_species_all -w *trimmed.fq.gz
+# WORDIR RAW_INPUT
+mkdir MIRTRACE && cd MIRTRACE
+mirtrace qc -s meta_species_all -a AGATCGGAAGAGCACACGTCT -w ../*fq.gz
 
 # Then check the mirrace-report.html
+
 ```
 
 
@@ -464,6 +497,21 @@ mapper.pl config.txt -d -c -j -l 18 -m -p $index_path/rna -s reads_collapsed.fa 
 # Hora de inicio 3:55 p.m
 # Hora final 4:15 p.m
 
+```
+
+Check the sequences length from `reads_collapsed.fa`
+
+```bash
+# fx2tabconvert FASTA/Q to tabular format, and provide various information, like sequence length, GC content/GC skew.
+# https://bioinf.shenwei.me/seqkit/usage/#fx2tab-tab2fx
+
+seqkit fx2tab --length --name --header-line  reads_collapsed.fa
+
+# inf not seqkit, lets:
+
+awk '/^>/{if (l!="") print l; print; l=0; next}{l+=length($0)}END{print l}' reads_collapsed.fa | head 
+
+seqkit fx2tab --length --name --header-line  reads_collapsed.fa | awk '{print $2}'  | sort -n | uniq -c > reads_collapsed.length_table.list
 ```
 
 #### 2. Quantify
