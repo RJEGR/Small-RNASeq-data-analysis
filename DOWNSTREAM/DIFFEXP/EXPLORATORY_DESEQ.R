@@ -6,9 +6,9 @@ if(!is.null(dev.list())) dev.off()
 options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 library(tidyverse)
+library(DESeq2)
 
 path <- '~/Documents/MIRNA_HALIOTIS/CLEAN_INPUT/'
-
 
 mtd <- read_tsv(list.files(path = path, pattern = 'METADATA', full.names = T))
 
@@ -36,14 +36,277 @@ row_id <- paste0(1:nrow(summary),"-" ,summary$`#miRNA`)
 
 rownames(count) <- row_id
 
+dim(count)
 
-dim(count <- count[rowSums(edgeR::cpm(count) > 5 ) >= 2, ])
+dim(count0 <- count[rowSums(edgeR::cpm(count) > 1 ) >= 2, ])
 
-# Multiple contrast ----
+# DESEQ2 -----
+# Select samples and run deseq2 
+
+which_sam <- function(mtd, f_col = "hpf", f = 24, ref = "Control") {
+  
+  samples_id <- mtd$colName
+  
+  # mtd %>% filter_at(vars(starts_with(f_col)), any_vars((. %% f) == 0))
+  
+  subset_mtd <- filter(mtd, if_any(starts_with(f_col), ~ (.x == f) == 0))
+  
+  x <- subset_mtd %>% pull(pH, name = colName)
+  
+  y <- samples_id %in% names(x)
+  
+  y[y == FALSE] <- "X"
+  
+  y <- structure(y, names = samples_id)
+  
+  y[names(y) %in% names(x)] <- as.double(relevel(factor(x), ref = ref))
+  
+  y <- paste(y, collapse = '')
+  
+  return(y)
+  
+}
+
+
+# Ex: g <- "000XX1XXXXX1XXXXXXX2XXX2XXXXXXXXXXXX"
+  
+g1 <- which_sam(mtd, f_col = "hpf", f = 24)
+g2 <- which_sam(mtd, f_col = "hpf", f = 110)
+
+# which_sam(mtd, f_col = "pH", f = "low")
+# which_sam(mtd, f_col = "pH", f = "Control", ref = 24)  # not work!
+# count, g
+
+res1 <- run_DESEQ2(count0, g1)
+res2 <- run_DESEQ2(count0, g2)
+
+# DESEQ DATAVIZ ----
+alpha <- 0.05
+
+res1.p <- prep_DE_data(res1, alpha = 0.05, lfcThreshold = 2) %>% mutate(hpf = "24 hpf")
+res2.p <- prep_DE_data(res2, alpha = 0.05, lfcThreshold = 2)  %>% mutate(hpf = "110 hpf")
+
+res.p <- rbind(res1.p , res2.p)
+
+# Volcano ----
+
+res.p %>%
+  mutate(hpf = factor(hpf, levels = c("24 hpf", "110 hpf"))) %>%
+  mutate(pvalue = -log10(pvalue)) %>%
+  ggplot(aes(x = logFC, y = pvalue)) +
+  geom_point(aes(color = cc), alpha = 3/5) +
+  scale_color_manual(name = "", values = colors_fc) + 
+  labs(x= expression(Log[2] ~ "Fold Change"), 
+    y = expression(-Log[10] ~ "P")) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(legend.position = "top")  +
+  geom_abline(slope = 0, intercept = -log10(alpha), linetype="dashed", alpha=0.5) +
+  geom_vline(xintercept = 0, linetype="dashed", alpha=0.5) -> pvol
+
+pvol <- pvol + facet_wrap(~ hpf, scales = 'free_y')
+
+ggsave(pvol,  filename = "volcano.png", path = path, width = 6, height = 3)
+
+res.p %>% arrange(logFC)
+
+# count0[rownames(count0) %in% '844-ami-miR-193b-3p',]
+
+# SI ES NEGATIVO ES EN LOW PH
+
+res.p %>%
+  mutate(g = ifelse(logFC > 0, 'Control', 'Low pH')) %>%
+  group_by(cc,g, hpf) %>%
+  tally() %>%
+  mutate(hpf = factor(hpf, levels = c("24 hpf", "110 hpf"))) %>%
+  filter(cc != 'NS') %>%
+  ggplot() +
+  geom_bar(aes(x = g, y = n, fill = cc), 
+    stat = 'identity', position = position_dodge2()) +
+  scale_fill_manual(name = "", values = colors_fc[-4]) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  labs(y = '# microRNAs', x = '') +
+  theme(legend.position = 'top') -> pbar
+
+pbar <- pbar + facet_wrap(~ hpf, scales = 'free_y')
+  
+res.p %>%
+  filter(cc != 'NS') %>%
+  filter(cc ==  'p - value ~ and ~ log[2] ~ FC') %>%
+  ggplot() +
+  geom_histogram(aes(padj, fill = cc)) +
+  # facet_wrap( cc ~ ., scales = 'free_x') +
+  scale_fill_manual(name = "", values = colors_fc[-4]) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(legend.position = 'none') +
+  labs(y = '# microRNAs') -> padjp
+
+library(patchwork)
+
+pbar / padjp -> savep
+
+ggsave(savep, 
+  filename = "diffExp_bar.png", path = path, 
+  width = 5, height = 5)
+
+#how up and down genes ----
+
+title <- 'Differentially expressed features'
+
+subtitle <- expression(p[adj] < 0.05 ~ and ~ abs ~ (log[2] ~ FC) > 2)
+
+table(res.p$cc)
+
+res.p %>%
+  # filter(cc ==  'p - value ~ and ~ log[2] ~ FC') %>%
+  group_by(hpf, sampleA, lfcT) %>%
+  tally() %>% mutate(pct = n / nrow(count0)) %>%
+  mutate(hpf = factor(hpf, levels = c("24 hpf", "110 hpf"))) %>%
+  ggplot(aes(x = hpf, y = pct, fill = lfcT)) +
+  geom_col(color = 'black') +
+  scale_fill_manual(name = "", values = c('#1f78b4', '#a6cee3', "grey80")) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  labs(y = '# microRNAs', x = '', subtitle = subtitle, title = title) +
+  theme(legend.position = 'top') -> psave
+
+psave <- psave + coord_flip()
+
+ggsave(psave, filename = "up_down_genes.png", path = path,
+  width = 4, height = 2.5)
+
+
+# Heatmap ----
+
+res2.p %>%
+  filter(cc ==  'Log[2] ~ FC') %>%
+  pull(ids) -> diffexpList2
+
+res1.p %>%
+  filter(cc == 'p - value ~ and ~ log[2] ~ FC') %>%
+  pull(ids) -> diffexpList1
+
+str(diffexpList <- c(diffexpList1, diffexpList2))
+str(diffexpList <- unique(diffexpList))
+
+# 
+# res.p %>%
+#   filter(cc ==  'p - value ~ and ~ log[2] ~ FC') %>%
+#   group_by(hpf) %>%
+#   arrange(padj) %>%
+#   # slice_head(n = 20) %>%
+#   pull(ids) -> diffexpList
+
+keep <- rownames(count0) %in% diffexpList
+
+dim(count0[keep,] -> DEcount)
+
+sample_cor = cor(DEcount, method='pearson', use='pairwise.complete.obs')
+
+# superheat::superheat()
+
+dist.method <- 'euclidean'
+
+linkage.method <- 'complete'
+
+# m <- log2(DEcount+1)
+
+m <- edgeR::cpm(DEcount)
+
+
+
+hc_samples <- hclust(dist(t(m), method = dist.method), 
+  method = linkage.method)
+
+# sample_dist = dist(t(DEcount), method='euclidean')
+# sample_dist = dist(sample_cor, method='euclidean')
+
+hc_sam_order <- hc_samples$labels[hc_samples$order]
+
+hc_genes <- hclust(dist(m, method = dist.method), method = linkage.method)
+
+hc_genes_ord <- hc_genes$labels[hc_genes$order]
+
+DEcount %>% 
+  # edgeR::cpm(DEcount)
+  as_tibble(rownames = 'id') %>%
+  pivot_longer(cols = colnames(DEcount), values_to = 'count', names_to = 'colName') %>%
+  mutate(colName = factor(colName, levels = hc_sam_order)) %>%
+  mutate(id = factor(id, levels = hc_genes_ord)) %>%
+  left_join(mtd) %>%
+  filter(count > 0) -> countLong
+
+?rstatix::get_summary_stats()
+
+countLong %>%
+  group_by(id, hpf, pH) %>% 
+  # rstatix::get_summary_stats(type = "mean_se") # TO LATE
+  summarise(count = mean(count), n = n()) -> countLong
+
+countLong %>% 
+  # distinct(colName, Diagnosis) %>% 
+  # mutate(col = ifelse(g1 %in% 'C', 'red', 'blue')) %>%
+  arrange(match(colName, hc_sam_order)) -> coldf 
+
+n <- length(unique(coldf$pH))
+
+# getPalette <- RColorBrewer::brewer.pal(n, 'Paired')
+
+getPalette <- c( "#4169E1", "red2")
+
+axis_col <- structure(getPalette, names = unique(coldf$pH))
+axis_col <- getPalette[match(mtd$pH, names(axis_col))]
+axis_col <- structure(axis_col, names = unique(coldf$colName))
+
+
+
+library(ggh4x)
+
+countLong %>%
+  ggplot(aes(x = pH, y = id, fill = log2(count+1))) + 
+  facet_grid(~ hpf) +
+  geom_raster() + 
+  theme_classic(base_size = 12, base_family = "GillSans") +
+  scale_fill_viridis_c(name = expression(Log[2]~'(count+1)')) +
+  labs(x = '', y = '') +
+  # ggh4x::facet_nested(~ hpf+pH,nest_line = T, scales = 'free_x') +
+  ggh4x::scale_y_dendrogram(hclust = hc_genes) +
+  # ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
+  theme(axis.text.x = element_text(angle = 45, 
+    hjust = 1, vjust = 1, size = 14), # color = axis_col
+    axis.ticks.length = unit(10, "pt"),
+    # legend.position = 'top',
+    panel.border = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank()) -> pheat
+
+
+pheat + guides(fill = guide_colorbar(barheight = unit(4, "in"),
+  ticks.colour = "black",
+  frame.colour = "black",
+  label.theme = element_text(size = 12))) -> pheat
+
+# pheat + facet_grid(~ hpf+pH, scales = 'free_x')
+
+ggsave(pheat, 
+  filename = "24hpf_contrast_control_vs_lowpH_hetmap.png", path = path, 
+  width = 8, height = 8)
+
+
+# (OMIT) Multiple contrast ----
+
+# Filter data for multiple contrast
+
+# mtd <- mtd[mtd$hpf == 110,]
+
+# mtd <- mtd[mtd$hpf == 24,]
+
+# head(count0 <- count0[names(count0) %in% mtd$colName])
 
 colors_fc <- c("red2",  "#4169E1", "forestgreen", "grey30")
   
-colData <- mtd %>% arrange(match(colName, names(count)))
+colData <- mtd %>% arrange(match(colName, names(count0)))
+
+# colData <- colData %>% mutate(g = paste(pH,hpf, sep = ''))
 
 colData <- mutate_if(colData, is.character, as.factor)
 colData <- mutate_if(colData, is.double, as.factor)
@@ -54,14 +317,12 @@ colData$pH <- relevel(colData$pH, ref = "Control")
 
 levels(colData$pH)
 
-library(DESeq2)
-
-count <- round(count)
+count0 <- round(count0)
 
 table(colData$pH)
 
 ddsFullCountTable <- DESeqDataSetFromMatrix(
-  countData = count,
+  countData = count0,
   colData = colData,
   design = ~ pH) # if not rep use design = ~ 1
 
@@ -176,168 +437,3 @@ res.p <- prep_DE_data(res, alpha = 0.05, lfcThreshold = 2) %>% drop_na(cc)
 logfc_in <- 2
 
 padj_in <- 0.05 
-
-# volcano ----
-
-res.p %>%
-  mutate(pvalue = -log10(pvalue)) %>%
-  ggplot(aes(x = logFC, y = pvalue)) +
-  geom_point(aes(color = cc), alpha = 3/5) +
-  scale_color_manual(name = "", values = colors_fc) + 
-  labs(x= expression(Log[2] ~ "Fold Change"), 
-    y = expression(-Log[10] ~ "P")) +
-  theme_bw(base_family = "GillSans", base_size = 12) +
-  theme(legend.position = "top") -> pvol
-
-pvol + geom_abline(slope = 0, intercept = -log10(padj_in), linetype="dashed", alpha=0.5) +
-  geom_vline(xintercept = 0, linetype="dashed", alpha=0.5) -> pvol
-
-ggsave(pvol,  filename = "volcano.png", path = path, width = 8, height = 5)
-
-
-res.p %>%
-  mutate(g = ifelse(logFC > 0, 'Control', 'Low pH')) %>%
-  group_by(cc,g ) %>% tally() %>%
-  filter(cc != 'NS') %>%
-  ggplot() +
-  geom_bar(aes(x = g, y = n, fill = cc), 
-    stat = 'identity', position = position_dodge2()) +
-  scale_fill_manual(name = "", values = colors_fc[-4]) +
-  theme_bw(base_family = "GillSans", base_size = 12) +
-  labs(y = '# microRNAs', x = '') +
-  theme(legend.position = 'top') -> pbar
-
-
-res.p %>%
-  filter(cc != 'NS') %>%
-  filter(cc ==  'p - value ~ and ~ log[2] ~ FC') %>%
-  ggplot() +
-  geom_histogram(aes(padj, fill = cc)) +
-  # facet_wrap( cc ~ ., scales = 'free_x') +
-  scale_fill_manual(name = "", values = colors_fc[-4]) +
-  theme_bw(base_family = "GillSans", base_size = 12) +
-  theme(legend.position = 'none') +
-  labs(y = '# microRNAs') -> padjp
-
-library(patchwork)
-
-pbar / padjp -> savep
-
-ggsave(savep, 
-  filename = "diffExp_bar.png", path = path, 
-  width = 5, height = 5)
-
-# Heatmap ----
-
-res %>% distinct(sampleA, sampleB)
-
-res %>% arrange(log2FoldChange)
-
-# res %>% sample_n(1000) %>%
-#   ggplot() +
-#   geom_point(aes(y = log2FoldChange, x = baseMean, color = -log10(padj)))
-
-
-alpha = 0.05 
-
-lfcThreshold = 2
-
-# Queremos genes que fueron superiores al umbral lfcThreshold & < alpha == FC+sig
-
-res %>% 
-  mutate(cc = NA) %>% 
-  mutate(cc = ifelse(padj < alpha & abs(log2FoldChange) > lfcThreshold, 'sigfc', cc)) %>%
-  drop_na(cc) -> res.p
-
-up <- 'Up-regulated'
-down <- 'Down-regulated'
-
-res.p %>%
-  mutate(lfcT = 'Basal') %>%
-  mutate(lfcT = ifelse(log2FoldChange > lfcThreshold, up, lfcT)) %>%
-  mutate(lfcT = ifelse(log2FoldChange < -lfcThreshold, down, lfcT)) -> res.p
-
-
-res.p %>%
-  # filter(cc ==  'p - value ~ and ~ log[2] ~ FC') %>%
-  pull(ids) -> diffexpList
-
-keep <- rownames(count) %in% diffexpList
-
-dim(count[keep,] -> DEcount)
-
-sample_cor = cor(DEcount, method='pearson', use='pairwise.complete.obs')
-
-# superheat::superheat()
-
-dist.method <- 'euclidean'
-linkage.method <- 'complete'
-
-m <- log2(DEcount+1)
-
-
-
-hc_samples <- hclust(dist(t(m), method = dist.method), 
-  method = linkage.method)
-
-# sample_dist = dist(t(DEcount), method='euclidean')
-# sample_dist = dist(sample_cor, method='euclidean')
-
-hc_sam_order <- hc_samples$labels[hc_samples$order]
-
-hc_genes <- hclust(dist(m, method = dist.method), method = linkage.method)
-
-hc_genes_ord <- hc_genes$labels[hc_genes$order]
-
-DEcount %>% 
-  as_tibble(rownames = 'id') %>%
-  pivot_longer(cols = colnames(DEcount), values_to = 'count', names_to = 'colName') %>%
-  # mutate(sample_id = factor(sample_id, levels = hc_sam_order)) %>%
-  # mutate(id = factor(id, levels = hc_genes_ord)) %>%
-  left_join(mtd) %>%
-  filter(count > 0) -> countLong
-
-countLong %>% 
-  # distinct(colName, Diagnosis) %>% 
-  # mutate(col = ifelse(g1 %in% 'C', 'red', 'blue')) %>%
-  arrange(match(colName, hc_sam_order)) -> coldf 
-
-coldf %>% mutate()
-
-n <- length(unique(coldf$pH))
-
-# getPalette <- RColorBrewer::brewer.pal(n, 'Paired')
-
-getPalette <- c( "#4169E1", "red2")
-
-axis_col <- structure(getPalette, names = unique(coldf$pH))
-axis_col <- getPalette[match(mtd$pH, names(axis_col))]
-axis_col <- structure(axis_col, names = unique(coldf$colName))
-
-
-
-library(ggh4x)
-
-countLong %>%
-  # sample_n(1000) %>%
-  ggplot(aes(x = colName, y = id, fill = log2(count+1))) + 
-  geom_raster() + 
-  theme_classic(base_size = 12, base_family = "GillSans") +
-  scale_fill_viridis_c(name = expression(Log[2]~'(count+1)')) +
-  labs(x = '', y = '') +
-  ggh4x::scale_y_dendrogram(hclust = hc_genes) +
-  ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
-  theme(axis.text.x = element_text(angle = 90, 
-    hjust = 1, vjust = 1, size = 7, color = axis_col), # 
-    axis.ticks.length = unit(10, "pt"),
-    # legend.position = 'top',
-    panel.border = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank(),
-    axis.line.y = element_blank()) -> pheat
-
-
-pheat + guides(fill = guide_colorbar(barheight = unit(4, "in"),
-  ticks.colour = "black",
-  frame.colour = "black",
-  label.theme = element_text(size = 12))) -> pheat
