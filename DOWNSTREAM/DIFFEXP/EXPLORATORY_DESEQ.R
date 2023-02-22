@@ -6,7 +6,10 @@ if(!is.null(dev.list())) dev.off()
 options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 library(tidyverse)
+
 library(DESeq2)
+
+source("~/Documents/GitHub/EDAT/DE_methods.R")
 
 path <- '~/Documents/MIRNA_HALIOTIS/CLEAN_INPUT/'
 

@@ -53,11 +53,15 @@ data %>% mutate(fileName = sub('.clean.fa.gz', '', fileName)) %>%
 # READ FASTA (uncompressed) ----
 # reads_collapsed.fa from mapper OR mirdeep2 module
 
-path <- '~/Documents/MIRNA_HALIOTIS/CLEAN_INPUT/'
+path <- '~/Documents/MIRNA_HALIOTIS/CLEAN_INPUT/TEST_09022023/'
 
 fileName <- list.files(path = path, pattern = 'reads_collapsed.fa', full.names = T)
 
 seqs1 <- readDNAStringSet(fileName, format="fasta")
+
+seqs1 <- unique(sort(seqs1)) # deduplic
+
+seqs1[sort(width(seqs1))]
 
 widths <- width(seqs1)
 widths <- as.data.frame(table(widths))

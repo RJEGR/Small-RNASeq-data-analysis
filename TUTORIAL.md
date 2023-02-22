@@ -98,6 +98,22 @@ ln -s /Users/cigom/Documents/Tools/TrimGalore-0.6.6/trim_galore .
 
 
 
+### Library manage
+
+```bash
+seqkit replace HR110761.clean.fa -p "^>" -r ''
+# "^(\\S+)\\s?"
+
+seqkit fx2tab *.fq.gz | head
+
+fasta_file=HR110761.clean.fa
+grep '^>' $fasta_file | sed 's/^>@//g' > ${fasta_file%.*}.ids & seqkit grep -n -f ${fasta_file%.*}.ids ${fasta_file%.clean.fa}.fq.gz -o ${fasta_file%.*}.fq
+
+
+```
+
+
+
 Fastq_screen (as internal control)
 
 Check https://rjegr.github.io/Transcriptomics/markdown/Processing
@@ -123,18 +139,377 @@ bash run_tut.sh
 
 ```
 
+### (omit because doesnt work) DANSR: A tool for the detection of annotated and novel small RNAs
+
+```bash
+git clone https://github.com/ChrisMaherLab/DANSR.git
+
+export PATH=/Users/cigom/Documents/Tools/DANSR/src/:$PATH
+
+dansr -h
+
+# Reference genome w/ bwa
+
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435_genomic
+
+REFERENCE_FILE=$index_path/GCF_023055435.1_xgHalRufe1.0.p_genomic.fna
+
+bwa index $REFERENCE_FILE
+
+length=10
+
+miRDeep2.pl reads_collapsed_l${length}.fa \
+    $ref \
+    reads_collapsed_l${length}_vs_${ref%.*}.arf  \
+    none \
+    none \
+    none 2> "mirdeep2_"$length"_"$(date +%Y%m%d)".log"
+
+# in order to create the ref gtf:
+# rnacentral_active.fasta.gz: Current set of sequences that are present in at least one expert database.
+
+curl -OJX GET "https://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/sequences/rnacentral_active.fasta.gz" # 7 Gb
+
+bwa aln $ref RNAcentral.fa
+
+INPUT_FILE=/Users/cigom/Documents/MIRNA_HALIOTIS/RAW_INPUT/filtered_data/HR110761_trimmed.fq.gz
+PATH_TO_FEATURES=/Users/cigom/Documents/MIRNA_HALIOTIS/GENOME_20230210/ncbi_dataset/data/GCF_023055435.1
+
+dansr \
+  --input-file=$INPUT_FILE\
+  --output-dir=example \
+	--sample-name=example \
+	--begin-no-trimming \
+	--reference=$REFERENCE_FILE \
+	--ref-gtf=$PATH_TO_FEATURES/genomic.gtf \
+	--gtf-small=$PATH_TO_FEATURES/genomic.gtf
+	
+# 	--ref-gtf=$PATH_TO_REFERENCE/Homo_sapiens.GRCh38.105.gtf \
+#	--gtf-small=reference/homo_sapiens.GRCh38.RNAcentral.gtf
+	
+	
+```
+
+### MANATEE (problemas de ejecucion debido a IntervalTree)
+
+> corre bien con la cuenta rvazquez@200.23.162.234
+>
+> Pass: Temporal2022
+>
+> revisar manatee_20230217.log (error con el formato de annotation)
+
+```bash
+
+scp /Users/cigom/Documents/MIRNA_HALIOTIS/CLEAN_IN@ cPUT/HR110761.clean.fa rvazquez@200.23.162.234:/home/rvazquez/
+
+git clone https://github.com/jehandzlik/Manatee.git
+
+cpan install Set::IntervalTree
+
+reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.fna
+
+Manatee/bowtie-1.0.1/bowtie-build $reference ${reference%.fna}
+
+cp config config.bkp
+
+vi config
+
+# configure annotation
+#using GFFUtils
+# https://github.com/fls-bioinformatics-core/GFFUtils
+# Full documentation is available at http://gffutils.readthedocs.org/
+
+source venv/bin/activate
+
+gtf_extract /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/genomic.gtf --fields 'gene_name,gene_id,gene_biotype' -o genomic_subset.gtf
+
+gtf_extract /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/genomic.gff --fields 'gene_name,gene_id,gene_biotype' --gff -o genomic_subset.gff
+
+cut -f3 genomic_subset.gtf | sort | uniq -c
+
+export PATH=/home/rvazquez/Manatee:$PATH
+
+mkdir "manatee_"$(date +%Y%m%d)
+
+# -i Path to pre-processed FASTQ or FASTA file. Valid formats: .fa, .fasta, .fastq, .fq, .fa.gz, .fasta.gz, .fastq.gz, .fq.gz.
+
+manatee -config config -i HR110761.clean.fa -o "manatee_"$(date +%Y%m%d) 2> "manatee_"$(date +%Y%m%d)".log" &
+
+--------------------------------MANDATORY INPUTS--------------------------------
+################################################################################
+Path and basename of the genome index to be searched. The basename is the name
+of any of the index files up to but not including the final .1.ebwt/.rev.1.ebwt
+/etc.q
+
+index=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic
+
+############################## ANNOTATION ######################################
+Path to annotation file in GFF3/GTF format. File should contain non coding
+annotation.
+# NOTE: Genomic annotation for ncRNAs is required as input in GTF format with the following tags in the attributes field: gene_name, gene_id, and gene_biotype.
+
+annotation=genomic_subset.gtf
+
+################################################################################
+Path to reference FASTA/FA genome file.
+
+genome=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.fna
+
+# problemas or issues at:
+
+cpan install ExtUtils::CppGuess # v ExtUtils-CppGuess-0.11
+cpan install ExtUtils::MakeMaker
+cpan install Set::IntervalTree
+
+
+# install path 
+/System/Library/Perl/5.30/ExtUtils
+/Users/cigom/perl5/lib/perl5/ExtUtils/CppGuess.pm
+export PERL5LIB=/Users/cigom/perl5/lib/perl5/ExtUtils/${PERL5LIB}
+export PERL5LIB=/System/Library/Perl/5.30/ExtUtils${PERL5LIB}
+
+
+export PERL5LIB=/Users/cigom/perl5/lib/perl5/darwin-thread-multi-2level/auto/ExtUtils:${PERL5LIB}
+/Users/cigom/perl5/lib/perl5/darwin-thread-multi-2level/auto/ExtUtils
+export 
+
+export PATH=/Users/cigom/Documents/Tools/Manatee:$PATH
+
+Manatee -h
+
+
+```
+
+
+
+### (OMIT) miRge 3.0 (problemas de instalación)
+
+> Este paquete interesa para evaluar la entropia de isoformas de mirnas (`--isoform-entropy`) y edicion AtoI (`--AtoI`). Pero vale la pena mejor encontrar un algoritmo en R que se encargue de hacer este calculo: https://bioconductor.org/packages/release/bioc/vignettes/isomiRs/inst/doc/isomiRs.html
+
+```bash
+conda install -c bioconda mirge3
+#wget https://www.python.org/ftp/python/3.7.5/python-3.7.5-macosx10.9.pkg
+#sudo installer -pkg python-3.7.5-macosx10.9.pkg -target /
+# Installing miRge3.0 with PyPi
+python3.7 -m pip install --user cutadapt reportlab==3.5.42 biopython==1.78  scikit-learn==0.23.1  hypothesis==5.15.1 pytest==5.4.2  scipy==1.4.1  matplotlib==3.2.1  joblib==0.15.1  pandas==1.0.3 future==0.18.2
+
+python3.7 -m pip install --user  mirge3
+# upgrade
+python3.7 -m pip install --user --upgrade  mirge3
+
+export PATH=$PATH:"/Library/Frameworks/Python.framework/Versions/3.7/bin"
+
+#
+Output in format: Requested package -> Available versionsThe following specifications were found to be incompatible with your system:
+
+  - feature:/osx-64::__osx==10.16=0
+  - feature:|@/osx-64::__osx==10.16=0
+  - mirge3 -> matplotlib-base -> __osx[version='>=10.11|>=10.12']
+
+```
+
+### (OMIT) Isomirna detection w miraaligner (from seqbuster > isomiRs fromLorena pantano) - error by using miraligner.jar (invalid or corrupt jarfile)
+
+> https://seqcluster.readthedocs.io/mirna_annotation.html
+
+```bash
+# dependencies
+
+# git clone https://github.com/ViennaRNA/ViennaRNA.git
+
+curl -OJX GET "https://www.tbi.univie.ac.at/RNA/download/sourcecode/2_5_x/ViennaRNA-2.5.1.tar.gz"
+
+tar -xvzf ViennaRNA-2.5.1.tar.gz –C .
+
+cd ViennaRNA*
+
+./configure
+make
+sudo make install
+
+# bedtools
+# https://bedtools.readthedocs.io/en/latest/content/installation.html
+curl -OJX GET "https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools-2.30.0.tar.gz"
+
+#
+
+curl -OJX GET "https://github.com/lpantano/seqbuster/raw/miraligner/modules/miraligner/miraligner.jar"
+
+# desde mac darle acceso a permisos de ejecucion
+#example:java -jar miraligner.jar -sub 1 -trim 3 -add 3 -s hsa -i test/test.fa -db DB -o test/out
+#example: see output at miraligner/test/output.mirna & miraligner/test/output.mirna.opt
+
+
+java -jar miraligner.jar -sub 1 -trim 3 -add 3 -s hsa -i ../HR110761.clean.fa -db ../MIRBASE_20230217  -o miraligner_out
+```
+
+
+
+### ilearnPlus (machine learning web method)
+
+```bash
+https://ilearnplus.erc.monash.edu/
+machine-learning pipelines for computational analysis and predictions using nucleic acid and protein sequences.
+
+https://github.com/Superzchen/iLearnPlus
+```
+
+### SHORTSTACKS (Easy to install and running on Mac) !!!!!
+
+```bash
+git clone https://github.com/MikeAxtell/ShortStack.git
+
+cd ShortStack
+
+
+export PATH=$PATH:"/home/rvazquez/ShortStack"
+export PATH=$PATH:"/home/rvazquez/Manatee/bowtie-1.0.1"
+export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
+
+export PATH=$PATH:"/home/rvazquez/seqkit_tool"
+
+
+# export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/ShortStack"
+# readfile must be in fasta (.fasta or .fa), colorspace-fasta (.csfasta), or fastq (.fastq or .fq) format, or their gzip-compressed versions (.fasta.gz, .fa.gz, .csfasta.gz, .fastq.gz, or .fq.gz) Can also be a list (seperated by spaces) of several read files.
+
+#    --adapter [string] : sequence of 3' adapter to trim off during read-pre
+#    processing. Must be at least 8 bases, with only ATCG characters. If not
+#    specified, reads are assumed to be already trimmed. Ex.  --adapter CTGTAGGC
+
+# path to reference genome in .fasta or .fa format. Required for any run.
+
+reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.fa
+
+# generate fai index
+
+
+samtools faidx $reference -o ${reference}.fai
+
+
+ShortStack --readfile HR110761.clean.fa --outdir test1 --genomefile $reference --bowtie_cores 12 2> "shortStacks_"$(date +%Y%m%d)".log" &
+
+
+ShortStack --readfile HR110761.clean.fa --outdir test1 --genomefile $reference --bowtie_cores 12
+
+curl -OJX GET "https://plantsmallrnagenes.science.psu.edu/axtelldata/ShortStack_TestData.zip"
+
+# bastante rapido y genera la siguiente informacion:
+Summary of primary alignments:
+	XY:Z:N -- Unmapped because no valid alignments: 494698 / 4949843 (10.0 %)
+	XY:Z:M -- Unmapped because alignment number exceeded option bowtie_m 50: 33919 / 4949843 (0.7 %)
+	XY:Z:O -- Unmapped because alignment number exceeded option ranmax 3 and no guidance was possible: 13352 / 4949843 (0.3 %)
+	XY:Z:U -- Uniquely mapped: 2728325 / 4949843 (55.1 %)
+	XY:Z:R -- Multi-mapped with primary alignment chosen randomly: 419508 / 4949843 (8.5 %)
+	XY:Z:P -- Multi-mapped with primary alignment chosen based on u: 1260041 / 4949843 (25.5 %)
+Alignment completed. Final bam file is test1/SRR051927_trimmed.bam
+
+Performing search for unplaced small RNAs.
+Completed at Fri Feb 17 00:26:54 PST 2023
+
+Fri Feb 17 00:26:54 PST 2023
+Tally of loci by predominant RNA size (DicerCall):
+
+DicerCall	NotMIRNA	MIRNA
+N or NA	6038	0
+20	281	1
+21	1453	33
+22	2310	4
+23	4389	0
+24	28876	0
+
+Unplaced small RNAs
+Size	MultiMapped	NoAlignments
+<20	251	5364
+20	48	1688
+21	183	2169
+22	264	1494
+23	527	1464
+24	1214	1523
+>24	52	1371
+```
+
+### denovo mirna detection w brumiR
+
+```bash
+git clone https://github.com/camoragaq/BrumiR.git
+
+export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/ShortStack-3.8.5/"
+
+
+perl brumir.pl -a test/sRNA-seq.human.trim.fa.gz -p prefix
+
+```
+
+
+
+
+
 
 
 ## Downloading files
 
 ### Genome reference
 
+Annotation features: https://www.ncbi.nlm.nih.gov/genome/annotation_euk/Haliotis_rufescens/101/
+
+Considere which file format to download:
+
+> ```
+> *_genomic.fna.gz file
+>        FASTA format of the genomic sequence(s) in the assembly. Repetitive 
+>        sequences in eukaryotes are masked to lower-case (see below).
+>        The FASTA title is formatted as sequence accession.version plus 
+>        description. The genomic.fna.gz file includes all top-level sequences in
+>        the assembly (chromosomes, plasmids, organelles, unlocalized scaffolds,
+>        unplaced scaffolds, and any alternate loci or patch scaffolds). Scaffolds
+>        that are part of the chromosomes are not included because they are
+>        redundant with the chromosome sequences; sequences for these placed 
+>        scaffolds are provided under the assembly_structure directory.
+>       
+> 
+> *_genomic.gff.gz file
+>        Annotation of the genomic sequence(s) in Generic Feature Format Version 3
+>        (GFF3). Sequence identifiers are provided as accession.version.
+>        Additional information about NCBI's GFF files is available at 
+>        ftp://ftp.ncbi.nlm.nih.gov/genomes/README_GFF3.txt.
+>        
+> *_protein.faa.gz file
+>        FASTA format sequences of the accessioned protein products annotated on
+>        the genome assembly. The FASTA title is formatted as sequence 
+>        accession.version plus description.
+>        
+> *_cds_from_genomic.fna.gz
+>        FASTA format of the nucleotide sequences corresponding to all CDS 
+>        features annotated on the assembly, based on the genome sequence. See 
+>        the "Description of files" section below for details of the file format.
+>        
+>        
+>  *_rna.fna.gz file
+>        FASTA format of accessioned RNA products annotated on the genome 
+>        assembly; Provided for RefSeq assemblies as relevant (Note, RNA and mRNA 
+>        products are not instantiated as a separate accessioned record in GenBank
+>        but are provided for some RefSeq genomes, most notably the eukaryotes.)
+>        The FASTA title is provided as sequence accession.version plus 
+>        description.
+>   
+>   *_rna_from_genomic.fna.gz
+>        FASTA format of the nucleotide sequences corresponding to all RNA 
+>        features annotated on the assembly, based on the genome sequence. See 
+>        the "Description of files" section below for details of the file format.
+>        
+> Ref: https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/6454/101/GCF_023055435.1_xgHalRufe1.0.p/README.txt
+> ```
+
+
+
 Updated version from (May 2022): https://www.ncbi.nlm.nih.gov/data-hub/genome/GCF_023055435.1/
 
 **Assembly methods** **Sequencing technology**: PacBio Sequel IIe; Dovetail's OmniC; Illumina NovaSeq
 
 ```bash
-curl -OJX GET "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/GCF_023055435.1/download?include_annotation_type=GENOME_GFF,RNA_FASTA,CDS_FASTA,PROT_FASTA&filename=GCF_023055435.1.zip" -H "Accept: application/zip"
+mkdir "GENOME_"$(date +%Y%m%d)
+cd "GENOME_"$(date +%Y%m%d)
+curl -OJX GET "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/GCF_023055435.1/download?include_annotation_type=GENOME_GFF,GENOME_GTF,GENOME_FASTA,RNA_FASTA,CDS_FASTA,PROT_FASTA&filename=GCF_023055435.1.zip" -H "Accept: application/zip"
 ```
 
 
@@ -163,6 +538,10 @@ ls GCF_0*/ncbi_dataset/data/GCF*
 
 
 
+And evaluate the genomic position (features)
+
+
+
 ### miRNA database
 
 The miRBase v. XX entries were retrieved from http://www.mirbase.org/ftp.shtml [[DOI](doi:10.1093/nar/gky1141)], MirGeneDB 2.0 data were downloaded from http://mirgenedb.org/download [[DOI](https://doi.org/10.1093/nar/gkz885)], and previously reported bivalve miRNAs were retrieved from the electronic supplementary material files of a number of papers
@@ -176,6 +555,7 @@ curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/hairpin.fa.gz" -H "Accept: ap
 
 curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/mature.fa.gz" -H "Accept: application/zip"
 
+curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/miRNA.str.zip"  -H "Accept: application/zip"
 
 gunzip *gz
 
@@ -190,7 +570,7 @@ MirGeneDB is a database of manually curated microRNA genes that have been valida
 miRNAs obtained may BLASTed (blastn) against miRBase and MirGeneDB databases.
 
 ```bash
-mkdir "MIRGENEDB"$(date +%Y%m%d)
+mkdir "MIRGENEDB_"$(date +%Y%m%d)
 
 cd MIRGENEDB*
 # https://mirgenedb.org/information
@@ -200,6 +580,17 @@ curl -o ALL.fas -OJX GET "https://mirgenedb.org/fasta/ALL?all=1"
 
 seqkit stats *fas
 
+```
+
+
+
+### rfam database
+
+```bash
+mkdir "RFAM_"$(date +%Y%m%d)
+cd RFAM_*
+curl -OJX GET "https://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/rfam/rfam_annotations.tsv.gz"
+curl -OJX GET "https://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/rfam/*.txt"
 ```
 
 
@@ -305,8 +696,6 @@ RNA 3' Adapter (RA3), part:
 
 mkdir filtered_data && cd filtered_data
 
-for i in $(ls ../*.gz); do ../../trim_galore $i ; done
-
 # Automatic adapter sequences detection
 for i in $(ls ../*.gz); do ../../trim_galore $i ; done
 
@@ -365,8 +754,6 @@ grep 'Total written (filtered):' m_18_M_30.summary | awk '{print $4}'
  
 ```
 
-
-
 2. Also we check the presence of adapter by running **global** aligment with maft
 
 ```bash
@@ -396,7 +783,7 @@ mafft --globalpair HR11082.clean_subset.fa > HR11082.clean_subset.afa
 
 
 
-3. Then, run mitrare in order to screening  the sRNA composition from the libraries as well as sanity check the adapter trimming
+3. Then, run mitrace in order to screening  the sRNA composition from the libraries as well as sanity check the adapter trimming
 
 `qc` Quality control mode (full set of reports). --species must be given.
 
@@ -411,7 +798,9 @@ mirtrace --help
 # mirtrace qc -s meta_species_all -w *trimmed.fq.gz
 # WORDIR RAW_INPUT
 mkdir MIRTRACE && cd MIRTRACE
-mirtrace qc -s meta_species_all -a AGATCGGAAGAGCACACGTCT -w ../*fq.gz
+mirtrace qc -s meta_species_all -a AGATCGGAAGAGCACACGTCT -w --uncollapse-fasta ../*fq.gz
+
+mirtrace qc -s meta_species_all -w --uncollapse-fasta ../*fq.gz
 
 # Then check the mirrace-report.html
 
@@ -424,7 +813,10 @@ mirtrace qc -s meta_species_all -a AGATCGGAAGAGCACACGTCT -w ../*fq.gz
 ```bash
 #!/bin/bash
 
-bowtie-build rna.fna rna
+# bowtie-build rna.fna rna
+bowtie-build GCF_023055435.1_xgHalRufe1.0.p_genomic.fna GCF_023055435.1_xgHalRufe1.0.p_genomic
+
+
 
 ```
 
@@ -514,9 +906,55 @@ mapper.pl config.txt -d -e -j -h -l 18 -k TCGTATGCCGTCTTCTGCTTGT -m -p rna -s re
 mapper.pl config.txt -d -e -j -h -l 18 -m -p rna -s reads_collapsed.fa -t reads_collapsed_vs_genome.arf -v 2> mapper.log
 
 # If fasta format
-index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435/
 
-mapper.pl config.txt -d -c -j -l 18 -m -p $index_path/rna -s reads_collapsed.fa -t reads_collapsed_vs_genome.arf -v 2> mapper.log
+# Using complete genome as reference
+# 1)
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435_genomic
+ref=GCF_023055435.1_xgHalRufe1.0.p_genomic
+
+length=15
+mapper.pl config.txt -d -c -l $length -m -p $index_path/$ref -s reads_collapsed_l${length}.fa -t reads_collapsed_l${length}_vs_${ref%.*}.arf -v 2> "mapper_"$(date +%Y%m%d)".log"
+
+# 2
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435_genomic
+ref=GCF_023055435.1_xgHalRufe1.0.p_genomic
+
+length=18
+mapper.pl config.txt -d -c -l $length -m -p $index_path/$ref -s reads_collapsed_l${length}.fa -t reads_collapsed_l${length}_vs_${ref%.*}.arf -v 2> "mapper_l"$length"_"$(date +%Y%m%d)".log"
+
+mv mapper_l18_20230210.log reads_collapsed_l18.fa reads_collapsed_l18_vs_GCF_023055435.1_xgHalRufe1.0.arf  TEST_l_18
+
+# 3
+
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435_genomic
+ref=GCF_023055435.1_xgHalRufe1.0.p_genomic
+
+length=10
+
+mapper.pl config.txt -d -c -l $length -m -p $index_path/$ref -s reads_collapsed_l${length}.fa -t reads_collapsed_l${length}_vs_${ref%.*}.arf -v 2> "mapper_l"$length"_"$(date +%Y%m%d)".log"
+
+mv mapper_l10_20230210.log reads_collapsed_l10.fa reads_collapsed_l10_vs_GCF_023055435.1_xgHalRufe1.0.arf  TEST_l_10
+
+tail -n14 mapper*.log | column -t
+
+
+# 4) BECAUSE 18 IS THE BEST NUMBER OF DATA, LETS TURN ON -q flag in order to              allow mapping reads with one mismatch in the seed (mapping takes longer)
+
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435_genomic
+ref=GCF_023055435.1_xgHalRufe1.0.p_genomic
+
+length=18
+
+mapper.pl config.txt -d -c -l $length -m -q -p $index_path/$ref -s reads_collapsed_l${length}_mismatch.fa -t reads_collapsed_l${length}_mismatch_vs_${ref%.*}.arf -v 2> "mapper_l"$length"_"$(date +%Y%m%d)".log"
+
+tail -n14 mapper*.log | column -t
+
+# (OMIT)
+# -c              input file is fasta format
+# -l discard reads shorter than int nts, default = 18
+# LA VERSION DE -l 10 DEMORA MAS DE DOS DIAS EN CUANTIFICAR (quantification step)
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435/
+mapper.pl config.txt -d -c -l 10 -m -p $index_path/rna -s reads_collapsed.fa -t reads_collapsed_vs_genome.arf -v 2> mapper.log
 
 
 # Hora de inicio 3:55 p.m
@@ -563,10 +1001,11 @@ Basic functions to run mirdeep2 module
 > total:11h:29m:25s
 
 ```bash
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435/
 
-miRDeep2.pl reads_collapsed.fa index.fa reads_collapsed_vs_genome.arf none none none 2> report.log
+miRDeep2.pl reads_collapsed.fa $index_path/rna reads_collapsed_vs_genome.arf none none none 2> report.log
 
-# Istead of "none" file Note that there it will in practice always improve miRDeep2 performance if miRNAs from some related species is input, even if it is not closely related.
+# Istead of "none" file. Note that there it will in practice always improve miRDeep2 performance if miRNAs from some related species is input, even if it is not closely related.
 
 **********
 The first three arguments to miRDeep2.pl must be files while arguments 4-6 can be files or must be designated as 'none'. Examples:
@@ -612,6 +1051,38 @@ mirdeep2 runs the follow steps:
 #doing survey of accuracy
 #producing graphic results
 
+index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435_genomic
+ref=GCF_023055435.1_xgHalRufe1.0.p_genomic.fna
+
+length=18
+mautre_ref_miRNAs.fa mature_other_miRNAs.fa  hairpin_ref_miRNAs
+mirbase_mat=/Users/cigom/Documents/MIRNA_HALIOTIS/MIRBASE_20230102/mature.fa
+mirgene_mat=/Users/cigom/Documents/MIRNA_HALIOTIS/MIRGENEDB_20230130/ALL-mat.fas
+mirgene_pre=/Users/cigom/Documents/MIRNA_HALIOTIS/MIRGENEDB_20230130/ALL-pre.fas
+
+miRDeep2.pl reads_collapsed_l${length}.fa \
+    $index_path/$ref \
+    reads_collapsed_l${length}_vs_${ref%.*}.arf  \
+    $mirbase_mat \
+    $mirgene_mat \
+    $mirgene_pre 2> "mirdeep2_"$length"_"$(date +%Y%m%d)".log"
+    
+#reads_collapsed_l${length}.fa
+#reads_collapsed_l${length}_vs_${ref%.*}.arf
+#2> "mirdeep2_"$length"_"$(date +%Y%m%d)".log"
+
+miRDeep2.pl reads_collapsed_l${length}.fa \
+    $index_path/$ref \
+    reads_collapsed_l${length}_vs_${ref%.*}.arf  \
+    none \ # mature_ref
+    none \ # mature_other
+    none 2> "mirdeep2_"$length"_"$(date +%Y%m%d)".log"
+    
+# or
+  
+miRDeep2.pl reads_collapsed_l${length}.fa $ref reads_collapsed_l${length}_vs_${ref%.*}.arf none mature.headers.fa hairpin_collapsed2dna.fa 2>report2.log
+
+
 ```
 
 
@@ -638,7 +1109,7 @@ miRDeep2.pl reads_collapsed.fa rna.fa reads_collapsed_vs_genome.arf mature_cel_s
 
 
 
-Hay que definir que estrategia de miRNAs conocidos podemos analizar para la etpa de mirdeep2.pl y quantifier.pl
+Hay que definir que estrategia de miRNAs conocidos podemos analizar para la etapa de mirdeep2.pl y quantifier.pl
 
 ```bash
 
@@ -650,7 +1121,18 @@ Hay que definir que estrategia de miRNAs conocidos podemos analizar para la etpa
 
 
 extract_miRNAs.pl mature.fa ref_specie mature > mature_ref_specie.fa && extract_miRNAs.pl hairpin.fa ref_specie > hairpin_ref_specie.fa
+
 ```
+
+### 4. MIRTOP
+
+> Command line tool to annotate with a standard naming miRNAs e isomiRs.
+
+```bash
+https://github.com/miRTop/mirtop
+```
+
+
 
 ## Differential Expression Analysis
 
