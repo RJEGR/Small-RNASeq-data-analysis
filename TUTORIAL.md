@@ -7,22 +7,188 @@ January 2023
 
 
 CHECK microRNA-encoded peptides???
+TRANSPONSABLE ELEMENTS DERIVED MIRNAS
 
-**Table of content**
+### Server info
 
-# Main
-- [1) Make a quick view of the meta data:](#1--make-a-quick-view-of-the-meta-data-)
-- [2) Run Trimmomatic](#2--run-trimmomatic)
-- [3) Test genome-guide assembly (hisat2)](#3--test-genome-guide-assembly--hisat2-)
-- [4) StringTie](#4--stringtie)
-  * [4.1) Assembly quality](#41--assembly-quality)
-  * [4.2) Transrate](#42--transrate)
-- [5) Annotation](#5--annotation)
-- [6) Quantification](#6--quantification)
+```bash
+cat /etc/*-release | grep "DISTRIB" # see linux distro and version
+
+#DISTRIB_ID=Ubuntu
+#DISTRIB_RELEASE=20.04
+#DISTRIB_CODENAME=focal
+#DISTRIB_DESCRIPTION="Ubuntu 20.04.1 LTS"
+# ID_LIKE=debian
+
+free -h # check RAM memomy available
+
+df -H # 
+
+ssh rvazquez@200.23.162.234
+
+```
+
+
 
 
 
 ## Installing tools
+
+#### Python 
+
+```bash
+# Anaconda Dependencies
+sudo apt-get install libgl1-mesa-glx libegl1-mesa libxrandr2 libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6
+
+# Download
+wget https://repo.anaconda.com/archive/Anaconda3-2022.10-Linux-x86_64.sh
+
+# install
+bash Anaconda3-2022.10-Linux-x86_64.sh
+
+# Include bioconda channel
+
+conda config --add channels defaults
+conda config --add channels bioconda
+conda config --add channels conda-forge
+
+echo "export PATH=$PATH:/home/rvazquez/anaconda3/bin" >> $HOME/.bash_profile 
+
+
+```
+#### NCBI utils
+```bash
+sh -c "$(wget -q ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh -O -)"
+
+echo "export PATH=\${PATH}:/home/rvazquez/edirect" >> ${HOME}/.bashrc
+
+# To activate EDirect for this terminal session, please execute the following:
+
+export PATH=${PATH}:${HOME}/edirect
+
+# 1.2) https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/
+
+sudo apt install ncbi-entrez-direct
+
+wget https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Linux.gz
+
+ftp-cp ftp.ncbi.nlm.nih.gov /entrez/entrezdirect xtract.Linux.gz
+
+gunzip -f xtract.Linux.gz
+
+chmod +x xtract.Linux
+
+mv xtract.Linux ~/.local/bin
+
+#Add it to your path, or put it somewhere that is in your path, for example in ~/.local/bin/ so that you can get help by doing:
+
+xtract.Linux -help
+
+# RE-OPEN BASH SESSION
+
+# 2) INSTALL sratoolkit FOR USE fastq-dump
+
+wget --output-document sratoolkit.tar.gz https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/current/sratoolkit.current-ubuntu64.tar.gz
+
+tar -vxzf sratoolkit.tar.gz
+
+echo "export PATH=$PATH:/home/rvazquez/RNA_SEQ_ANALYSIS/sratoolkit.3.0.1-ubuntu64/bin/" >> $HOME/.bash_profile 
+
+
+which fasterq-dump # a replacement for the much older fastq-dump tool.
+
+# 3) For best performance, obtain an API Key from NCBI, and place the following line in your .bash_profile and .zshrc configuration files:
+
+# export NCBI_API_KEY=unique_api_key
+echo "NCBI_API_KEY=74e0e4bf2d8eaa3bb742c46316dbafe12909" >> $HOME/.bash_profile
+
+# Test
+
+esearch -db sra -query "PRJNA488641" |  efetch -format docsum | xtract -pattern Runs -ACC @acc  -element "&ACC" > SraAccList.txt
+
+
+# then download data
+# Ex.
+fasterq-dump --split-files "SRR8956805" --skip-technical -p
+
+for i in $(head -n9 SraAccList_larvae_samples.txt); do fasterq-dump --split-files $i --skip-technical -p; done &> fasterq_dump.log
+
+
+
+
+```
+And also
+#### RepeatMasker
+**Homology-based prediction:** Homology-based approach involves searching commonly used databases for known TEs. We used RepeatProteinMask and RepeatMasker with repbase which contains a vast amount of known TEs.
+
+```bash
+wget http://www.repeatmasker.org/RepeatMasker/RepeatMasker-4.1.4.tar.gz
+
+sudo cp RepeatMasker*.gz /usr/local
+cd /usr/local
+sudo gunzip RepeatMasker*.gz
+sudo tar xvf RepeatMasker*.tar
+
+# 2) install dependencies
+version=Dfam_3.7 # Dfam release 3.7 (January 2023)
+
+wget https://www.dfam.org/releases/${version}/families/Dfam_curatedonly.h5.gz -O Dfam37_curatedonly.h5.gz
+
+gunzip Dfam37_curatedonly.h5.gz
+
+mv Dfam37_curatedonly.h5 /usr/local/RepeatMasker/Libraries
+
+cd /usr/local/RepeatMasker/Libraries
+
+sudo mv Dfam.h5 Dfam.h5.bak
+
+sudo ln -s /usr/local/RepeatMasker/Libraries/Dfam37_curatedonly.h5 Dfam.h5
+
+# NOTE: This will overwrite the distributed Dfam.h5 file.
+
+# 3) INSTALL TANDEP REPEATS FINDER
+
+git clone https://github.com/Benson-Genomics-Lab/TRF.git
+cd TRF
+sudo mkdir build
+sudo ../configure
+sudo make
+sudo make install
+# To copy binary elsewhere
+cp /usr/local/TRF/build/src/trf /usr/local/RepeatMasker/util/trf
+
+# INSTALL Sequence Search Engin (HMMER by default)
+
+conda install -c bioconda hmmer
+
+
+# 4)
+cd /usr/local/RepeatMasker
+
+echo "export PATH=$PATH:/home/rvazquez/anaconda3/bin" >> $HOME/.bash_profile 
+
+sudo chmod 777 /usr/local/RepeatMasker
+
+perl ./configure
+
+export PATH:$PATH: # RepeatProteinMask
+
+echo "export PATH=$PATH:/usr/local/RepeatMasker/" >> $HOME/.bash_profile 
+
+# test http://www.repeatmasker.org/webrepeatmaskerhelp.html
+
+# Note:
+Using Dfam with RepeatMasker
+============================
+
+RepeatMasker ships with a copy of Dfam (curated families only) in FamDB format. This can be replaced with a newer 
+version of Dfam, or with the full set of curated and uncurated families provided the famdb.py tool in the package
+is also updated.
+
+To use Dfam 3.7 with RepeatMasker 4.1.4 or earlier, first download an updated copy of the famdb.py tool from:
+https://github.com/Dfam-consortium/FamDB and replace the file in the RepeatMasker directory.  Then download the
+latest Dfam *.h5 file and rerun the RepeatMasker configure script.
+```
 
 ### Preprocessing
 
@@ -52,7 +218,7 @@ miRTrace is a QC(quality control) tool for small RNA sequencing data (sRNA-Seq).
 
 ```bash
 conda install -c bioconda mirtrace
-
+# OR conda install -c "bioconda/label/cf201901" mirtrace
 mirtrace -v # 1.0.1
 
 mirtrace --help
@@ -79,7 +245,7 @@ cutadapt --help
 
 
 
-**Trimgalone**
+**Trimgalone (isteand of cutadapt)**
 
 ```bash
 # https://github.com/FelixKrueger/TrimGalore
@@ -94,6 +260,16 @@ ln -s /Users/cigom/Documents/Tools/TrimGalore-0.6.6/trim_galore .
 
 # lease install Cutadapt first and make sure it is in the PATH, or specify the path to the Cutadapt executable using --path_to_cutadapt /path/to/cutadapt
 
+```
+
+
+
+***fastq-screen***
+
+```bash
+conda install fastq-screen
+conda update fastq-screen
+# https://anaconda.org/bioconda/fastq-screen
 ```
 
 
@@ -356,15 +532,90 @@ https://github.com/Superzchen/iLearnPlus
 
 ### SHORTSTACKS (Easy to install and running on Mac) !!!!!
 
+
+
+### 1) FORMAT DATA INPUT
+
+```BASH
+export PATH=$PATH:"/home/rvazquez/seqkit_tool"
+
+# FOR SRNA-SEQS LIBS:
+
+# RENAME HEADERS USING seqkit replace 
+# (seqkit rename only rename duplicated IDs)
+# seqkit replace -p .+ -r "seq_{nr}" --nr-width 5 # use --nr-width flag to choose n digits
+
+# 0) TEST:
+
+# fasta_file=HR110761.clean.fa
+
+# cat $fasta_file | seqkit replace -p .+ -r "seq_{nr}" > ${fasta_file%.fa}.newid.fa
+
+# 1) Loop
+
+for i in $(ls *clean.fa); do cat $i | seqkit replace -p .+ -r "seq_{nr}" > ${i%.fa}.newid.fa; done
+
+# 2) FOR GENOMIC FILES REMOVE EXTRA ID DESCRIPTION
+
+reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.fa
+
+cat $reference |  seqkit replace -p "\s.+" > ${reference%.fa}.newid.fa
+# ${fasta_file%.fa}.newid.fa
+
+# TO CONVERT FASTA TO FASTQ
+../bbmap/reformat.sh ../HR110761.clean.fa out=file.fq
+
+# test
+
+mirtrace qc -s meta_species_all file.fq -w --uncollapse-fasta
+
+seqkit fx2tab HR110761.clean.newid.fa | awk '{print $0,"EEEEEEEEEEEEEEEEEEEEE"}' | seqkit tab2fx > test_tab2fx.fq
+
+```
+
+### 2) Remove duplicates preserving their reads count
+
+```bash
+# USING SEQKIT
+
+# -s, --by-seq by seq
+# -i, --ignore-case ignore case
+# -D, --dup-num-file string    file to save number and list of duplicated seqs
+cat $fasta_file | seqkit rmdup -s -i -o unique.clean.fa.gz -D duplicated.detail.txt
+
+# VSEARCH 
+
+seqs=${fasta%.fasta}.good.fasta
+sorted=${seqs%.fasta}_sorted.fasta
+derep=${seqs%.fasta}_derep.fasta
+
+vsearch  -sortbylength $seqs -output $sorted
+vsearch -derep_fulllength $sorted -output $derep -sizeout
+
+# OR TALLY
+# Trimmed reads between 18-38 nt were collapsed to unique sequences using tally while preserving their counts from each sample (-l 18 -u 38 -format ‘>seq%I_w%L_x%C%n%R%n’). Sequences that were only observed 1 or 2 times across the 22 samples were discarded as they most likely represent sequencing errors, and in any case contain little useful information
+```
+
+
+
 ```bash
 git clone https://github.com/MikeAxtell/ShortStack.git
 
-cd ShortStack
+# cd ShortStack
+
+Dependencies (in PATH):
+
+#samtools (version 1.x)
+#bowtie (if aligning)
+#bowtie-build (if aligning and .ebwt indices not found)
+#gzip (if aligning)
+#RNAfold (unless running with --nohp option to disable MIRNA search)
 
 
 export PATH=$PATH:"/home/rvazquez/ShortStack"
 export PATH=$PATH:"/home/rvazquez/Manatee/bowtie-1.0.1"
 export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
+export PATH=$PATH:"//usr/local/bin/" # RNAfold from Vienna 
 
 export PATH=$PATH:"/home/rvazquez/seqkit_tool"
 
@@ -378,18 +629,23 @@ export PATH=$PATH:"/home/rvazquez/seqkit_tool"
 
 # path to reference genome in .fasta or .fa format. Required for any run.
 
-reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.fa
+reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
 
 # generate fai index
 
-
 samtools faidx $reference -o ${reference}.fai
 
+ShortStack --readfile HR110761.clean.newid.fa HR110762.clean.newid.fa --outdir test1 --genomefile ${reference}.fai --bowtie_cores 12 2> "shortStacks_"$(date +%Y%m%d)".log" &
 
-ShortStack --readfile HR110761.clean.fa --outdir test1 --genomefile $reference --bowtie_cores 12 2> "shortStacks_"$(date +%Y%m%d)".log" &
+# configure (RUNNING)
+
+HR110763.clean.newid.fa HR11083.clean.newid.fa HR24763.clean.newid.fa  HR2483.clean.newid.fa HR110761.clean.newid.fa HR11081.clean.newid.fa HR24761.clean.newid.fa HR2481.clean.newid.fa HR110762.clean.newid.fa  HR11082.clean.newid.fa HR24762.clean.newid.fa HR2482.clean.newid.fa
+
+ShortStack --readfile HR110761.clean.newid.fa HR110762.clean.newid.fa --outdir ShortStack_"$(date +%Y%m%d)"_test --genomefile ${reference} --bowtie_cores 20 --sort_mem 60G --mismatches 0 --mmap u --mincov 1 --pad 1 2> "ShortStack_"$(date +%Y%m%d)".log" &
 
 
-ShortStack --readfile HR110761.clean.fa --outdir test1 --genomefile $reference --bowtie_cores 12
+
+exit
 
 curl -OJX GET "https://plantsmallrnagenes.science.psu.edu/axtelldata/ShortStack_TestData.zip"
 
@@ -428,13 +684,76 @@ Size	MultiMapped	NoAlignments
 >24	52	1371
 ```
 
-### denovo mirna detection w brumiR
+
+
+### SHORSTACK ERROR (REVISAR)
+
+```bash
+# fail to read the header from "-" 
+# CREO QUE ES ERROR DEL ARCHIVO DE REFERENCIA O FASTA, TIENE CARACETERES ESPECIALE ADEMAS DEL HEADER
+# PROBLEMA EN: Your header is too big to fit in a BAM file (2325494614 bytes, while the maximum officially allowed is 2147483648). samtools version 1.9 didn't error check this very well, which is why the conversion from sam apparently worked. The latest develop branch will say:
+
+# SOLVED: https://github.com/samtools/samtools/issues/1105#issuecomment-530300080
+
+tail /home/rvazquez/shortStacks_20230217.log
+```
+
+
+
+
+
+### denovo mirna detection w brumiR (WORKING ON CLUSTER)
+
+```bash
+# Quick run
+export PATH=$PATH:"~/BrumiR-3.0"
+
+# TEST (WORKING!)
+perl brumir.pl -a test/sRNA-seq.human.trim.fa.gz -p prefix
+```
+
+
 
 ```bash
 git clone https://github.com/camoragaq/BrumiR.git
+cd ~/BrumiR-3.0
 
-export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/ShortStack-3.8.5/"
+mkdir bin
+cp src/* bin/
 
+make all
+
+# omit warning message
+
+# add additional software:
+
+wget https://github.com/GATB/bcalm/releases/download/v2.2.2/bcalm-binaries-v2.2.2-Linux.tar.gz
+
+wget https://www.tbi.univie.ac.at/RNA/download/sourcecode/2_4_x/ViennaRNA-2.4.14.tar.gz
+
+tar -zxvf ViennaRNA-2.4.14.tar.gz
+
+cd ViennaRNA-2.4.14.tar.gz
+
+
+./configure
+
+ln -s /usr/include/locale.h /usr/include/xlocale.h
+
+make
+
+sudo make install
+
+# 
+
+cp bcalm-binaries-v2.2.2-Linux/bin/bcalm ~/BrumiR-3.0/bin
+
+ln -s /usr/local/bin/RNA* ~/BrumiR-3.0/bin
+
+
+export PATH=$PATH:"~/BrumiR-3.0"
+
+# TEST (WORKING!)
 
 perl brumir.pl -a test/sRNA-seq.human.trim.fa.gz -p prefix
 
@@ -804,6 +1123,7 @@ mirtrace qc -s meta_species_all -w --uncollapse-fasta ../*fq.gz
 
 # Then check the mirrace-report.html
 
+
 ```
 
 
@@ -1052,7 +1372,7 @@ mirdeep2 runs the follow steps:
 #producing graphic results
 
 index_path=/Users/cigom/Documents/MIRNA_HALIOTIS/INDEX/GCF_023055435_genomic
-ref=GCF_023055435.1_xgHalRufe1.0.p_genomic.fna
+ref=GCF_023055435.1_xgHalRufe1.0.p_genomic.fa
 
 length=18
 mautre_ref_miRNAs.fa mature_other_miRNAs.fa  hairpin_ref_miRNAs
