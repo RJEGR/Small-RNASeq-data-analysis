@@ -31,7 +31,11 @@ names(count)
 
 summary <- count[,1:4]
 
-summary %>% distinct(`#miRNA`)
+count %>% distinct(`#miRNA`)
+
+summary %>% dplyr::count(`#miRNA`, sort = T)
+
+summary %>% filter(`#miRNA`== 'dre-miR-430a-3p')
 
 count <- as.data.frame(count[,5:16])
 
