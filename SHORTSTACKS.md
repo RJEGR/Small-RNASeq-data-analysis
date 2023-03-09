@@ -14,7 +14,7 @@
 tail /home/rvazquez/shortStacks_20230217.log
 ```
 
-Este software implementa la caja de herramietnas samtools. Samtools presenta errores en su uso cuando los nombres de cabecera de los archivos fasta (> my_sequence_name) superan un maximo de bits permitido (_Your header is too big to fit in a BAM file (2325494614 bytes, while the maximum officially allowed is 2147483648_, Ejemplo [aqui](https://github.com/samtools/samtools/issues/1105#issuecomment-530300080)).  Por lo anterior, se recomienda dar formato de entrada a los inptus , tanto archivos fasta/fastq como genoma de referencia:
+Este software implementa la caja de herramientas samtools. El uso de samtools presenta errores cuando los nombres de cabecera de los archivos fastx (Ej. `> my_sequence_name`) superan un maximo de bits permitido (Ej del error: fail to read the header from ... ). La solucion se describe [aqui](https://github.com/samtools/samtools/issues/1105#issuecomment-530300080)) y suguiere que _Your header is too big to fit in a BAM file (2325494614 bytes, while the maximum officially allowed is 2147483648_.Por lo anterior, se recomienda dar formato de entrada a los inputs , tanto archivos fasta/fastq como genoma de referencia:
 
 
 ### 1) FORMAT DATA INPUT
@@ -53,7 +53,7 @@ exit
 seqkit fx2tab HR110761.clean.newid.fa | awk '{print $0,"EEEEEEEEEEEEEEEEEEEEE"}' | seqkit tab2fx > test_tab2fx.fq
 
 ```
-### Filtering reads based on its biotype (mirtrace)
+### 2) Filtering reads based on its biotype (mirtrace)
 ```bash
 
 # test
@@ -77,15 +77,15 @@ cd qc_passed_reads.all.uncollapsed/
 
 for i  in $(ls *fasta); do cat $i | seqkit grep -n -r -p "rnatype:mirna" -p "rnatype:unknown" >  ${i%.fasta}.subset.fasta; done
 
-cat HR110762.clean.newid.fasta | seqkit grep -n -r -p "rnatype:mirna" -p "rnatype:unknown" > HR110762.clean.newid.subset.fasta
+# cat HR110762.clean.newid.fasta | seqkit grep -n -r -p "rnatype:mirna" -p "rnatype:unknown" > HR110762.clean.newid.subset.fasta
 
 
 
 
 ```
-### Profilling as a function of read length 
+### 3) Profilling as a function of read length 
 ```bash
-for i in $(ls *.clean.newid.fasta); do seqkit fx2tab $i -l -g -n -H > ${i%.fasta}.profiling; done &
+for i in $(ls *.clean.newid.fasta); do seqkit fx2tab $i -l -g -H > ${i%.fasta}.profiling; done &
 
 # scp -r rvazquez@200.23.162.234:/home/rvazquez/MIRTRACE/configfile.output/qc_passed_reads.all.uncollapsed/PROFILING_BY_READ_LENGTH .
 
@@ -153,13 +153,15 @@ reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_0
 
 samtools faidx $reference -o ${reference}.fai
 
-ShortStack --readfile HR110761.clean.newid.fa HR110762.clean.newid.fa --outdir test1 --genomefile ${reference}.fai --bowtie_cores 12 2> "shortStacks_"$(date +%Y%m%d)".log" &
+# ShortStack --readfile HR110761.clean.newid.fa HR110762.clean.newid.fa --outdir test1 --genomefile ${reference}.fai --bowtie_cores 12 2> "shortStacks_"$(date +%Y%m%d)".log" &
 
 # configure (RUNNING)
+# INPUTS: ~/MIRTRACE/configfile.output/qc_passed_reads.all.uncollapsed/SUBSET_OF_KNOWN_AND_UNKNOWN_READS
+#
+ 
+ShortStack --readfile  HR110761.clean.newid.subset.fasta HR110762.clean.newid.subset.fasta HR110763.clean.newid.subset.fasta HR11081.clean.newid.subset.fasta HR11082.clean.newid.subset.fasta HR11083.clean.newid.subset.fasta HR24761.clean.newid.subset.fasta HR24762.clean.newid.subset.fasta HR24763.clean.newid.subset.fasta HR2481.clean.newid.subset.fasta  HR2482.clean.newid.subset.fasta HR2483.clean.newid.subset.fasta --outdir ShortStack_"$(date +%Y%m%d)"_test --genomefile ${reference} --bowtie_cores 20 --sort_mem 60G --mismatches 0 --dicermax 30 --mmap u --mincov 1 --pad 1 2> "ShortStack_"$(date +%Y%m%d)".log" &
 
-# HR110763.clean.newid.fa HR11083.clean.newid.fa HR24763.clean.newid.fa  HR2483.clean.newid.fa HR110761.clean.newid.fa HR11081.clean.newid.fa HR24761.clean.newid.fa HR2481.clean.newid.fa HR110762.clean.newid.fa  HR11082.clean.newid.fa HR24762.clean.newid.fa HR2482.clean.newid.fa
-
-ShortStack --readfile HR110761.clean.newid.fa HR110762.clean.newid.fa --outdir ShortStack_"$(date +%Y%m%d)"_test --genomefile ${reference} --bowtie_cores 20 --sort_mem 60G --mismatches 0 --dicermax 30 --mmap u --mincov 1 --pad 1 2> "ShortStack_"$(date +%Y%m%d)".log" &
+#ShortStack --readfile HR110761.clean.newid.fa HR110762.clean.newid.fa --outdir ShortStack_"$(date +%Y%m%d)"_test --genomefile ${reference} --bowtie_cores 20 --sort_mem 60G --mismatches 0 --dicermax 30 --mmap u --mincov 1 --pad 1 2> "ShortStack_"$(date +%Y%m%d)".log" &
 
 
 
