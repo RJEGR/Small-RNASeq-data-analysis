@@ -9,7 +9,7 @@ if(!is.null(dev.list())) dev.off()
 
 options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
-current_ref <- '~/Documents/MIRNA_HALIOTIS/GCF_023055435.1/ncbi_dataset/data/GCF_023055435.1/'
+current_ref <- '~/Documents/MIRNA_HALIOTIS/TRASH/GCF_023055435.1/ncbi_dataset/data/GCF_023055435.1/'
 # prev_ref <- '~/Documents/MIRNA_HALIOTIS/GCF_003343065.1/ncbi_dataset/data/GCF_003343065.1/'
 
 # review report at https://www.ncbi.nlm.nih.gov/genome/annotation_euk/Haliotis_rufescens/101/
@@ -23,6 +23,8 @@ library(tidyverse)
 # https://edinburgh-genome-foundry.github.io/DnaFeaturesViewer/ (compare viz with this)
 
 gff <- ape::read.gff(file)
+
+names(gff)
 
 head(gff)[1:8]
 
