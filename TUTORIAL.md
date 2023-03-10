@@ -270,16 +270,20 @@ ln -s /Users/cigom/Documents/Tools/TrimGalore-0.6.6/trim_galore .
 
 ***fastq-screen***
 
+Consider mapping to three genomes (A, B and C), the string '003' produces a file in which reads do not map to genomes A or B, but map (once or more) to genome C.  The string '--1' would generate a file in which reads uniquely map to genome C. Whether reads  map to genome A or B would be ignored.
+
 ```bash
 conda install fastq-screen
 conda update fastq-screen
 # https://anaconda.org/bioconda/fastq-screen
 
-fastq_screen \
-  --aligner bowtie2 \
-  --conf fastq_screen.conf \
-  --nohits \
-  --outdir ./output Trimmed_2P.fastq
+fastq_screen --aligner bowtie2 --conf fastqscreen.conf --subset 0 --filter 3---- --tag --force --outdir ./fastq_screen/ 012-X04-P68-COI-ICT_S46_L001_R1_001.fastq.fastq
+  
+  
+  for i in *qtrim.gz; do fastq_screen --aligner bowtie2 --conf fastqscreen.conf --subset 0 --tag --filter 0000330 --outdir ./fastq_screen/ $i; done
+  
+  # filter option is the good flag
+  # 
 ```
 Finally, modify the configure file (dowload a template [here](../examples/fastq_screen/fastq_screen.conf)) and then run the tool:
 
