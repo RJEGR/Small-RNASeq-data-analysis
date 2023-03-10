@@ -37,8 +37,11 @@ Esta base de referencia proviene del trabajo de Huang et al (2021), Tabla suplem
 Para la preduccion de miRs maduros y precursores se consideró el siguiente criterio: 
 1. Predicted mature miRs were allowed to have only 0 - 4 mismatch in sequences with know mature miRNA
 2. The mismatched nucleotides were not permitted in know miRNA seed region (2 - 8 bp)
-3. miRNA precursor can fold into an appropiate hairpin secondary structure that contains mature miRNA sequence whitin one arm of the hairpin and has the smallest possible folding energy.
-Consultar el script
+3. miRNA precursor can fold into an appropriate hairpin secondary structure that contains mature miRNA sequence within one arm of the hairpin and has the smallest possible folding energy.
+Consultar el script [`GENOME_WIDE_MIRS_MOLLUSK.R`](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/GENOME_WIDE_MIRS_MOLLUSK.R) para revisión del procesamiento de dichas lecturas.
+
+## piwi interacting RNAs (piRNAs)
+The use of this db is motivated by the identification of reads > 26 nt in the library from embrio-larval stages. Here, PIRBASE V3 is used as standard gold to detect piRNAs reads. Prior to the annotation the use of `shortstacks` allow to  identify piRNA candidates based several sequences features. pirBASE_v3 is downloaded manually from here: http://bigdata.ibp.ac.cn/piRBase/download.php. In addition to standard golds We taking into account the presence of two mollusk > gastropods were piRNAs are identified: (Anaspidea -aca- and Biomphalaria glabrata -bgl-)
 
 ## MIRTRACE DATABASE CREATION
 Revisar pagina 16 del manual
@@ -53,15 +56,21 @@ export PATH=$PATH:"/home/rvazquez/MIRTRACE/mirtrace/src/scripts/database_creatio
 
 # use python3 if neeeded
 
-generate-mirtrace-rnatype-database.py -h
+generate-mirtrace-rnatype-database.py \
+  --out-dir $PWD \
+  --species-abbrev moll \
+  --species-verbosename meta_mollusck_db \
+  --mirna-seqs molluscs_mature.fasta \
+  --artifacts-seqs rnacentral_active.fasta \
+  --rrna-seqs empty.fasta \
+  --trna-seqs empty.fasta
 
---out-dir $PWD
---species-abbrev my_abb
---species-verbosename my_sp_name
---mirna-seqs miRNA.fa
---rrna-seqs RRNA_SEQS
---trna-seqs TRNA_SEQS
---artifacts-seqs ARTIFACTS_SEQS
+# testing single pipeline
+dna_sequences=rnacentral_active.fasta
+mirtrace-db-generator.py --sequences $dna_sequences --out ${dna_sequences%.fasta}_db.gz
+
+dna_sequences=molluscs_mature.fa
+mirtrace-db-generator.py --sequences $dna_sequences --out ${dna_sequences%.fa}_db.gz
 
 # emtpy fasta
 
