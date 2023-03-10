@@ -33,7 +33,7 @@ library(readxl)
 
 my_custom_name_repair <- function(nms) tolower(gsub(" ", "_", nms))
 
-workbook <- lapply(excel_sheets(xls_f), 
+.workbook <- lapply(excel_sheets(xls_f), 
   read_excel, 
   path = xls_f, 
   range = cell_cols("B:D"), 
@@ -41,11 +41,11 @@ workbook <- lapply(excel_sheets(xls_f),
 
 # name workbook list by sheet names
 
-names(workbook) <- excel_sheets(xls_f)
+names(.workbook) <- excel_sheets(xls_f)
 
 
 workbook <-
-  mapply(`[<-`, workbook, 'sp', value = names(workbook), SIMPLIFY = FALSE)
+  mapply(`[<-`, .workbook, 'sp', value = names(.workbook), SIMPLIFY = FALSE)
 
 workbook <- do.call(rbind, workbook)
 
@@ -56,12 +56,45 @@ workbook <- workbook %>% distinct()
 
 workbook <- workbook %>% filter(nchar(mature_sequence) >= 18)
 
+llist <- function(x) {
+  x <- paste(x, sep = '|', collapse = '|')
+  x <- list(x)
+  x <- unlist(x)
+}
+
+# DEBIDO A REDUNDANCIA EN LOS NOMBRES, HAREMOS UN NUEVO ID POR SECUENCIAS
+workbook %>% distinct(mature_sequence)
+
+# workbook <- workbook %>% 
+#   arrange(mirna) %>%
+#   distinct(mature_sequence, sp,.keep_all = T)
+
+workbook <- workbook %>% 
+  # distinct(mature_sequence, sp,.keep_all = T) %>%
+  group_by(mature_sequence) %>%
+  mutate(n_sp = length(sp), 
+    across(sp, .fns = llist)) %>% 
+  ungroup() %>%
+  distinct(mature_sequence, .keep_all = T) %>% 
+  # summarise(n_sp = length(sp), 
+    # across(sp, .fns = llist)) %>% 
+  mutate(n_sp = paste0(n_sp, "_sp")) %>%
+  unite("headers", c("mirna", "n_sp"), sep = "_") 
+  
+
+workbook <- workbook %>%
+  mutate(n = mature_sequence) %>% unite("headers", c("headers", "n"), sep = "_") 
+
+workbook %>% arrange(headers) %>% distinct(headers) 
+
+#  workbook %>% unite("headers", c("mirna", "sp"), sep = "|")
+
 # =================
 # Save fasta file
 # ================
 # help in https://astrobiomike.github.io/amplicon/dada2_workflow_ex
 
-miRs_header <- workbook %>% unite("headers", c("mirna", "sp"), sep = "|") %>% pull(headers)
+miRs_header <- workbook %>% pull(headers)
 head(miRs_header <- paste(">", miRs_header, sep=""))
 
 mature_seqs <- workbook %>% pull(mature_sequence)
@@ -70,8 +103,8 @@ hairpin_seqs <- workbook %>% pull(mirna_precursor)
 mature_fasta <- c(rbind(miRs_header, mature_seqs))
 hairpin_fasta <- c(rbind(miRs_header, hairpin_seqs))
 
-write(mature_fasta, file = paste0(path, "/mature.fasta"))
-write(hairpin_fasta, file = paste0(path, "/precursor.fasta"))
+write(mature_fasta, file = paste0(path, "/molluscs_mature.fa"))
+write(hairpin_fasta, file = paste0(path, "/molluscs_precursor.fa"))
 
 
 # exit
