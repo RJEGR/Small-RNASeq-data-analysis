@@ -1,4 +1,13 @@
 
+# Ricardo Gomez-Reyes
+# Huang et al (2021) had (in silico) scan potential mollusks miRs using a genome-wide approach: 
+
+# 1. Predicted mature miRs were allowed to have only 0 - 4 mismatch in sequences with know mature miRNA
+# 2. The mismatched nucleotides were not permitted in know miRNA seed region (2 - 8 bp)
+# 3. miRNA precursor can fold into an appropriate hairpin secondary structure that contains mature miRNA sequence within one arm of the hairpin and has the smallest possible folding energy.
+
+# Here we generate precursor and mature fasta format for downstream analysis:
+
 # Table S1. Genome-wide scanning miRNAs in mollusks
 # Table S2. Target prediction of miRNAs in C. gigas and P. fucata.
 
