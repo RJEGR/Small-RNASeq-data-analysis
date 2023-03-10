@@ -177,6 +177,10 @@ echo "export PATH=$PATH:/usr/local/RepeatMasker/" >> $HOME/.bash_profile
 
 # test http://www.repeatmasker.org/webrepeatmaskerhelp.html
 
+libdir=/usr/local/RepeatMasker/Libraries/
+
+RepeatMasker -s -libdir $libdir -gff GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa &> RepeatMasker.log &
+
 # Note:
 Using Dfam with RepeatMasker
 ============================
@@ -270,6 +274,16 @@ ln -s /Users/cigom/Documents/Tools/TrimGalore-0.6.6/trim_galore .
 conda install fastq-screen
 conda update fastq-screen
 # https://anaconda.org/bioconda/fastq-screen
+
+fastq_screen \
+  --aligner bowtie2 \
+  --conf fastq_screen.conf \
+  --nohits \
+  --outdir ./output Trimmed_2P.fastq
+```
+Finally, modify the configure file (dowload a template [here](../examples/fastq_screen/fastq_screen.conf)) and then run the tool:
+
+
 ```
 
 
@@ -599,7 +613,7 @@ perl brumir.pl -a test/sRNA-seq.human.trim.fa.gz -p prefix
 ## Downloading files
 
 ### Genome reference
-
+ENSEMBLE FEATURES: https://metazoa.ensembl.org/info/data/ftp/index.html
 Annotation features: https://www.ncbi.nlm.nih.gov/genome/annotation_euk/Haliotis_rufescens/101/
 
 Considere which file format to download:
