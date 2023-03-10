@@ -1,7 +1,8 @@
 # DATABASE CURATION
 Genomic features and coordinates (Ex. Protein coding genes, tRNA, rRNA, ncRNAs classes, pseudogenes, etc.) may be taking from genomic GFF files. Recently (February, 2023), ENSEMBLE release the genomic features for Haliotis rufescense according to the genomic version 3055435v1rs
 
-ENSEMBLE:
+## ENSEMBLE:
+A diferencia de NCBI, la version de ENSEMBLE tiene las anotaciones de UTR
 
 **GTF:** Gene sets for each species. These files include annotations of both coding and non-coding genes. 
 **GFF3:** GFF3 provides access to all annotated transcripts which make up an Ensembl gene set. 
@@ -19,6 +20,25 @@ wget https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-56/metazoa/embl/haliotis_r
 
 wget https://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/sequences/rnacentral_active.fasta.gz
 ```
+
+Son aprox 6.7 Gb de informacion comprimida (29 Gb descomp), contiene todas las secuencias de RNa de distintas bases de datos tales como: mirgenedb, mirbase, pirbase, snoRNA, rRNA, ensemble, etc ([aqui](https://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/sequences/by-database/) detalle). La anotacion se debe obtener del archivo `id_mappings`:
+
+```bash
+wget https://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/id_mapping/id_mapping.tsv.gz
+# format Example
+URS0000000001	ENA	GU786683.1:1..200:rRNA	77133	rRNA	
+URS0000000001	ENA	GU786868.1:1..200:rRNA	77133	rRNA	
+URS0000000001	ENA	GU786889.1:1..200:rRNA	77133	rRNA	
+```
+
+## MOLLUSC MIRS FROM GENOME_WIDE_ANALYSIS 
+Esta base de referencia proviene del trabajo de Huang et al (2021), Tabla suplementaria Table_S1. Contiene distintas listas de miRs de 35 especies de moluscos. Un total de 5,823 secuencias unicas de miRs maduras y precursoras fueron recuperadas para su implementacion en la busqueda de miRs. Algunos de estos miRs fueron validados por steep-loop qRT-PCR usando U6-snRNA como referencia interna. El metodo de detección insilico se describe a continuacion: 
+
+Para la preduccion de miRs maduros y precursores se consideró el siguiente criterio: 
+1. Predicted mature miRs were allowed to have only 0 - 4 mismatch in sequences with know mature miRNA
+2. The mismatched nucleotides were not permitted in know miRNA seed region (2 - 8 bp)
+3. miRNA precursor can fold into an appropiate hairpin secondary structure that contains mature miRNA sequence whitin one arm of the hairpin and has the smallest possible folding energy.
+Consultar el script
 
 ## MIRTRACE DATABASE CREATION
 Revisar pagina 16 del manual
