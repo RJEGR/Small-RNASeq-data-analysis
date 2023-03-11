@@ -56,27 +56,60 @@ export PATH=$PATH:"/home/rvazquez/MIRTRACE/mirtrace/src/scripts/database_creatio
 
 # use python3 if neeeded
 
+cd /home/rvazquez/MIRTRACE/mirtrace/src/scripts/database_creation
+
+# WORKING MODE!!
+dna_sequences=/home/rvazquez/MIRTRACE/CUSTOM_DB/molluscs_mature.fa
+
 generate-mirtrace-rnatype-database.py \
   --out-dir $PWD \
   --species-abbrev moll \
   --species-verbosename meta_mollusck_db \
-  --mirna-seqs molluscs_mature.fasta \
-  --artifacts-seqs rnacentral_active.fasta \
-  --rrna-seqs empty.fasta \
-  --trna-seqs empty.fasta
+  --mirna-seqs $dna_sequences
 
-# testing single pipeline
-dna_sequences=rnacentral_active.fasta
-mirtrace-db-generator.py --sequences $dna_sequences --out ${dna_sequences%.fasta}_db.gz
+# 2)
+dna_sequences=/home/rvazquez/MIRTRACE/CUSTOM_DB/rnacentral_active.fasta
 
-dna_sequences=molluscs_mature.fa
-mirtrace-db-generator.py --sequences $dna_sequences --out ${dna_sequences%.fa}_db.gz
+# WORKING MODE!!
+generate-mirtrace-rnatype-database.py \
+  --out-dir $PWD \
+  --species-abbrev rnac \
+  --species-verbosename rna_central_db \
+  --mirna-seqs $dna_sequences
+
+# 3)
+
+dna_sequences=/home/rvazquez/MIRTRACE/CUSTOM_DB/PIRBASE.fa
+
+generate-mirtrace-rnatype-database.py \
+  --out-dir $PWD \
+  --species-abbrev pirb \
+  --species-verbosename pirna_gold_db \
+  --mirna-seqs $dna_sequences
+#  --artifacts-seqs rnacentral_active.fasta \
+#  --rrna-seqs empty.fasta \
+#  --trna-seqs empty.fasta
 
 # emtpy fasta
 
 # 3) RUNNING THE FILES
+custom_db_dir=/home/rvazquez/MIRTRACE/mirtrace/src/scripts/database_creation
 
-mirtrace qc --species my_abb --custom-db-folder $PWD ...
+# /home/rvazquez/MIRTRACE/configfile.output/qc_passed_reads.all.uncollapsed/SUBSET_OF_KNOWN_AND_UNKNOWN_READS/*clean.newid.subset.fasta
+
+fastq_path=/home/rvazquez/MIRTRACE/configfile.output/qc_passed_reads.all.uncollapsed/SUBSET_OF_KNOWN_AND_UNKNOWN_READS/
+
+# moll db
+mirtrace qc -s moll -w --uncollapse-fasta --custom-db-folder $custom_db_dir $fastq_path/**clean.newid.subset.fasta
+
+# rna central
+
+mirtrace qc -s rnac -w --uncollapse-fasta --custom-db-folder $custom_db_dir $fastq_path/**clean.newid.subset.fasta
+
+# pirna db
+
+mirtrace qc -s pirb -w --uncollapse-fasta --custom-db-folder $custom_db_dir $fastq_path/*.clean.newid.subset.fasta
+
 
 # aqui podriamos concatener la version mas reciente de mirbase + mirgenedb en el flag mirna-seqs, y asi sucesivamente en el flag rrna y trna incluir infomracion de rnacentral (split snorna, etc)
 
