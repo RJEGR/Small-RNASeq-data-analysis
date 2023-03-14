@@ -25,7 +25,9 @@ MULTIQC
 conda install multiqc
 TRIMMOMATIC
 conda install -c bioconda trimmomatic
-
+# PICARD (SAMMERGE), check java compativ.
+git clone https://github.com/broadinstitute/picard.git
+# git clone https://github.com/broadinstitute/picard.git --branch 2.25.0
 ```
 
 Export tools:
@@ -70,4 +72,110 @@ trimmomatic PE -threads 20 -phred33 \
     ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10 SLIDINGWINDOW:4:15 MINLEN:36 LEADING:5 TRAILING:5
 done &> trimmomatic.log &
 
+```
+After finishing
+```bash
+grep 'Input Read Pairs' trimmomatic.log  | awk '{print $4, $7, $12, $17, $20}' > reads_in.tmp
+
+grep phred33 trimmomatic.log | awk '{gsub(/_/," ", $2); print $2}' | awk '{print $1}'  > samples_id.tmp
+
+paste samples_id.tmp reads_in.tmp | column -t; rm *tmp
+##
+```
+Good!
+## Align reads to genome
+
+```bash
+mkdir GENOME_INDEX;cd GENOME_INDEX
+
+# ln -s /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa .
+
+genome=GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
+
+g_name=`basename ${genome%.fa}`
+
+hisat2-build -p 20 $genome ${genome%.fa}
+
+# Run on paired-end reads
+
+#hisat2 --phred33 -p 8 -x ./GENOME_INDEX/$g_name -1 reads_f.fq -2 reads_r.fq -S output.sam
+
+# /home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX
+
+mkdir SAM_FILES
+
+idx_file=/home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX/$g_name
+
+for file in $(ls *_R1.P.qtrim.fq.gz | grep gz)
+do
+withpath="${file}"
+filename=${withpath##*/}
+base="${filename%*_R*.P.qtrim.fq.gz}"
+hisat2 --phred33 -p 4 -x $idx_file  \
+    --rna-strandness RF \
+    -1 ${base}_R1.P.qtrim.fq.gz -2 ${base}_R2.P.qtrim.fq.gz \
+    --rg-id=${base} --rg SM:${base} -S ./SAM_FILES/${base}.sam
+done &> hisat2.log &
+
+# to kill the process related to it ps -o pid=pidid | xargs kill
+# use ps to identify the loop process
+```
+
+## Stringtie
+
+```bash
+# 1.1 sam to bam conversion and sorting
+
+for sam_f in $(ls *sam)
+do
+samtools sort -@ 4 -o ${sam_f%.sam}.sorted.bam $sam_f
+done
+
+# Merge HISAT2 BAM files
+# 1) Usin samtools 
+samtools merge output.bam *bam &> merge_bam.log &
+
+#  2) 
+PICARD=/home/rvazquez/RNA_SEQ_ANALYSIS/picard/build/libs/picard.jar
+
+# java -jar $PICARD -h 
+    
+java -Xmx2g -jar $PICARD MergeSamFiles -OUTPUT UHR.bam -INPUT UHR_Rep1.bam -INPUT UHR_Rep2.bam -INPUT UHR_Rep3.bam
+
+java -Xmx2g -jar $PICARD MergeSamFiles -OUTPUT output.bam \
+-INPUT  SRR8956796.sorted.bam \
+-INPUT  SRR8956797.sorted.bam \
+-INPUT  SRR8956798.sorted.bam \
+-INPUT  SRR8956799.sorted.bam \
+-INPUT  SRR8956800.sorted.bam \
+-INPUT  SRR8956801.sorted.bam \
+-INPUT  SRR8956802.sorted.bam \
+-INPUT  SRR8956803.sorted.bam \
+-INPUT  SRR8956804.sorted.bam \
+-INPUT  SRR8956805.sorted.bam
+
+
+
+# 2) Assembly
+
+stringtie ${out_sam%.sam}.sorted.bam -o transcripts.gtf
+
+# 2.1 Reference annotation transcripts (-G)
+# Flag -G is for include reference annotation to use for guiding the assembly process (GTF/GFF)
+
+ln -s /home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.gtf genome.gtf
+
+stringtie --rf -p 4 -l HBR_Rep1 -o HBR_Rep1/transcripts.gtf $RNA_ALIGN_DIR/HBR_Rep1.bam
+
+stringtie output.sorted.bam -B -G genome.gtf -o transcripts.gtf
+
+# 3) Generate a FASTA file with the DNA sequences for all transcripts in a GFF file.
+
+
+# -w flag write a fasta file with spliced exons for each transcript
+
+ln -s /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa genome.fa
+
+
+gffread -w transcripts.fa -g genome.fa transcripts.gtf
 ```
