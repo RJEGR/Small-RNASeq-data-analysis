@@ -1,6 +1,5 @@
-
-### SHORTSTACKS (Easy to install and running on Mac) !!!!!
-
+# Introduction
+Mirs loci, which produce the primary stem-loop transcripts, comprise only a small percentage of the source of the entire regulatory small RNA repertory in contrast to other type pf endogenous regulatory small RNAs. Based on the small RNA alignment patterns, shortstacks identifies and annotate both, miRs and non-miRs loci, and provides detailed descriptions of the small RNA populations emanating from each locus (S. Shaid and M. Axtell, 2013).
 
 ### SHORSTACK ERROR (REVISAR)
 
@@ -134,7 +133,7 @@ export PATH=$PATH:"/home/rvazquez/ShortStack"
 export PATH=$PATH:"/home/rvazquez/Manatee/bowtie-1.0.1"
 export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
 export PATH=$PATH:"//usr/local/bin/" # RNAfold from Vienna 
-
+export PATH=$PATH:"/home/rvazquez/EMBOSS-6.6.0/emboss"
 export PATH=$PATH:"/home/rvazquez/seqkit_tool"
 
 
@@ -167,41 +166,35 @@ ShortStack --readfile  HR110761.clean.newid.subset.fasta HR110762.clean.newid.su
 
 exit
 
-curl -OJX GET "https://plantsmallrnagenes.science.psu.edu/axtelldata/ShortStack_TestData.zip"
-
-# bastante rapido y genera la siguiente informacion:
-Summary of primary alignments:
-	XY:Z:N -- Unmapped because no valid alignments: 494698 / 4949843 (10.0 %)
-	XY:Z:M -- Unmapped because alignment number exceeded option bowtie_m 50: 33919 / 4949843 (0.7 %)
-	XY:Z:O -- Unmapped because alignment number exceeded option ranmax 3 and no guidance was possible: 13352 / 4949843 (0.3 %)
-	XY:Z:U -- Uniquely mapped: 2728325 / 4949843 (55.1 %)
-	XY:Z:R -- Multi-mapped with primary alignment chosen randomly: 419508 / 4949843 (8.5 %)
-	XY:Z:P -- Multi-mapped with primary alignment chosen based on u: 1260041 / 4949843 (25.5 %)
-Alignment completed. Final bam file is test1/SRR051927_trimmed.bam
-
-Performing search for unplaced small RNAs.
-Completed at Fri Feb 17 00:26:54 PST 2023
-
-Fri Feb 17 00:26:54 PST 2023
-Tally of loci by predominant RNA size (DicerCall):
-
-DicerCall	NotMIRNA	MIRNA
-N or NA	6038	0
-20	281	1
-21	1453	33
-22	2310	4
-23	4389	0
-24	28876	0
-
-Unplaced small RNAs
-Size	MultiMapped	NoAlignments
-<20	251	5364
-20	48	1688
-21	183	2169
-22	264	1494
-23	527	1464
-24	1214	1523
->24	52	1371
 ```
+Additional installations:
+
+```bash
+# http://emboss.open-bio.org/html/adm/ch01s01.html
+#You should use the URL:
+
+ftp://emboss.open-bio.org/pub/EMBOSS/.
+#The file you need for the EMBOSS base installation is
+# EMBOSS-latest.tar.gz
+
+gunzip emboss-latest.tar.gz
+tar xvf emboss-latest.tar
+cd EMBOSS-*
+#Compiling. If you are compiling a fresh installation:
+./configure
+make
+#If you compile it on subsequent occasions, use the following:-
+# rm config.cache;make clean
+
+export PATH=$PATH:"/home/rvazquez/EMBOSS-6.6.0/emboss"
+
+multi_fasta=/home/rvazquez/GENOME_20230217/multi_genome.fa
+outname=`basename ${multi_fasta%.fa}`
+einverted -sequence $multi_fasta -outfile nw_${outname}.inv -outseq nw_${outname}.align -gap 12 -threshold 50 -match 3 -mismatch -4
+   
+```
+
+## Dataviz shortstacks outputs
+
 
 
