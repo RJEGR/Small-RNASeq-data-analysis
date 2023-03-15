@@ -39,9 +39,11 @@ for i in $(ls *clean.fa); do cat $i | seqkit replace -p .+ -r "seq_{nr}" > ${i%.
 
 # 2) FOR GENOMIC FILES REMOVE EXTRA ID DESCRIPTION
 
-reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.fa
+# reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.fa
 
-cat $reference |  seqkit replace -p "\s.+" > ${reference%.fa}.newid.fa
+reference=/home/rvazquez/GENOME_20230217/ENSEMBLE/multi_genome.newid.fa
+
+# cat $reference |  seqkit replace -p "\s.+" > ${reference%.fa}.newid.fa
 # ${fasta_file%.fa}.newid.fa
 
 # TO CONVERT FASTA TO FASTQ
@@ -91,6 +93,7 @@ for i in $(ls *.clean.newid.fasta); do seqkit fx2tab $i -l -g -H > ${i%.fasta}.p
 ```
 
 ### X) (optional) Remove duplicates preserving their reads count
+Hasta ahora ha dado resultados poco entendibles, dereplica una libreria de 3,098,492 (R2483.clean.newid.subset.fasta:3098492) en solamente 16 secuencias
 
 ```bash
 # USING SEQKIT
@@ -100,22 +103,49 @@ for i in $(ls *.clean.newid.fasta); do seqkit fx2tab $i -l -g -H > ${i%.fasta}.p
 # -D, --dup-num-file string    file to save number and list of duplicated seqs
 cat $fasta_file | seqkit rmdup -s -i -o unique.clean.fa.gz -D duplicated.detail.txt
 
-# VSEARCH 
+# TESTING BY MIRNAS READS
+# VSEARCH (to profile single nucleotide difference between unique sequences) 
 
-seqs=${fasta%.fasta}.good.fasta
+fasta_f=/home/rvazquez/MIRTRACE/configfile.output/qc_passed_reads.all.uncollapsed/ALL_UNCOLLAPSED_READS/HR2483.clean.newid.fasta
+
+seqkit grep -n -r -p "rnatype:mirna" $fasta_f >  `basename ${fasta_f%.fasta}`.subset.fasta;
+
+id=0.99
+seqs=`basename ${fasta_f%.fasta}`.subset.fasta;
 sorted=${seqs%.fasta}_sorted.fasta
 derep=${seqs%.fasta}_derep.fasta
+cntrds=${seqs%.*}_${id}_cnsns.tmp
+acntrds=${cntrds%.*}_${min}_ab.fa
 
-vsearch  -sortbylength $seqs -output $sorted
+vsearch  -sortbylength $seqs -output $sorted --sizein
+
 vsearch -derep_fulllength $sorted -output $derep -sizeout
+
+vsearch  -sortbylength $udrp -output $udrp_srt
+# 4.
+# usearch -cluster_smallmem $udrp_srt -id  $id -centroids $cntrds -usersort -sizeout
+# -consout instead of -centroids
+vsearch --threads 20 -cluster_smallmem $sorted -id $id -consout $cntrds -usersort -sizeout
+
+# save representative centroides
+usearch -sortbysize $cntrds -minsize $min -output $acntrds
+
+# Sequences distribution and size
+grep '^>' $derep | cut -d"=" -f2 | sed 's/;$//g'| sort | uniq -c | sort -k2,2 -n > derep_distr.txt
+grep '^>' $cntrds | cut -d"=" -f2 | sed 's/;$//g'| sort | uniq -c | sort -k2,2 -n > centroids_distr.txt
+
 
 # OR TALLY
 # Trimmed reads between 18-38 nt were collapsed to unique sequences using tally while preserving their counts from each sample (-l 18 -u 38 -format ‘>seq%I_w%L_x%C%n%R%n’). Sequences that were only observed 1 or 2 times across the 22 samples were discarded as they most likely represent sequencing errors, and in any case contain little useful information
 ```
 
+### Running shortstacks
+
+`-pad`: Los grupos de ARN pequeños encontrados inicialmente se fusionarán si la distancia entre ellos es menor o igual que el valor de pad. Debe ser un número entero entre 0 y 5000 0. Valor predeterminado: 75. Usamos pad=1 para recuperar formacion minima de clusteres
 
 
 ```bash
+# VERSION 3.8
 git clone https://github.com/MikeAxtell/ShortStack.git
 
 # cd ShortStack
@@ -135,16 +165,8 @@ export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
 export PATH=$PATH:"//usr/local/bin/" # RNAfold from Vienna 
 export PATH=$PATH:"/home/rvazquez/EMBOSS-6.6.0/emboss"
 export PATH=$PATH:"/home/rvazquez/seqkit_tool"
-
-
-# export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/ShortStack"
-# readfile must be in fasta (.fasta or .fa), colorspace-fasta (.csfasta), or fastq (.fastq or .fq) format, or their gzip-compressed versions (.fasta.gz, .fa.gz, .csfasta.gz, .fastq.gz, or .fq.gz) Can also be a list (seperated by spaces) of several read files.
-
-#    --adapter [string] : sequence of 3' adapter to trim off during read-pre
-#    processing. Must be at least 8 bases, with only ATCG characters. If not
-#    specified, reads are assumed to be already trimmed. Ex.  --adapter CTGTAGGC
-
-# path to reference genome in .fasta or .fa format. Required for any run.
+export PATH=$PATH:"/home/rvazquez/UCSCTOOLS/"
+export PATH=$PATH:"/home/rvazquez/ShortTracks"
 
 reference=/home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
 
@@ -188,13 +210,121 @@ make
 
 export PATH=$PATH:"/home/rvazquez/EMBOSS-6.6.0/emboss"
 
-multi_fasta=/home/rvazquez/GENOME_20230217/multi_genome.fa
+multi_fasta=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.fa
 outname=`basename ${multi_fasta%.fa}`
 einverted -sequence $multi_fasta -outfile nw_${outname}.inv -outseq nw_${outname}.align -gap 12 -threshold 50 -match 3 -mismatch -4
    
 ```
 
+### Improving shorstacks (v 4.0)
+
+El 12 de Marzo del 2023, se actualizo la version a 4.0, trayendo mejoras y facilidades en la instalacion y uso de la herramienta:
+
+Using repeat inv file and nuclear+organelle genome (en la version superior a 3 ya no existen estos flags)
+
+Installing newer version
+```bash
+# Shortstacks 4 requiered python >= 3.10.8, Therefore, lets upgrade it
+
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update 
+sudo apt install python3.11
+
+# INSTALL PIP FOR THIS VERSION 
+# https://pip.pypa.io/en/stable/installation/
+
+
+export PATH=$PATH:"/home/rvazquez/.local/bin/"
+
+pip3.11 install biopython
+pip3.11 install tqdm
+pip3.11 install tq
+
+git clone https://github.com/MikeAxtell/ShortTracks.git
+
+cd ShortTracks
+
+# Replace ShortTracks header as follow:
+# #!/usr/bin/env python3.11
+
+# conda create --name strucvis strucvis
+
+git clone https://github.com/MikeAxtell/ShortStack.git
+
+mv ShortStack ShortStack4
+cd ShortStacks4
+mv ShortStack ShortStack4
+
+vi ShortStack4
+# Replace header as follow:
+# #!/usr/bin/env python3.11
+ 
+export PATH=$PATH:"/home/rvazquez/ShortStack4"
+export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
+export PATH=$PATH:"//usr/local/bin/" # RNAfold from Vienna 
+export PATH=$PATH:"/home/rvazquez/EMBOSS-6.6.0/emboss"
+export PATH=$PATH:"/home/rvazquez/seqkit_tool"
+
+export PATH=$PATH:"/home/rvazquez/bowtie-1.3.1-linux-x86_64"
+# 
+git clone https://github.com/MikeAxtell/strucVis.git
+export PATH=$PATH:"/home/rvazquez/strucVis"
+
+```
+
+Then running
+
+```bash
+
+
+export PATH=$PATH:"/home/rvazquez/UCSCTOOLS/"
+export PATH=$PATH:"/home/rvazquez/ShortStack4"
+export PATH=$PATH:"/home/rvazquez/bowtie-1.3.1-linux-x86_64"
+export PATH=$PATH:"/usr/local/bin/"
+export PATH=$PATH:"/home/rvazquez/strucVis"
+export PATH=$PATH:"/home/rvazquez/UCSCTOOLS/"
+export PATH=$PATH:"/home/rvazquez/ShortTracks"
+export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
+
+REF=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.fa
+MIRGENEDB=/home/rvazquez/MIRGENEDB_20230314/ALL-mat.fa
+
+# generate fai index
+# samtools faidx $reference -o ${reference}.fai
+
+
+# TESTING VERSION 4.0
+
+#../bbmap/reformat.sh HR110761.clean.newid.subset.fasta out=file.fq
+
+# ShortStacks4 --genomefile $REF --knownRNAs $MIRGENEDB --dn_mirna --outdir ShortStack_"$(date +%Y%m%d)"_test --threads 20 --dicermax 30 --mmap u --mincov 0.8 --pad 1 --readfile file.fq
+ 
+#  CONVERT ALL FASTA TO FASTQ
+
+# for i in $(ls *newid.subset.fasta); do ../bbmap/reformat.sh $i out=${i%.fasta}.fq;done
+
+readfile=`ls -x *.newid.subset.fq`
+
+ShortStacks4 --genomefile $REF --knownRNAs $MIRGENEDB --dn_mirna --outdir ShortStack_"$(date +%Y%m%d)"_out --threads 24 --dicermax 30 --mmap u --mincov 0.8 --pad 1 --readfile $readfile &> "ShortStack_"$(date +%Y%m%d)".log" &
+```
+
 ## Dataviz shortstacks outputs
+
+Load source 
+```bash
+export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/strucVis"
+export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/ShortTracks"
+export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/UCSCTOOLS" 
+export PATH=$PATH:""
+```
+Then
+```bash
+ShortTracks --bamfile merged_alignments.bam --mode readlength --stranded 
+```
+
+Open jbroswer >
+Assembly display name: Haliotis rufescense (nuclei and organelle genome (GCA_023055435.1)
+Assembly name: hr_multigenome_ensemble
 
 
 
