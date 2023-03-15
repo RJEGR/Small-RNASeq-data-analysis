@@ -626,47 +626,6 @@ And evaluate the genomic position (features)
 
 
 
-### miRNA database
-
-The miRBase v. XX entries were retrieved from http://www.mirbase.org/ftp.shtml [[DOI](doi:10.1093/nar/gky1141)], MirGeneDB 2.0 data were downloaded from http://mirgenedb.org/download [[DOI](https://doi.org/10.1093/nar/gkz885)], and previously reported bivalve miRNAs were retrieved from the electronic supplementary material files of a number of papers
-
-```bash
-mkdir "MIRBASE_"$(date +%Y%m%d)
-
-cd MIRBASE_*
-
-curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/hairpin.fa.gz" -H "Accept: application/zip"
-
-curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/mature.fa.gz" -H "Accept: application/zip"
-
-curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/miRNA.str.zip"  -H "Accept: application/zip"
-
-gunzip *gz
-
-grep -c "^>" *.fa
-
-```
-
-### MirGene DB
-
-MirGeneDB is a database of manually curated microRNA genes that have been validated and annotated as initially described in [Fromm et al. 2015 ](http://www.annualreviews.org/doi/abs/10.1146/annurev-genet-120213-092023)and [Fromm et al. 2020](https://academic.oup.com/nar/advance-article/doi/10.1093/nar/gkz885/5584683?guestAccessKey=b9fe4339-a36b-49df-96ea-9e2cd7a1c99b). MirGeneDB 2.1 includes more than 16,000 microRNA gene entries representing more than 1,500 miRNA families from 75 metazoan species and published in the [2022 NAR database issue](https://academic.oup.com/nar/advance-article/doi/10.1093/nar/gkab1101/6439665). All microRNAs can be browsed, searched and downloaded.
-
-miRNAs obtained may BLASTed (blastn) against miRBase and MirGeneDB databases.
-
-```bash
-mkdir "MIRGENEDB_"$(date +%Y%m%d)
-
-cd MIRGENEDB*
-# https://mirgenedb.org/information
-curl -OJX GET "https://mirgenedb.org/static/data/ALL/ALL-pre.fas" -H "Accept: application/zip"
-curl -o ALL-mat.fas -OJX GET "https://mirgenedb.org/fasta/ALL?mat=1" 
-curl -o ALL.fas -OJX GET "https://mirgenedb.org/fasta/ALL?all=1"
-
-seqkit stats *fas
-
-```
-
-
 
 ### rfam database
 
