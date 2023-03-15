@@ -88,13 +88,16 @@ Good!
 ```bash
 mkdir GENOME_INDEX;cd GENOME_INDEX
 
+
 # ln -s /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa .
 
-genome=GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
+#genome=GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
+
+genome=/home/rvazquez/GENOME_20230217/ENSEMBLE/multi_genome.newid.fa
 
 g_name=`basename ${genome%.fa}`
 
-hisat2-build -p 20 $genome ${genome%.fa}
+hisat2-build -p 22 $genome $g_name &> hisat2_build.log &
 
 # Run on paired-end reads
 
@@ -102,7 +105,7 @@ hisat2-build -p 20 $genome ${genome%.fa}
 
 # /home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX
 
-mkdir SAM_FILES
+mkdir HISAT2_SAM_BAM_FILES
 
 idx_file=/home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX/$g_name
 
@@ -154,27 +157,42 @@ java -Xmx2g -jar $PICARD MergeSamFiles -OUTPUT output.bam \
 -INPUT  SRR8956804.sorted.bam \
 -INPUT  SRR8956805.sorted.bam
 
+# 2) Reference-guide assembly
 
+stringtie --rf -p 4 -G $RNA_REF_GTF -l HBR_Rep1 -o HBR_Rep1/transcripts.gtf $RNA_ALIGN_DIR/HBR_Rep1.bam
 
-# 2) Assembly
+# (optional)
 
 stringtie ${out_sam%.sam}.sorted.bam -o transcripts.gtf
 
-# 2.1 Reference annotation transcripts (-G)
-# Flag -G is for include reference annotation to use for guiding the assembly process (GTF/GFF)
+# 2.1 Reference annotation transcripts 
 
+# SOURCE THE GENOME GTG
 ln -s /home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.gtf genome.gtf
 
-stringtie --rf -p 4 -l HBR_Rep1 -o HBR_Rep1/transcripts.gtf $RNA_ALIGN_DIR/HBR_Rep1.bam
+# SOURCE THE GENOME FASTA
 
-stringtie output.sorted.bam -B -G genome.gtf -o transcripts.gtf
+ln -s /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa genome.fa
+
+# Flag -G is for include reference annotation to use for guiding the assembly process (GTF/GFF)
+# -l <label>       name prefix for output transcripts (default: MSTRG)
+
+for file in $(ls *sorted.bam)
+do
+withpath="${file}"
+filename=${withpath##*/}
+base="${filename%*.sorted.bam}"
+stringtie --rf -p 4 -G genome.gtf -l $base -o ${base}_transcripts.gtf $file
+done
+
+# WARNING: no reference transcripts were found for the genomic sequences where reads were mapped!
+# Please make sure the -G annotation file uses the same naming convention for the genome sequences.
 
 # 3) Generate a FASTA file with the DNA sequences for all transcripts in a GFF file.
 
 
 # -w flag write a fasta file with spliced exons for each transcript
 
-ln -s /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa genome.fa
 
 
 gffread -w transcripts.fa -g genome.fa transcripts.gtf
