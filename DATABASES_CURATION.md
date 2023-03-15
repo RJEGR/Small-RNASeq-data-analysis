@@ -1,8 +1,20 @@
 # DATABASE CURATION
-Genomic features and coordinates (Ex. Protein coding genes, tRNA, rRNA, ncRNAs classes, pseudogenes, etc.) may be taking from genomic GFF files. Recently (February, 2023), ENSEMBLE release the genomic features for Haliotis rufescense according to the genomic version 3055435v1rs
+Genomic features and coordinates (Ex. Protein coding genes, tRNA, rRNA, ncRNAs classes, pseudogenes, etc.) may be taking from genomic GFF files. Recently (February, 2023), ENSEMBLE release the genomic features for _Haliotis rufescense_ according to the genomic version 3055435v1
 
 ## ENSEMBLE:
-A diferencia de NCBI, la version GFF de ENSEMBLE tiene las anotaciones de UTR
+A diferencia de NCBI, la version GFF de ENSEMBLE tiene las anotaciones de UTR.
+
+**Notar que** el ENSEMBLE tiene la version `GCA_023055435.1` del genoma de _Haliotis rufescense_  con el prefijo GCA. Lo anterior indica que esta version es una copia del ensamble de GenBank. Por otro lado, la version ` GCF_023055435`, antes descargada, indica que la copia del ensamble proviene de RefSeq. Otras diferencias importantes son las [siguientes](https://computationalbiologybytes.wordpress.com/2015/10/02/clarifying-the-differences-between-the-grc-and-refseq-versions-of-h38/):
+
+What is the difference between GCA$ and GCF $ ?
+
+1. The GCA indicates the GenBank copy of the assembly, and the GCF indicates the RefSeq copy of the assembly.
+2. The GenBank copy is the assembly that was provided by the submitter to GenBank. The RefSeq assembly is a copy of the GenBank copy that is used as the basis for RefSeq annotation. (This is a historical precedent: RefSeq does not annotate GenBank sequences, they only annotate RefSeq sequences: http://www.ncbi.nlm.nih.gov/books/NBK50679/).
+3. Ex. The GenBank copy of the human reference assembly is devoid of annotation. The RefSeq copy contains the NCBI-provided annotation.
+4. There are no sequence differences between GenBank and RefSeq versions of the equivalent human assembly release (e.g. GRCh38.p4).
+
+
+What is the difference between GTF and GFF format ?
 
 **GTF:** Gene sets for each species. These files include annotations of both coding and non-coding genes. 
 **GFF3:** GFF3 provides access to all annotated transcripts which make up an Ensembl gene set. 
@@ -11,19 +23,44 @@ A diferencia de NCBI, la version GFF de ENSEMBLE tiene las anotaciones de UTR
 
 ```bash
 wget https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-56/metazoa/embl/haliotis_rufescens_gca023055435v1rs/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.nonchromosomal.dat.gz
+
+# TOPLEVEL (*.dna.toplevel.fa.gz): These files contains all sequence regions flagged as toplevel (toplevel sequences unmasked) in an Ensembl schema. This includes chromsomes, regions not assembled into chromosomes and N padded haplotype/patch regions.
+
+# The header line in an FASTA dump files containing DNA sequence consists of the following attributes : coord_system:version:name:start:end:strand This coordinate-system string is used in the Ensembl API to retrieve slices with the SliceAdaptor.
+
+wget https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-56/metazoa/fasta/haliotis_rufescens_gca023055435v1rs/dna/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.dna.toplevel.fa.gz
+
+
+# These files hold the transcript sequences corresponding to non-coding RNA genes (ncRNA).
+
+wget https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-56/metazoa/fasta/haliotis_rufescens_gca023055435v1rs/ncrna/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.ncrna.fa.gz
+
+
+
 ```
 
 ## Generate multi-FASTA genome which include both, nuclear and organelle (mtDNA) genomes.
 Unmasked version of genome should be used to allow the discovery of repeat-associated small RNAs, which are numerous in many species (S. Shaid and M. Axtell, 2013). We also concatenated both, mtDNA (JALGQA010000616.1) and nuclear genome (GCA_023055435.1) into one multi-FASTA file to allow comprehensive annotation/discovery of small RNAs-producing loci.  
 
 ```bash
-nuclear_file=~/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
+# nuclear_file=~/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
+
+nuclear_file=/home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.dna.toplevel.fa
+
 mt_file=/home/rvazquez/GENOME_20230217/HR_mtDNA_whole_genome_shotgun_sequence_JALGQA010000616.1.fasta 
-cat $nuclear_file $mt_file > multi_genome.fa
+
+# cat $nuclear_file $mt_file > multi_genome.fa
 # grep -c "^>" multi_genome.fa
 # 616 scaffolds
 
-# /home/rvazquez/GENOME_20230217/multi_genome.fa
+# FOR GENOMIC FILES REMOVE EXTRA ID DESCRIPTION
+
+cat $nuclear_file $mt_file|seqkit replace -p "\s.+" > multi_genome.newid.fa
+
+
+seqkit fx2tab --length --name multi_genome.newid.fa | head
+
+# /home/rvazquez/GENOME_20230217/ENSEMBLE/multi_genome.newid.fa
 
 ```
  
@@ -46,6 +83,49 @@ URS0000000001	ENA	GU786868.1:1..200:rRNA	77133	rRNA
 URS0000000001	ENA	GU786889.1:1..200:rRNA	77133	rRNA	
 ```
 
+## MicroRNAs DB
+### miRNA database
+
+The miRBase v. 22 entries were retrieved from http://www.mirbase.org/ftp.shtml [[DOI](doi:10.1093/nar/gky1141)], MirGeneDB 2.0 data were downloaded from http://mirgenedb.org/download [[DOI](https://doi.org/10.1093/nar/gkz885)], and previously reported bivalve miRNAs were retrieved from the electronic supplementary material files of a number of papers
+
+```bash
+mkdir "MIRBASE_"$(date +%Y%m%d)
+
+cd MIRBASE_*
+
+curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/hairpin.fa.gz" -H "Accept: application/zip"
+
+curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/mature.fa.gz" -H "Accept: application/zip"
+
+curl -OJX GET "https://www.mirbase.org/ftp/CURRENT/miRNA.str.zip"  -H "Accept: application/zip"
+
+gunzip *gz
+
+grep -c "^>" *.fa
+
+```
+
+### MirGene DB
+
+MirGeneDB is a database of manually curated microRNA genes that have been validated and annotated as initially described in [Fromm et al. 2015 ](http://www.annualreviews.org/doi/abs/10.1146/annurev-genet-120213-092023)and [Fromm et al. 2020](https://academic.oup.com/nar/advance-article/doi/10.1093/nar/gkz885/5584683?guestAccessKey=b9fe4339-a36b-49df-96ea-9e2cd7a1c99b). MirGeneDB 2.1 includes more than 16,000 microRNA gene entries representing more than 1,500 miRNA families from 75 metazoan species and published in the [2022 NAR database issue](https://academic.oup.com/nar/advance-article/doi/10.1093/nar/gkab1101/6439665). All microRNAs can be browsed, searched and downloaded.
+
+miRNAs obtained may BLASTed (blastn) against miRBase and MirGeneDB databases.
+
+```bash
+mkdir "MIRGENEDB_"$(date +%Y%m%d)
+
+cd MIRGENEDB*
+# https://mirgenedb.org/information
+curl -OJX GET "https://mirgenedb.org/static/data/ALL/ALL-pre.fas" -H "Accept: application/zip"
+curl -o ALL-mat.fas -OJX GET "https://mirgenedb.org/fasta/ALL?mat=1" 
+curl -o ALL.fas -OJX GET "https://mirgenedb.org/fasta/ALL?all=1"
+
+seqkit stats *fas
+
+```
+
+
+
 ## MOLLUSC MIRS FROM GENOME_WIDE_ANALYSIS 
 Esta base de referencia proviene del trabajo de Huang et al (2021), Tabla suplementaria Table_S1. Contiene distintas listas de miRs de 35 especies de moluscos. Un total de 5,823 secuencias unicas de miRs maduras y precursoras fueron recuperadas para su implementacion en la busqueda de miRs. Algunos de estos miRs fueron validados por steep-loop qRT-PCR usando U6-snRNA como referencia interna. El metodo de detección insilico se describe a continuacion: 
 
@@ -57,6 +137,8 @@ Consultar el script [`GENOME_WIDE_MIRS_MOLLUSK.R`](https://github.com/RJEGR/Smal
 
 ## piwi interacting RNAs (piRNAs)
 The use of this db is motivated by the identification of reads > 26 nt in the library from embrio-larval stages. Here, PIRBASE V3 is used as standard gold to detect piRNAs reads. Prior to the annotation the use of `shortstacks` allow to  identify piRNA candidates based several sequences features. pirBASE_v3 is downloaded manually from here: http://bigdata.ibp.ac.cn/piRBase/download.php. In addition to standard golds We taking into account the presence of two mollusk > gastropods were piRNAs are identified: (Anaspidea -aca- and Biomphalaria glabrata -bgl-)
+
+
 
 ## MIRTRACE DATABASE CREATION
 Revisar pagina 16 del manual
@@ -246,13 +328,19 @@ make install
 cp imagespread eledef eleredef edgeredef famdef ../bin/
 # /home/rvazquez/RECON1.05/bin
 
-# 
+# REPEATCOUNT
 
 wget 
 http://www.repeatmasker.org/RepeatScout-1.0.6.tar.gz
 gunzip RepeatScout.*; tar xvf RepeatScout-1.0.6.tar
 
-#
+RC_DIR=/usr/local/RepeatScout-1.0.5
+TRF_DIR=/usr/local/RepeatMasker/util/
+CDHIT_DIR=/usr/bin/
+UCSCTOOLS_DIR=/home/rvazquez/UCSCTOOLS
+RMBLAST_DIR=/home/rvazquez/rmblast-2.13.0/bin
+NINJA_DIR=home/rvazquez/NINJA-0.95-cluster_only/NINJA
+# 
 wget https://www.repeatmasker.org/rmblast/rmblast-2.13.0+-x64-linux.tar.gz
 
 gunzip rmblast-2.13.0+-x64-linux.tar.gz
@@ -267,6 +355,14 @@ tar xvf genometools-1.6.0.tar
 cd genometools*
 make cairo=no threads=yes
 make install
+
+# LTR_RETRIEVER
+
+conda install -c bioconda ltr_retriever 
+
+# ninja
+
+git clone https://github.com/TravisWheelerLab/NINJA.git
 ```
 
 
