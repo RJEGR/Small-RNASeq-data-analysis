@@ -55,6 +55,7 @@ seqkit fx2tab HR110761.clean.newid.fa | awk '{print $0,"EEEEEEEEEEEEEEEEEEEEE"}'
 
 ```
 ### 2) Filtering reads based on its biotype (mirtrace)
+Porque correr el filtrado de srna-seqs? While miRs are processed from hairpin containing precursor, tRNA are folded into characteristic L-shaped structure but both, tRNA and miRs are synthesized as a single-strand molecules than results in a rich source of rna fragments from similar size (Daniel Hasler, 2016) 
 ```bash
 
 # test
@@ -272,7 +273,7 @@ export PATH=$PATH:"/home/rvazquez/strucVis"
 
 ```
 
-Then running
+####  Running
 
 ```bash
 
@@ -287,7 +288,15 @@ export PATH=$PATH:"/home/rvazquez/ShortTracks"
 export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
 
 REF=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.fa
+
+# Evaluamos que no hay redundancia entre los ids y concatenamos en una sola base
+
 MIRGENEDB=/home/rvazquez/MIRGENEDB_20230314/ALL-mat.fa
+PIRBASE=/home/rvazquez/MIRTRACE/CUSTOM_DB/PIRBASE_V3/PIRBASE_rmdup.fasta
+
+cat $MIRGENEDB $PIRBASE | seqkit rmdup -n -o knownsRNA.fa
+
+# [INFO] 0 duplicated records removed
 
 # generate fai index
 # samtools faidx $reference -o ${reference}.fai
@@ -305,10 +314,35 @@ MIRGENEDB=/home/rvazquez/MIRGENEDB_20230314/ALL-mat.fa
 
 readfile=`ls -x *.newid.subset.fq`
 
-ShortStacks4 --genomefile $REF --knownRNAs $MIRGENEDB --dn_mirna --outdir ShortStack_"$(date +%Y%m%d)"_out --threads 24 --dicermax 30 --mmap u --mincov 0.8 --pad 1 --readfile $readfile &> "ShortStack_"$(date +%Y%m%d)".log" &
+# --knownRNAs $MIRGENEDB
+
+ShortStacks4 --genomefile $REF --knownRNAs knownsRNA.fa --dn_mirna --outdir ShortStack_"$(date +%Y%m%d)"_out --threads 24 --dicermax 30 --mmap u --mincov 0.8 --pad 1 --readfile $readfile &>> "ShortStack_"$(date +%Y%m%d)".log" &
+
+# esperar 2 minutos a ver avances del archivo log
+
+# Appending Standard Output and Standard Error: 2>&1. 
+# https://www.cyberciti.biz/faq/how-to-redirect-standard-error-in-bash/
+# Bash executes the redirects from left to right as follows:
+# cmd >>file.txt 2>&1
+# >>file.txt: Open file.txt in append mode and redirect stdout there.
+# 2>&1: Redirect stderr to "where stdout is currently going". In this case, that is a file opened in append mode. In other words, the &1 reuses the file descriptor which stdout currently uses.
+
+# to kill the process related to it ps -o pid=pidid | xargs kill
 ```
 
 ## Dataviz shortstacks outputs
+
+/home/rvazquez/SHORTSTACKS/ShortStack_20230315_out
+
+
+([M. Axtell Note](https://github.com/MikeAxtell/ShortStack#genome-browsers)): The output of ShortStack is designed to work with genome browsers. Specifically, the files Results.gff3, knownRNAs.gff3, the .bam files, and the .bw files can be directly visualized on either major genome browser (IGV, JBrowse). JBrowse2 has the ability to create "multi-wiggle" tracks. These tracks show multiple quantitative data tracks at once, bound to a common quantitative axis. The .bw bigwig files created by ShortStack & ShortTracks are normalized to reads-per-million, allowing direct comparisons in a multi-wiggle track. This allows visualization of size, coverage, and strandedness of the data. 
+
+Types of bigwig files produced by ShortStack:
+
+* readlength/stranded: A set of 8 .bw files with suffixes in the format _x_y.bw
+  - x : A number ('21', '22', '23-24') or the string 'other', indicating the sizes of sRNAs tracked in that file.
+  - y : Either 'p' or 'm' for the plus or minus genomic strand.
+* readgroup: Only produced when there are multiple samples in the alignment. A set of n .bw files, with one per read-group. Because values are normalized to reads-per-million, these tracks are directly comparable to each other.
 
 Load source 
 ```bash
@@ -317,14 +351,25 @@ export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/ShortTracks"
 export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/UCSCTOOLS" 
 export PATH=$PATH:""
 ```
-Then
+Then (if shortstacks is version =< 3.8)
 ```bash
 ShortTracks --bamfile merged_alignments.bam --mode readlength --stranded 
 ```
 
-Open jbroswer >
+Follow similar instructions than [here](https://jbrowse.org/jb2/docs/tutorials/config_gui/):
+
+`Open JBroswer > create new assembly > show as linear > add track > multi-wiggle-track
+
+Follow instructions to edit format: https://github.com/MikeAxtell/ShortTracks
+
 Assembly display name: Haliotis rufescense (nuclei and organelle genome (GCA_023055435.1)
 Assembly name: hr_multigenome_ensemble
+
+consider https://gmod.github.io/JBrowseR/
+
+```bash
+printf "$PWD/%s\n" *.bam
+```
 
 
 
