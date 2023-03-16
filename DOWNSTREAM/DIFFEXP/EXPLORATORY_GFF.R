@@ -11,7 +11,7 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 current_ref <- '~/Documents/MIRNA_HALIOTIS/TRASH/GCF_023055435.1/ncbi_dataset/data/GCF_023055435.1/'
 # prev_ref <- '~/Documents/MIRNA_HALIOTIS/GCF_003343065.1/ncbi_dataset/data/GCF_003343065.1/'
-
+# current_ref <- "/Users/cigom/Documents/MIRNA_HALIOTIS/MGCounts/mgcount_tutorial/annotations_gtf/"
 # review report at https://www.ncbi.nlm.nih.gov/genome/annotation_euk/Haliotis_rufescens/101/
 
 file <- list.files(path = current_ref, pattern = "genomic.gff", full.names = T)
@@ -23,6 +23,9 @@ library(tidyverse)
 # https://edinburgh-genome-foundry.github.io/DnaFeaturesViewer/ (compare viz with this)
 
 gff <- ape::read.gff(file)
+
+# gff <- read_tsv(file[3], comment = "#", col_names = F)
+
 
 names(gff)
 
