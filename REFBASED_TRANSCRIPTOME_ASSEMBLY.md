@@ -93,31 +93,32 @@ mkdir GENOME_INDEX;cd GENOME_INDEX
 
 #genome=GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
 
+cd /home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY
+
 genome=/home/rvazquez/GENOME_20230217/ENSEMBLE/multi_genome.newid.fa
 
 g_name=`basename ${genome%.fa}`
 
-hisat2-build -p 22 $genome $g_name &> hisat2_build.log &
+idx_file=/home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX/$g_name
+
+# hisat2-build -p 22 $genome $g_name &> hisat2_build.log &
 
 # Run on paired-end reads
 
 #hisat2 --phred33 -p 8 -x ./GENOME_INDEX/$g_name -1 reads_f.fq -2 reads_r.fq -S output.sam
 
-# /home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX
 
-mkdir HISAT2_SAM_BAM_FILES
-
-idx_file=/home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX/$g_name
+mkdir -p HISAT2_SAM_BAM_FILES
 
 for file in $(ls *_R1.P.qtrim.fq.gz | grep gz)
 do
 withpath="${file}"
 filename=${withpath##*/}
 base="${filename%*_R*.P.qtrim.fq.gz}"
-hisat2 --phred33 -p 4 -x $idx_file  \
+hisat2 --phred33 -p 2 -x $idx_file  \
     --rna-strandness RF \
     -1 ${base}_R1.P.qtrim.fq.gz -2 ${base}_R2.P.qtrim.fq.gz \
-    --rg-id=${base} --rg SM:${base} -S ./SAM_FILES/${base}.sam
+    --rg-id=${base} --rg SM:${base} -S HISAT2_SAM_BAM_FILES/${base}.sam
 done &> hisat2.log &
 
 # to kill the process related to it ps -o pid=pidid | xargs kill
