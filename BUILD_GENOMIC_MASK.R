@@ -1,6 +1,16 @@
+
+
+rm(list = ls())
+
+if(!is.null(dev.list())) dev.off()
+
+options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
+
+
 # TEST https://github.com/MikeAxtell/sRNA_Viewer
 
 # Non redundant (nr) genomic annotation mask may be build to reduce the Intra-range features (i.e overlapped annotations) and assign mapped sequences to unique/single annotations. Using proference (or hierarchical) annotation selection as follow: rRNA > tRNA, Transposable elements (TE) > protein-coding exon, other ncRNAs, introns, pseudogenes ... (Cei Abreu,2023)
+
 
 
 # LA VERSION DE ENSEMBLE CONTIENE INFORMACION SOBRE LAS REGIONES UTR, LO QUE LA VERSION DE NCBI NO TIENE:
@@ -22,7 +32,7 @@ names(ensemble_gff) <- c("seqname", "source", "feature", "start", "end", "score"
 
 
 ensemble_gff %>% count(feature) 
-
+ensemble_gff %>% count(source)
 # ensemble_gff <- ape::read.gff(gff_f)
 
 # Note -----
