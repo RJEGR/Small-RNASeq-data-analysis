@@ -83,7 +83,7 @@ paste samples_id.tmp reads_in.tmp | column -t; rm *tmp
 ##
 ```
 Good!
-## Align reads to genome
+## Align reads to genome (HISAT2)
 
 ```bash
 mkdir GENOME_INDEX;cd GENOME_INDEX
@@ -105,7 +105,8 @@ idx_file=/home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX/$g_name
 
 # Run on paired-end reads
 
-#hisat2 --phred33 -p 8 -x ./GENOME_INDEX/$g_name -1 reads_f.fq -2 reads_r.fq -S output.sam
+#Ex: 
+# hisat2 --phred33 -p 8 -x ./GENOME_INDEX/$g_name -1 reads_f.fq -2 reads_r.fq -S output.sam
 
 
 mkdir -p HISAT2_SAM_BAM_FILES
@@ -125,15 +126,119 @@ done &> hisat2.log &
 # use ps to identify the loop process
 ```
 
-## Stringtie
+## Reference guide assembly (Stringtie)
 
 ```bash
-# 1.1 sam to bam conversion and sorting
+RNA_REF_GTF=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.gtf
 
-for sam_f in $(ls *sam)
+RNA_ALIGN_DIR=/home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/HISAT2_SAM_BAM_FILES/
+
+WD=/home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE
+
+cd $WD
+ln -s $RNA_ALIGN_DIR/*.sam
+
+# 1) sam to bam conversion and sorting
+
+# StringTie takes as input a SAM, BAM or CRAM file sorted by coordinate (genomic location). This file should contain spliced RNA-seq read alignments such as HISAT2
+
+for i in $(ls *sam)
 do
-samtools sort -@ 4 -o ${sam_f%.sam}.sorted.bam $sam_f
+samtools sort -@ 12 -o ${i%.sam}.sorted.bam $i
 done
+
+# 2)  run stringtie in reference-guided mode
+# A reference annotation file in GTF or GFF3 format can be provided to StringTie using the -G option which can be used as 'guides' for the assembly process and help improve the transcript structure recovery for those transcripts.
+
+# -l <label>       name prefix for output transcripts (default: MSTRG)
+
+for i in $(ls *.sorted.bam)
+do
+withpath="${i}"
+filename=${withpath##*/}
+bs="${filename%*.sorted.bam}"
+stringtie --rf -p 12 -G $RNA_REF_GTF -l $bs -o ${bs}_transcripts.gtf $i
+done
+
+# 2.1) (optional) run stringtie in de novo mode
+
+for i in $(ls *.sorted.bam)
+do
+withpath="${i}"
+filename=${withpath##*/}
+bs="${filename%*.sorted.bam}"
+stringtie --rf -p 12 -l $bs -o ${bs}_transcripts.gtf $i
+done
+
+```
+## Output single transcriptome assembly
+
+```bash
+RNA_REF_GTF=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.gtf
+
+RNA_REF_FASTA=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.fa
+
+WD=/home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE
+
+cd $WD
+
+ls -1 *_transcripts.gtf > stringtie_gtf_list.txt
+
+# awk '{if($3=="transcript") print}' stringtie_merged.gtf | cut -f 1,4,9 | less
+
+# 1) Merge gtf
+stringtie --rf --merge -p 24 -o transcripts.gtf -G $RNA_REF_GTF stringtie_gtf_list.txt
+
+# 2) Generate a FASTA file with the DNA sequences for all transcripts in a GFF file
+
+# -w flag write a fasta file with spliced exons for each transcript
+
+gffread -w transcripts.fa -g $RNA_REF_FASTA transcripts.gtf
+
+# 3) Optional
+
+gffcompare -r $RNA_REF_GTF -o gffcompare transcripts.gtf
+cat gffcompare.stats
+```
+
+## Output abundance matrix
+```bash
+# Note: 
+# When the -e option is used, the reference annotation file -G is a required input and StringTie will not attempt to assemble the input read alignments but instead it will only estimate the expression levels of the "reference" transcripts provided in the -G file. With this option, no "novel" transcript assemblies (isoforms) will be produced, and read alignments not overlapping any of the given reference transcripts will be ignored, which may provide a considerable speed boost when the given set of reference transcripts is limited to a set of target genes for example.
+
+# https://rnabio.org/module-05-isoforms/0005/05/01/Differential-Splicing/
+
+# 1) Rerun strti using -e flag
+
+for i in $(ls *.sorted.bam)
+do
+withpath="${i}"
+filename=${withpath##*/}
+bs="${filename%*.sorted.bam}"
+stringtie --rf -p 12 -G transcripts.gtf -e -o ${bs}_transcripts.gtf $i
+done
+
+# stringtie --rf -p 4 -G transcripts.gtf -e -o ab_transcripts.gtf $RNA_ALIGN_DIR/UHR_Rep1.bam
+
+
+https://github.com/RJEGR/Cancer_sete_T_assembly/blob/main/compile_trimmomatic.md#5-assembly-quality
+
+# PREPARE DE PY
+https://ccb.jhu.edu/software/stringtie/index.shtml?t=manual
+
+ls -l *_transcripts.gtf > samples.txt
+
+#./sample1/sample1.gtf
+#    ./sample2/sample2.gtf
+#    ./sample3/sample3.gtf
+    
+python prepDE.py -i samples.txt
+
+```
+
+## notes
+```bash
+# 
 
 # Merge HISAT2 BAM files
 # 1) Usin samtools 
@@ -158,9 +263,6 @@ java -Xmx2g -jar $PICARD MergeSamFiles -OUTPUT output.bam \
 -INPUT  SRR8956804.sorted.bam \
 -INPUT  SRR8956805.sorted.bam
 
-# 2) Reference-guide assembly
-
-stringtie --rf -p 4 -G $RNA_REF_GTF -l HBR_Rep1 -o HBR_Rep1/transcripts.gtf $RNA_ALIGN_DIR/HBR_Rep1.bam
 
 # (optional)
 
@@ -171,30 +273,5 @@ stringtie ${out_sam%.sam}.sorted.bam -o transcripts.gtf
 # SOURCE THE GENOME GTG
 ln -s /home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.gtf genome.gtf
 
-# SOURCE THE GENOME FASTA
 
-ln -s /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa genome.fa
-
-# Flag -G is for include reference annotation to use for guiding the assembly process (GTF/GFF)
-# -l <label>       name prefix for output transcripts (default: MSTRG)
-
-for file in $(ls *sorted.bam)
-do
-withpath="${file}"
-filename=${withpath##*/}
-base="${filename%*.sorted.bam}"
-stringtie --rf -p 4 -G genome.gtf -l $base -o ${base}_transcripts.gtf $file
-done
-
-# WARNING: no reference transcripts were found for the genomic sequences where reads were mapped!
-# Please make sure the -G annotation file uses the same naming convention for the genome sequences.
-
-# 3) Generate a FASTA file with the DNA sequences for all transcripts in a GFF file.
-
-
-# -w flag write a fasta file with spliced exons for each transcript
-
-
-
-gffread -w transcripts.fa -g genome.fa transcripts.gtf
 ```
