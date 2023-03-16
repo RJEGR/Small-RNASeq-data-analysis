@@ -9,7 +9,8 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 library(tidyverse)
 
 # path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230308_test/"
-path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230314_test/"
+# path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230314_test/"
+path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out//"
 
 list.files(path = path, pattern = "txt")
 
@@ -34,7 +35,7 @@ Results %>% filter(MIRNA == "Y" & is.na(KnownRNAs) == T) %>% view()
 Results %>% filter(MIRNA == "Y") %>% drop_na(KnownRNAs) %>% view()
 
 
-# Using follow columns to generate fasta headers:
+# Using follow columns to generate fasta headers: (not requiered for shortstacks 4.0)
 # Locus: Coordinates of the locus in Chrom:Start-Stop format, one-based, inclusive.
 # Name: Name for the Locus. De novo loci are named like Cluster_1, etc. Loci provided by the user with option --locifile preserve the user-given names.
 
