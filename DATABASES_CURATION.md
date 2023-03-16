@@ -87,6 +87,8 @@ seqkit subseq --gtf utr.gtf $genome --gtf-tag "gene_id" -o utr.fa
 Unmasked version of genome should be used to allow the discovery of repeat-associated small RNAs, which are numerous in many species (S. Shaid and M. Axtell, 2013). We also concatenated both, mtDNA (JALGQA010000616.1) and nuclear genome (GCA_023055435.1) into one multi-FASTA file to allow comprehensive annotation/discovery of small RNAs-producing loci.  
 
 ```bash
+WD=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF
+cd $WD
 # nuclear_file=~/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa
 
 nuclear_file=/home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.dna.toplevel.fa
@@ -105,6 +107,14 @@ cat $nuclear_file $mt_file|seqkit replace -p "\s.+" > multi_genome.newid.fa
 seqkit fx2tab --length --name multi_genome.newid.fa | head
 
 # /home/rvazquez/GENOME_20230217/ENSEMBLE/multi_genome.newid.fa
+
+# CURATE GTF
+mtGTF=/home/rvazquez/GENOME_20230217/HR_mtDNA_whole_genome_shotgun_sequence_JALGQA010000616.1.gff3
+
+cp /home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.gtf multi_genome.newid.gtf
+
+
+tail -n1 $mtGTF >> multi_genome.newid.gtf
 
 ```
  
