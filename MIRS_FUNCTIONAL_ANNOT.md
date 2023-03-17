@@ -73,6 +73,20 @@ miranda --h
 
 ```
 
+## SubmiRine
+```bash
+# https://research.nhgri.nih.gov/software/SubmiRine/download.shtml
+
+wget https://research.nhgri.nih.gov/software/SubmiRine/downloads/SubmiRine.tar.gz
+gunzip SubmiRine.tar.gz
+tar xvf SubmiRine.tar
+
+export PATH=$PATH:"/home/rvazquez/MIRS_FUNCTIONAL_ANNOT/SubmiRine/src"
+
+# CHECK PY VERSION
+```
+
+
 ###  RUNNING TOOLS
 
 
@@ -90,12 +104,17 @@ target=/home/rvazquez/GENOME_20230217/ENSEMBLE/utr.fa
 query=mir.fasta
 
 
-miranda $query $target
+
+miranda $query $target > miranda.out &
+
+# free(): invalid next size (fast)
+# [1]+  Aborted                 (core dumped) miranda $query $target > miranda.out
 
 # Segmentation fault (core dumped)
 # sudo apt-get clean all
 
-# 2)
+# 2) (RNAHYB Tiene sezgos debido a sus calibraciones en el flag -s, ademas no sabemos los rangos del flag -d que omite a -s)
+
 # RNAhybrid [options] [target sequence] [query sequence].
 RNAhybrid -t $target -m 20000 -q $query -n 50 -f 2,8 -s 3utr_human > RNAhybrid.out &
 
