@@ -29,7 +29,7 @@ conda install -c bioconda trimmomatic
 git clone https://github.com/broadinstitute/picard.git
 # git clone https://github.com/broadinstitute/picard.git --branch 2.25.0
 ```
-## Downloading dataset (NCBI utils)
+## 0) Downloading dataset (NCBI utils)
 ```bash
 sh -c "$(wget -q ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh -O -)"
 
@@ -87,7 +87,7 @@ esearch -db sra -query "PRJNA488641" |  efetch -format docsum | xtract -pattern 
 for i in $(cat SraAccList.txt); do fasterq-dump --split-files $i --skip-technical -p; done &> fasterq_dump.log
 
 ```
-
+Additional tools
 ```bash
 # Additional
 
@@ -107,7 +107,7 @@ ln -s $INSTALL_DIR/gffread_dir/gffread
 ln -s $INSTALL_DIR/gffcompare_dir/gffcompare
 ```
 
-Export tools:
+### Export tools:
 
 ```bash
 export PATH=$PATH:"/home/rvazquez/RNA_SEQ_ANALYSIS/hisat2"
@@ -115,7 +115,7 @@ export PATH=$PATH:"/home/rvazquez/RNA_SEQ_ANALYSIS/stringtie"
 export PATH=$PATH:"/home/rvazquez/anaconda3/bin/"
 ```
 
-## Exploratory RNA-seq quality
+## 1) Exploratory RNA-seq quality
 ```bash
 mkdir -p fastqc
 fastqc *.fastq -t 24 --nogroup -o ./fastqc &> fastqc.log &
@@ -129,7 +129,7 @@ https://github.com/RJEGR/Cancer_sete_T_assembly/blob/main/compile_trimmomatic.md
 
 Identificamos que es necesario remover la presencia del adaptor universal. Hay prencencia de N en entre secuencias pero la calidad de todas las biblitecas es superior a Phred > 30.
 
-## Trimming adapters
+## 2) Trimming adapters
 Using trimmomatic. Parameter description is detailed [here](http://www.usadellab.org/cms/?page=trimmomatic)
 
 ```bash
@@ -160,8 +160,8 @@ grep phred33 trimmomatic.log | awk '{gsub(/_/," ", $2); print $2}' | awk '{print
 paste samples_id.tmp reads_in.tmp | column -t; rm *tmp
 ##
 ```
-Good!
-## Align reads to genome (HISAT2)
+
+## 3) Align reads to genome (HISAT2)
 
 ```bash
 mkdir GENOME_INDEX;cd GENOME_INDEX
@@ -186,6 +186,9 @@ idx_file=/home/rvazquez/RNA_SEQ_ANALYSIS/GENOME_INDEX/$g_name
 #Ex: 
 # hisat2 --phred33 -p 8 -x ./GENOME_INDEX/$g_name -1 reads_f.fq -2 reads_r.fq -S output.sam
 
+cd /home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY
+
+ln -s /home/rvazquez/RNA_SEQ_ANALYSIS/PROCESSED_LIBS/*P.qtrim.fq.gz
 
 mkdir -p HISAT2_SAM_BAM_FILES
 
@@ -200,11 +203,13 @@ hisat2 --phred33 -p 2 -x $idx_file  \
     --rg-id=${base} --rg SM:${base} -S HISAT2_SAM_BAM_FILES/${base}.sam
 done &> hisat2.log &
 
+for i in $(ls *P.qtrim.fq.gz);do unlink $i; done
+
 # to kill the process related to it ps -o pid=pidid | xargs kill
 # use ps to identify the loop process
 ```
 
-## Reference guide assembly (Stringtie)
+## 4) Reference guide assembly (Stringtie)
 
 ```bash
 RNA_REF_GTF=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.gtf
@@ -244,7 +249,7 @@ done
 mkdir REFBASED_MODE; mv *_transcripts.gtf REFBASED_MODE
 
 ```
-## Denovo based assembly
+## 5) Denovo based assembly
 
 ```bash
 # 1) (optional) run stringtie in de novo mode
@@ -278,7 +283,7 @@ grep "^>" -c transcripts.fa # 93,305
 
 ```
 
-## Output FASTA transcriptome assembly
+### 5.1) Output FASTA transcriptome assembly
 
 Prepare guide assembly
 ```bash
@@ -322,9 +327,10 @@ awk '{if($3=="transcript") print}' DENOVO_MODE.gffcompare.annotated.gtf | cut -f
   
 ```
 
-## Output abundance matrix
+### 5.2) Output abundance matrix
 For each RNA-Seq sample, run StringTie using the `-B/-b` and `-e` options in order to estimate transcript abundances and generate read coverage tables.
-### Generating guide based format
+
+#### Generating guide based format
 ```bash
 # Note: 
 # When the -e option is used, the reference annotation file -G is a required input and StringTie will not attempt to assemble the input read alignments but instead it will only estimate the expression levels of the "reference" transcripts provided in the -G file. With this option, no "novel" transcript assemblies (isoforms) will be produced, and read alignments not overlapping any of the given reference transcripts will be ignored, which may provide a considerable speed boost when the given set of reference transcripts is limited to a set of target genes for example.
@@ -381,21 +387,19 @@ echo "$bs" `printf "$PWD/${bs}_eB_dir/$fname"`
 #echo "$bs" "$fname"
 done > samples.txt
 
+# GaD, continuar aqui 17/03/23
 
-python ../prepDE.py --string=MSTRG -i samples.txt
+prepDE.py3 -i samples.txt  -v
+
+# ..writing transcript_count_matrix.csv
+# ..writing gene_count_matrix.csv
+# All done.
 
 # These count matrices (CSV files) can then be imported into R for use by DESeq2 and edgeR (using the DESeqDataSetFromMatrix and DGEList functions, respectively).
 
-# Also, prepDE.py either accepts a .txt (sample_lst.txt) file listing the sample IDs and the GTFs' paths or by default expects a ballgown directory produced by StringTie run with the -B option
-
-stringtie --rf -p 24 -G transcripts.gtf -e -B -o SRR8956797_dir/eG.gtf SRR8956797.sorted.bam
-
-printf "eG.gtf $PWD/eG.gtf\n" > samples.txt
-
-python ../prepDE.py --string=MSTRG -i samples.txt
 ```
 
-### Generating De novo (Optional)
+#### Generating De novo (Optional)
 ```bash
 MODE=DENOVO_MODE
 
@@ -414,6 +418,30 @@ ln -s $WD/$MODE/transcripts.gtf .
 # Note: Use the reference guided merged GTF in -G flag
 
 # (Run as above)
+
+```
+
+Prepare assembly directory for file trasfer
+```bash
+MODE=REFBASED_MODE # DENOVO_MODE
+
+FOLDER_PATH=/home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/$MODE
+
+tree -L 1 $FOLDER_PATH
+
+tar -czvf ${MODE}.tar.gz $FOLDER_PATH
+
+# 
+
+scp rvazquez@200.23.162.234:/home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/REFBASED_MODE.tar.gz 
+
+scp rvazquez@200.23.162.234:/home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/REFBASED_MODE.tar.gz .
+
+scp rvazquez@200.23.162.234:/home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/DENOVO_MODE.tar.gz .
+
+# Extract
+
+tar -xzvf REFBASED_MODE.tar.gz
 
 ```
 
