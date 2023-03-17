@@ -273,6 +273,12 @@ export PATH=$PATH:"/home/rvazquez/strucVis"
 
 ```
 
+### Analysis on the GYM motif of natural miRNAs
+Lee, Y.  et al (2023) analysis revealed a position-dependent 3-bp motif that strongly promotes processing: a paired G, a paired pyrimidine (Y), and a mismatched C or less favourably A (M) at positions −1, 0 and 1 on the 3p side, respectively (with DICER cleaving between G and Y). Therefore, they named this element the GYM motif. 
+```bash
+https://github.com/haedongkim615
+```
+
 ####  Running
 
 ```bash
