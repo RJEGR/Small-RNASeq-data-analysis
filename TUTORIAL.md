@@ -56,67 +56,7 @@ echo "export PATH=$PATH:/home/rvazquez/anaconda3/bin" >> $HOME/.bash_profile
 
 
 ```
-#### NCBI utils
-```bash
-sh -c "$(wget -q ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh -O -)"
-
-echo "export PATH=\${PATH}:/home/rvazquez/edirect" >> ${HOME}/.bashrc
-
-# To activate EDirect for this terminal session, please execute the following:
-
-export PATH=${PATH}:${HOME}/edirect
-
-# 1.2) https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/
-
-sudo apt install ncbi-entrez-direct
-
-wget https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Linux.gz
-
-ftp-cp ftp.ncbi.nlm.nih.gov /entrez/entrezdirect xtract.Linux.gz
-
-gunzip -f xtract.Linux.gz
-
-chmod +x xtract.Linux
-
-mv xtract.Linux ~/.local/bin
-
-#Add it to your path, or put it somewhere that is in your path, for example in ~/.local/bin/ so that you can get help by doing:
-
-xtract.Linux -help
-
-# RE-OPEN BASH SESSION
-
-# 2) INSTALL sratoolkit FOR USE fastq-dump
-
-wget --output-document sratoolkit.tar.gz https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/current/sratoolkit.current-ubuntu64.tar.gz
-
-tar -vxzf sratoolkit.tar.gz
-
-echo "export PATH=$PATH:/home/rvazquez/RNA_SEQ_ANALYSIS/sratoolkit.3.0.1-ubuntu64/bin/" >> $HOME/.bash_profile 
-
-
-which fasterq-dump # a replacement for the much older fastq-dump tool.
-
-# 3) For best performance, obtain an API Key from NCBI, and place the following line in your .bash_profile and .zshrc configuration files:
-
-# export NCBI_API_KEY=unique_api_key
-echo "NCBI_API_KEY=74e0e4bf2d8eaa3bb742c46316dbafe12909" >> $HOME/.bash_profile
-
-# Test
-
-esearch -db sra -query "PRJNA488641" |  efetch -format docsum | xtract -pattern Runs -ACC @acc  -element "&ACC" > SraAccList.txt
-
-
-# then download data
-# Ex.
-fasterq-dump --split-files "SRR8956805" --skip-technical -p
-
-for i in $(head -n9 SraAccList_larvae_samples.txt); do fasterq-dump --split-files $i --skip-technical -p; done &> fasterq_dump.log
-
-
-
-
-```
+#### 
 And also
 #### 
 ### Preprocessing
