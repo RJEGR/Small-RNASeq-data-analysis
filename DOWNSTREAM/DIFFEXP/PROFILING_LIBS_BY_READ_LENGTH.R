@@ -79,18 +79,58 @@ out %>%
   scale_y_continuous(ylab, labels = scales::percent) +
   # scale_y_continuous(ylab, labels = scales::comma) + # if y = n
   scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 1)) +
-  see::scale_fill_pizza() -> ps
+  see::scale_fill_pizza() -> bottom
 
-ps <- ps + theme_bw(base_family = "GillSans", base_size = 11) +
+bottom <- bottom + theme_bw(base_family = "GillSans", base_size = 11) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'none',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank())
+
+# ggsave(bottom, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH.png', path = path, width = 6, height = 5, device = png)
+
+# 1.1) top plot ---- 
+
+xlab <- ""
+ylab <- "Number of reads"
+
+out %>% 
+  mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
+  group_by(group, Length, rnatype) %>% summarise(n = sum(n)) %>%
+  group_by(group, Length) %>% mutate(pct = n / sum(n)) %>%
+  ggplot(aes(x = Length, y = n, fill = rnatype)) + 
+  # facet_grid(group ~ ., scales = "free_y") + 
+  geom_col(width = 0.85) +
+  scale_y_continuous(ylab, labels = scales::comma) +
+  scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 1)) +
+  see::scale_fill_pizza() -> top
+
+top <- top + theme_bw(base_family = "GillSans", base_size = 11) +
   theme(strip.background = element_rect(fill = 'white', color = 'white'),
     legend.position = 'top',
     panel.border = element_blank(),
-    panel.grid.minor = element_blank())
-    # axis.text.y = element_blank(), 
-    # axis.ticks.y = element_blank(),
-    # panel.grid.major = element_blank()) 
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid.major = element_blank())
 
-ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH.png', path = path, width = 6, height = 5, device = png)
+library(patchwork)
+
+ps <- top / bottom + plot_layout(heights = c(0.3, 1), design = )
+
+# t, b The top and bottom bounds of the area in the grid
+# 
+# l, r The left and right bounds of the area int the grid
+# 
+
+layout <- c(
+  area(t = 0.5, b = 1,l = 1, r = 1),
+  area(t = 1, b = 1, l = 1, r = 1)
+)
+
+top / bottom + plot_layout(heights = c(0.3, 1), design = layout)
+
+ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ.png', path = path, width = 6, height = 5, device = png)
 
 # out %>% ggplot(aes(x = Length, y = n, fill = rnatype)) + geom_col()
 
