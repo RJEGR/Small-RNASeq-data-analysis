@@ -262,7 +262,7 @@ vi ShortStack4
  
 export PATH=$PATH:"/home/rvazquez/ShortStack4"
 export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
-export PATH=$PATH:"//usr/local/bin/" # RNAfold from Vienna 
+export PATH=$PATH:"/usr/local/bin/" # RNAfold from Vienna 
 export PATH=$PATH:"/home/rvazquez/EMBOSS-6.6.0/emboss"
 export PATH=$PATH:"/home/rvazquez/seqkit_tool"
 
@@ -371,7 +371,7 @@ Follow instructions to edit format: https://github.com/MikeAxtell/ShortTracks
 Assembly display name: Haliotis rufescense (nuclei and organelle genome (GCA_023055435.1)
 Assembly name: hr_multigenome_ensemble
 
-consider https://gmod.github.io/JBrowseR/
+Consider https://gmod.github.io/JBrowseR/
 
 ```bash
 printf "$PWD/%s\n" *.bam
