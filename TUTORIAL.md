@@ -1117,20 +1117,3 @@ https://github.com/miRTop/mirtop
 ```
 
 
-
-## Differential Expression Analysis
-
-
-
-```R
-library(tidyverse)
-
-path <- '~/Documents/MIRNA_HALIOTIS/CLEAN_INPUT/'
-
-mtd <- read_tsv(list.files(path = path, pattern = 'METADATA', full.names = T))
-
-fileName <- list.files(path = path, pattern = 'miRNAs_expressed_all_samples', full.names = T)
-
-count <- read_tsv(file = fileName)
-
-```
