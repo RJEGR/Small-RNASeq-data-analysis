@@ -322,22 +322,41 @@ mirtrace qc -s pirb -w --uncollapse-fasta --custom-db-folder $custom_db_dir $fas
 ```
 
 ## Repetitive landscape annotation
-
-The overall high content of repetitive elements observed in molluscan genomes makes the first step of masking extremely important. The term repeated elements designate different nucleotide structures, from several low-complexity sequences to highly complex structures such as transposable elements.
-
 Deseamos identificar elementos transponible s(Transposable elements , TE) del genoma del abulon usando RepeatMasker (Homology-based tool) o una combinacion de dos herramintas basadas en homologia (Repeatmasker, RepeatModeler) y prediccion de novo (Ej. LTR FINDER, RepeatScount).
 
+The overall high content of repetitive elements observed in molluscan genomes makes the first step of masking extremely important. The term repeated elements designate different nucleotide structures, from several low-complexity sequences to highly complex structures such as transposable elements. Similarly to TE-derived dsRNAs, sRNAs, including microRNAs (miRNAs), short-interfering RNAs (siRNAs) and PIWI-interacting RNAs (piRNAs), play central roles in regulating TEs185 . Some challenges are shared by both sRNA-seq analysis and mRNA-seq analysis, such as mapping ambiguity or quantification186 . However, sRNA-seq analysis in the context of repeated sequences has other specificities that are detailed by Nathan R. Johnson et al (2016)
+
+
 **Homology-based prediction:** Homology-based approach involves searching commonly used databases for known TEs. We used RepeatProteinMask and RepeatMasker with repbase which contains a vast amount of known TEs.
+
+### BWA  
+https://mobilednajournal.biomedcentral.com/articles/10.1186/s13100-017-0086-z#Sec2
+sRNA reads of 21 nt, 22 nt and 24 nt length and mRNA reads longer than 25 nt were mapped to the maize B73 genome (RefGen_V2) and the maize TE database using bwa with zero mismatches (‘bwa aln –n 0’). Because bwa places multiply mapping reads randomly onto one mapping location under the default setting, we selected ‘bwa samse –n 100000000’ to ensure that all alignments were reported
+
+
+### Repeat masker
 
 `WD=/home/rvazquez/TRANSPOSABLE_ELEMENTS`
 
 ```bash
-genome=/home/rvazquez/GENOME_20230217/multi_genome.fa
+genome=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.fa
 
 # /usr/local/RepeatMasker/Libraries
 libdir=/usr/local/RepeatMasker/Libraries/
 # -libdir $libdir
-RepeatMasker -s -a -inv -gff -species "Haliotis rufescens" $genome &> RepeatMasker.log &
+
+RepeatMasker -s -a -inv -libdir $libdir -gff -species "all" $genome &> RepeatMasker.log &
+
+RepeatMasker -gff -species "all" $genome &> RepeatMasker.log &
+
+# -s  Slow search; 0-5% more sensitive, 2.5 times slower than default.
+# -a      shows the alignments in a .align output file; -ali(gnments) also works
+# -inv    alignments are presented in the orientation of the repeat (with option -a)
+
+#-threads 20
+
+
+# -norna Because of their close similarity to SINEs and the abundance of some of their pseudogenes, RepeatMasker by default screens for matches to small pol III transcribed RNAs (mostly tRNAs and snRNAs). When you're interested in small RNA genes, you should use the -norna option that leaves these sequences unmasked, while still masking SINEs
 
 # 
 famdb.py -i $libdir/RepeatMaskerLib.h5
@@ -347,8 +366,6 @@ famdb.py -i $libdir/RepeatMaskerLib.h5
 # in the RepeatMasker repeat database. Some examples are:
 
 ```
-
-
 RepeatMasker Installation (take a while ...)
 ```bash
 wget http://www.repeatmasker.org/RepeatMasker/RepeatMasker-4.1.4.tar.gz
@@ -403,12 +420,26 @@ export PATH:$PATH: # RepeatProteinMask
 
 echo "export PATH=$PATH:/usr/local/RepeatMasker/" >> $HOME/.bash_profile 
 
-# test http://www.repeatmasker.org/webrepeatmaskerhelp.html
-
 libdir=/usr/local/RepeatMasker/Libraries/
 
-RepeatMasker -s -libdir $libdir -gff GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa &> RepeatMasker.log &
+# run
 
+RepeatMasker -s -libdir $libdir -gff multi_genome.newid.fa &> RepeatMasker.log &
+
+# INCLUDE ALL SPECIES 
+cp RepeatMasker RepeatMasker.bkp
+
+# Fix the issue by changing RepeatMasker line 7718 from this -->
+if ( $lineage eq "") {
+
+# To this -->
+if ( $lineage eq "" && $species ne 'root' && $species ne 'all') {
+
+# Because REGEX fails to account for negative numbers also replace line 8141 with:
+
+if ( /^STATS\s+LOCAL\s+FORWARD\s+([\-\d\.]+)\s+([\d\.]+)/ ) {
+
+# Ref https://github.com/rmhubley/RepeatMasker/issues/195
 # Note:
 #Using Dfam with RepeatMasker
 #============================
@@ -420,7 +451,9 @@ famdb.py -i dfam.h5
 #To use Dfam 3.7 with RepeatMasker 4.1.4 or earlier, first download an updated copy of the famdb.py tool from: https://github.com/Dfam-consortium/FamDB and replace the file in the RepeatMasker directory.  Then download the latest Dfam *.h5 file and rerun the RepeatMasker configure script.
 ```
 
-then repeatModeler
+### repeatModeler
+https://github.com/Dfam-consortium/RepeatModeler
+https://github.com/4ureliek/Parsing-RepeatMasker-Outputs/blob/master/parseRM.pl
 
 ```bash
 # eledef
