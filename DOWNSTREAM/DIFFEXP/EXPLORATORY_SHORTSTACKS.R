@@ -14,7 +14,7 @@ path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out//"
 
 list.files(path = path, pattern = "txt")
 
-count_f <- list.files(path = path, pattern = "Counts.txt", full.names = T)
+# count_f <- list.files(path = path, pattern = "Counts.txt", full.names = T)
 
 res_f <- list.files(path = path, pattern = "Results.txt", full.names = T)
 
@@ -24,16 +24,22 @@ res_f <- list.files(path = path, pattern = "Results.txt", full.names = T)
 
 Results <- read_tsv(res_f)
 
-# Results %>% arrange(MajorRNA) %>% head() %>% view()
+# Results %>% arrange(MajorRNA) %>% sample_n(100) %>% view()
 
-# MIRNA column: Did the locus pass all criteria to be called a MIRNA locus? If so, 'Y'. If not, 'N'.
+# MIRNA column:  ------
+# Did the locus pass all criteria to be called a MIRNA locus? If so, 'Y'. If not, 'N'.
 
-Results %>% count(MIRNA)
+Results %>% dplyr::count(MIRNA)
+Results %>% drop_na(KnownRNAs) %>% dplyr::count(MIRNA)
 
-
-Results %>% filter(MIRNA == "Y" & is.na(KnownRNAs) == T) %>% view()
+Results %>% filter(MIRNA == "N" & is.na(KnownRNAs) == T) %>% view()
 
 Results %>% filter(MIRNA == "Y") %>% drop_na(KnownRNAs) %>% view()
+
+# PIRNAS -----
+
+Results %>% filter(grepl("piR-",KnownRNAs)) %>% count(MIRNA)
+Results %>% filter(grepl("piR-",KnownRNAs) & MIRNA == "Y" ) %>% view()
 
 
 # Using follow columns to generate fasta headers: (not requiered for shortstacks 4.0)
