@@ -205,17 +205,37 @@ https://github.com/mswzeus/TargetNet
 
 ```bash
 git clone https://github.com/mswzeus/TargetNet.git
+
 cd TargetNet
+
 conda env create -f TargetNet.yaml  # take more than 1 hour
 
 conda create -n TargetNet python=3.8
 
-conda activate TargetNet
+source activate TargetNet
+
+conda config --add channels defaults
+conda config --add channels bioconda
+conda config --add channels conda-forge
+conda config --add channels pytorch
+# conda list
+
+# -c CHANNEL
 
 conda install pytorch==1.10.2 torchvision==0.11.3 cudatoolkit=11.3 -c pytorch -c conda-forge
 
 pip install -r requirements.txt
 
+# 
+
+export PATH=$PATH:"/home/rvazquez/TargetNet"
+
+python3.8 train_model.py --help
+
+CUDA_VISIBLE_DEVICES=0
+
+# training the model
+python3.8 train_model.py --data-config config/data/miRAW_train.json --model-config config/model/TargetNet.json --run-config config/run/run.json --output-path results/TargetNet_training/
 ```
 
 ## Others
