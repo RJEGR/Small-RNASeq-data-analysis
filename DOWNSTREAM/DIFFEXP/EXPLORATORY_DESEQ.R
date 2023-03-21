@@ -11,17 +11,20 @@ library(DESeq2)
 
 source("~/Documents/GitHub/EDAT/DE_methods.R")
 
-path <- '~/Documents/MIRNA_HALIOTIS/CLEAN_INPUT/'
+path <- '~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/'
 
 mtd <- read_tsv(list.files(path = path, pattern = 'METADATA', full.names = T))
 
-fileName <- list.files(path = path, pattern = 'miRNAs_expressed_all_samples', full.names = T)
+# fileName <- list.files(path = path, pattern = 'miRNAs_expressed_all_samples', full.names = T)
+fileName <- list.files(path = path, pattern = "Counts.txt", full.names = T)
 
-count <- read_tsv(file = fileName)
+Countdf <- read_tsv(file = fileName)
 
-whichCols <- !grepl('norm', names(count))
+# whichCols <- !grepl('norm', names(count))
 
-count <- count[whichCols]
+# count <- count[whichCols]
+
+Countdf %>% dplyr::count(MIRNA)
 
 # count %>% distinct(`#miRNA`)
 
