@@ -335,6 +335,36 @@ ShortStacks4 --genomefile $REF --knownRNAs knownsRNA.fa --dn_mirna --outdir Shor
 
 # to kill the process related to it ps -o pid=pidid | xargs kill
 ```
+#### Using raw reads as imput
+
+```bash
+pip install cutadapt
+sudo ln -s /home/rvazquez/.local/bin/cutadapt /usr/local/bin/
+
+# Extract
+# tar -xzvf 01.RawData.tar.gz
+
+export PATH=$PATH:"/home/rvazquez/UCSCTOOLS/"
+export PATH=$PATH:"/home/rvazquez/ShortStack4"
+export PATH=$PATH:"/home/rvazquez/bowtie-1.3.1-linux-x86_64"
+export PATH=$PATH:"/usr/local/bin/"
+export PATH=$PATH:"/home/rvazquez/strucVis"
+export PATH=$PATH:"/home/rvazquez/UCSCTOOLS/"
+export PATH=$PATH:"/home/rvazquez/ShortTracks"
+export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
+
+REF=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.fa
+
+readfile=`ls -x HR*fq.gz`
+
+# Invalid autotrim_key AGATCGGAAGAGC : Must be 20-30 letters long
+
+ShortStacks4 --autotrim --autotrim_key AGATCGGAAGAGCACACGTCT --genomefile $REF --knownRNAs knownsRNA.fa --dn_mirna --outdir ShortStack_"$(date +%Y%m%d)"_out --threads 8 --dicermax 30 --mmap u --mincov 0.8 --pad 1 --readfile $readfile &>> "ShortStack_"$(date +%Y%m%d)".log" &
+
+# /home/rvazquez/SHORTSTACKS/RAW_TEST/ShortStack_20230320_out
+
+```
+
 
 ## Dataviz shortstacks outputs
 
@@ -364,7 +394,25 @@ ShortTracks --bamfile merged_alignments.bam --mode readlength --stranded
 
 Follow similar instructions than [here](https://jbrowse.org/jb2/docs/tutorials/config_gui/):
 
-`Open JBroswer > create new assembly > show as linear > add track > multi-wiggle-track
+### JBroswer 
+`Open JBroswer > Open sequence file (Submit new assembly) > (Select a view to launch) Linear genome view > OPEN
+
+FILE > Open track ... > multi-wiggle-track > Choose (multiple) files from yout computer (*.bw) > Write track name 'SRNA LOCATION | BY LENGTH' > SUBMIT
+
+Track setting (three dots upper in the left) > render type as xyplot OR multiline (if overlaps)
+Track setting (three dots upper in the left) > Edit color arrangement:
+Set the colors and order like so:
+
+21 plus and minus: blue
+22 plus and minus: mediumseagreen
+23-24 plus and minus: tomato
+other : gray
+
+
+`Submit new assembly:`  
++ Type: IndexedFastaAdapter
++ FastaLocation: /Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/multi_genome.newid.fa
++  faiLocation: /Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/multi_genome.newid.fa.fai
 
 Follow instructions to edit format: https://github.com/MikeAxtell/ShortTracks
 
