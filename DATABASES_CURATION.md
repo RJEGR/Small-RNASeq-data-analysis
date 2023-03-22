@@ -59,7 +59,7 @@ awk '{print $3}' *.gtf| sort | grep "utr" | uniq -c
  # 77553 five_prime_utr
  # 54432 three_prime_utr
 ```
-Subseq sequences 
+Subseq UTR sequences 
 ```bash
 gtf=Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.gtf
 genome=multi_genome.newid.fa
@@ -67,6 +67,12 @@ genome=multi_genome.newid.fa
 cat $gtf | grep "utr" > utr.gtf
 
 seqkit subseq --gtf utr.gtf $genome --gtf-tag "gene_id" -o utr.fa
+
+# REMOVING DUPLICATED sequences (-s) in --only-positive-strand (-P)
+
+cat utr.fa | seqkit rmdup -s -P -D duplicated_detail.txt -d duplicates.fasta -o utr_rmdup.fa
+
+# [INFO] 49035 duplicated records removed
 
 # FOR --gtf-tag choose one of the follow:
 #gene_id "GeneID_125373053"; 
@@ -177,7 +183,7 @@ curl -o ALL.fa -OJX GET "https://mirgenedb.org/fasta/ALL?all=1"
 
 seqkit stats *fa
 
-# TEST REMOVING DUPLICATES
+# TEST REMOVING DUPLICATED sequences (-s) in --only-positive-strand (-P)
 
 cat ALL-mat.fa | seqkit rmdup -s -P -D duplicated_detail.txt -d duplicates.fasta -o ALL-mat-rmdup.fasta
 
