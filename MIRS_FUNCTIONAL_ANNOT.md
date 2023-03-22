@@ -1,3 +1,4 @@
+
 # microRNA functional annotation
 The mayority of miRs are conserved in both sequence and function across Metazoa. Best know function for miRs is the repression of protein-coding gene expression which is involved in 
 
@@ -37,11 +38,14 @@ export PATH=$PATH:"/home/rvazquez/RNAhybrid-2.1.2/src/"
 
 RNAhybrid -t genome_or_transcriptome.fa -q miRNAs.fasta
 
+ -m <max targetlength>
+  -n <max query length>
 
 ```
 
 ## miRanda
-https://cbio.mskcc.org/miRNA2003/miranda.html
+https://cbio.mskcc.org/miRNA2003/miranda.html (old version)
+upgrade: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2945792/
 ```bash
 wget https://cbio.mskcc.org/miRNA2003/src1.9/binaries/miRanda-1.9-i686-linux-gnu.tar.gz
 
@@ -200,8 +204,75 @@ Then configure and build tensorflow
 bazel build [--config=option] //tensorflow/tools/pip_package:build_pip_package
 ```
 
+## miRAW (hard to train the model )
+```bash
+git clone https://app86@bitbucket.org/bipous/miraw_dl4mirna_bin
+# git clone git@bitbucket.org:bipous/miraw_dl4mirna_binaries.git
+
+chmod +x miraw_dl4mirna_binaries/miRAW.jar
+
+export PATH=$PATH:"/home/rvazquez/MIRS_FUNCTIONAL_ANNOT/miRAW/miraw_dl4mirna_binaries"
+
+
+
+miRAW.jar --help
+
+Options:
+	GenePrediction: predict miRNA-gene interactions
+	ClassifySites:
+	TrainModel:
+	CreateDataSets:
+	CrossValidation:
+	
+miRAW.jar GenePrediction help
+
+miRAW GeneClassification evaluates a set of 3'UTR gene and microRNAs transcripts to predict their interactions and target sites.
+
+Usage: miRaw GeneClassification option configurationFile
+	option: predict - predicts the target sites and saves them to a file.
+	option: evaluate - predicts the gene-miRNA interactions and validates them against a Unified file.
+
+	Configuration must have the following parametes
+		UnifiedFile: location csv file containing the geneName, geneId, miRRNAname, 3UTR transcritpt, mature miRNA transcript, validation (only for evaluation)
+		DLModel: location of the Deep Learning Model to use
+		ExperimentFolder: folder where the experiment results will be saved
+		ExperimentName: name of the experiment
+		
+#
+
+git clone https://bitbucket.org/bipous/miraw_-dl4mirnatargeting_code.git
+
+miraw_-dl4mirnatargeting_code/TestData/ConfigFile/genePrediction.properties
+
+########################################
+###########GenePrediction###############
+########################################
+ExperimentName=FullCycle
+ExperimentFolder=/Users/apla/Documents/MirnaTargetDatasets/BioinformaticsPaper/GenePredResults
+UnifiedFile=/Users/apla/Documents/MirnaTargetDatasets/BioinformaticsPaper/DataSet/Original/tarBamirseValidTranscript.csv
+DLModel=/Users/apla/Documents/MirnaTargetDatasets/BioinformaticsPaper/CVResults/BioinformaticsCV/Set1/lastModel.bin
+
+```
+
+## targetscan 7
+https://elifesciences.org/articles/05005#abstract
+
+
 ## TargetNet (well mantained)
 https://github.com/mswzeus/TargetNet
+
+Datasets: The complete TargetNet algorithm was evaluated with two types of experimentally verified miRNA–mRNA pair datasets, (i) miRAW and (ii) log-fold change (LFC) test datasets.
+
+**miRNA–mRNA pair datasets:**
++ **Train validated:** First, we used miRAW test datasets with binary labels indicating functional and non-functional targets. They originated from DIANA-TarBase (Vlachos et al., 2015) and MirTarBase (Chou et al., 2016) databases. The miRAW test datasets can help us evaluate the functional miRNA target classification performance of TargetNet.
+
++ **Train validated**: Second, we used eleven microarray and two RNA-seq LFC test datasets with real-valued labels indicating the level of functionality of miRNA targets. In each microarray and RNA-seq dataset, a miRNA was individually transfected into HeLa and HEK329 cells, respectively. Then, the log-fold change of mRNA expression was measured. More negative labels indicate more functional miRNA–mRNA pairs, which strongly down-regulate the targeted genes. The LFC test datasets can help us to evaluate how well TargetNet distinguishes high-functional miRNA targets.
+
+**miRNA–CTS pair datasets**
+**- Predicted model:** The prediction model of TargetNet was trained with miRAW miRNA–CTS pair datasets. 
+
+
+4.1.1 miRNA–mRNA pair datasets
 
 ```bash
 git clone https://github.com/mswzeus/TargetNet.git
@@ -236,7 +307,44 @@ CUDA_VISIBLE_DEVICES=0
 
 # training the model
 python3.8 train_model.py --data-config config/data/miRAW_train.json --model-config config/model/TargetNet.json --run-config config/run/run.json --output-path results/TargetNet_training/
+
+#
+CUDA_VISIBLE_DEVICES=0
+python3.8 evaluate_model.py --data-config config/data/miRAW_eval.json --model-config config/model/TargetNet.json --run-config config/run/run.json --checkpoint pretrained_models/TargetNet.pt --output-path results/TargetNet-evaluation/
+
+# For using other datasets, modify the data paths specified in the miRAW_eval.json data-config file.
+
+# config/data/miRAW_train.json
+
+{
+  "train_path": "data/miRAW_Train_Validation.txt",
+  "val_path": "data/miRAW_Train_Validation.txt"
+}
+
+# mirna_id        mirna_seq       mrna_id mrna_seq        label   split
+
+# config/data/miRAW_eval.json
+# Your imput samples to deep search test
+
+{
+"test0_path": "data/miRAW_Test0.txt",
+"test1_path": "data/miRAW_Test1.txt",
+"test2_path": "data/miRAW_Test2.txt",
+"test3_path": "data/miRAW_Test3.txt",
+"test4_path": "data/miRAW_Test4.txt",
+"test5_path": "data/miRAW_Test5.txt",
+"test6_path": "data/miRAW_Test6.txt",
+"test7_path": "data/miRAW_Test7.txt",
+"test8_path": "data/miRAW_Test8.txt",
+"test9_path": "data/miRAW_Test9.txt"
+}
+
+# RESULTS
+results/TargetNet-evaluation/
 ```
+
+
+
 
 ## Others
 https://bitbucket.org/account/user/bipous/projects/MIRAW.
