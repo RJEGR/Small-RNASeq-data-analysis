@@ -32,7 +32,9 @@ Results <- read_tsv(res_f)
 Results %>% dplyr::count(MIRNA)
 Results %>% drop_na(KnownRNAs) %>% dplyr::count(MIRNA)
 
-Results %>% filter(MIRNA == "N" & is.na(KnownRNAs) == T) %>% view()
+Results %>% filter(MIRNA == "N" & is.na(KnownRNAs) == F) %>% view()
+
+Results %>% filter(MIRNA == "Y" & is.na(KnownRNAs) == T) %>% view()
 
 Results %>% filter(MIRNA == "Y") %>% drop_na(KnownRNAs) %>% view()
 
