@@ -402,5 +402,5 @@ names(out) <- gsub("_DDS.rds", "", basename(rds_f))
 
 res <- bind_rows(out, .id = 'Contrast')
 
-do.call(rbind, out) -> res
+
 
