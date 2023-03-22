@@ -484,3 +484,23 @@ ln -s /home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1r
 
 
 ```
+
+### 6) Annotation
+https://github.com/Trinotate/Trinotate/wiki
+```bash
+wget https://github.com/Trinotate/Trinotate/archive/refs/tags/Trinotate-v4.0.0.tar.gz
+
+tar -xvf Trinotate-v4.0.0.tar.gz
+
+cd Trinotate-Trinotate-v4.0.0/
+
+chmod +x Trinotate
+
+./Trinotate --help
+
+https://github.com/RJEGR/Transcriptomics/blob/master/markdown/trinotate.md
+
+
+./util/admin/Build_Trinotate_Boilerplate_SQLite_db.pl Trinotate &> build.log &
+
+```
