@@ -364,7 +364,45 @@ ShortStacks4 --autotrim --autotrim_key AGATCGGAAGAGCACACGTCT --genomefile $REF -
 # /home/rvazquez/SHORTSTACKS/RAW_TEST/ShortStack_20230320_out
 
 ```
+Se identifica que para las muestras tHR11076, tHR1108 y tHR2476 hay un mayor numero de lecturas recuperadas con shortstacks que con otras herramientas. Evaluamos en mirtrace el origen de estas lecturas. De ser adecuado, procedemos a reanalizar shortstacks con estas muestras.
+```bash
+# 1)
+# tHR11076*.fq.gz tHR1108*.fq.gz tHR2476*.fq.gz
+mkdir mirtrace; cd mirtrace
 
+ln -s /home/rvazquez/SHORTSTACKS/RAW_TEST/ShortStack_20230320_out/tHR2476*.fq.gz .
+ln -s /home/rvazquez/SHORTSTACKS/RAW_TEST/ShortStack_20230320_out/tHR110*.fq.gz .
+
+mirtrace qc -s meta_species_all *.fq.gz -w --uncollapse-fasta --t 20
+
+# 2)
+
+# scp -r rvazquez@200.23.162.234:/home/rvazquez/MIRTRACE/configfile.output/qc_passed_reads.all.uncollapsed/PROFILING_BY_READ_LENGTH .
+```
+rerun
+```bash
+export PATH=$PATH:"/home/rvazquez/UCSCTOOLS/"
+export PATH=$PATH:"/home/rvazquez/ShortStack4"
+export PATH=$PATH:"/home/rvazquez/bowtie-1.3.1-linux-x86_64"
+export PATH=$PATH:"/usr/local/bin/"
+export PATH=$PATH:"/home/rvazquez/strucVis"
+export PATH=$PATH:"/home/rvazquez/UCSCTOOLS/"
+export PATH=$PATH:"/home/rvazquez/ShortTracks"
+export PATH=$PATH:"/home/rvazquez/bedtools2/bin"
+
+REF=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.fa
+
+ln -s /home/rvazquez/SHORTSTACKS/RAW_TEST/ShortStack_20230320_out/tHR2476*.fq .
+ln -s /home/rvazquez/SHORTSTACKS/RAW_TEST/ShortStack_20230320_out/tHR110*.fq .
+
+
+readfile=`ls -x *fq`
+
+# --knownRNAs $MIRGENEDB
+
+ShortStacks4 --genomefile $REF --knownRNAs knownsRNA.fa --dn_mirna --outdir ShortStack_"$(date +%Y%m%d)"_out --threads 12 --dicermax 30 --mmap u --mincov 0.8 --pad 1 --readfile $readfile &>> "ShortStack_"$(date +%Y%m%d)".using_cross_samples_log" &
+
+```
 
 ## Dataviz shortstacks outputs
 
