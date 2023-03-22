@@ -424,6 +424,8 @@ export PATH=$PATH:"~/BrumiR-3.0"
 
 # TEST (WORKING!)
 perl brumir.pl -a test/sRNA-seq.human.trim.fa.gz -p prefix
+
+
 ```
 
 
