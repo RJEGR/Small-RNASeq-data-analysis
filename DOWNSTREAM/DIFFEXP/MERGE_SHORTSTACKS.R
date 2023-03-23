@@ -8,7 +8,7 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 library(tidyverse)
 
-path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out//"
+path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 list.files(path = path, pattern = "txt")
 
@@ -101,7 +101,7 @@ p1 <- p1 + geom_text(
 
 mtd <- read_tsv(list.files(path = path, pattern = 'METADATA', full.names = T))
 
-nrow(raw_count <- COUNTS[colNames])
+# nrow(raw_count <- COUNTS[colNames])
 
 # x) Choose contrast  ----
 
@@ -255,6 +255,9 @@ res <- get_res(dds, contrast) # # take a long
 
 DESeqDataSetFromInputs <- function(colData, count, f_col = ...) {
   
+  
+  if(!is.matrix(count)) stop()
+  
   names(colData)[names(colData) %in% f_col] <- "Design"
   
   # 0) Remove single samples:
@@ -268,14 +271,15 @@ DESeqDataSetFromInputs <- function(colData, count, f_col = ...) {
   x <- colData %>% pull(Design, name = LIBRARY_ID)
   
   # 1) According to colData, filter samples ----
+  keep_cols <- colnames(count) %in% names(x)
   
-  ncol(count <- count[names(count) %in% names(x)])
+  ncol(count <- count[,keep_cols])
   
   # 2) Filter data by removing low-abundance genes ----
   
-  keep <- rowSums(edgeR::cpm(count) > 1) >= 2
+  keep_rows <- rowSums(edgeR::cpm(count) > 1) >= 2
   
-  nrow(count <- count[keep,])
+  nrow(count <- count[keep_rows,])
   
   count <- round(count)
   
@@ -312,15 +316,21 @@ DESeqDataSetFromInputs <- function(colData, count, f_col = ...) {
   return(out)
 }
 
-count <- as(raw_count, "matrix")
+nrow(raw_count <- COUNTS[colNames]) # 66,226
 
-rownames(count) <- COUNTS$Coords
+raw_count <- as(raw_count, "matrix")
+
+rownames(raw_count) <- COUNTS$Name
+
+# Warning, count data must be a matrix class object !!
+
 
 dds_A <- DESeqDataSetFromInputs(mtd, raw_count, f_col = "CONTRAST_A") # 62,817 transcripts and 56 samples
 dds_B <- DESeqDataSetFromInputs(mtd, raw_count, f_col = "CONTRAST_B") # 21,006 transcripts and 56 samples
 dds_C <- DESeqDataSetFromInputs(mtd, raw_count, f_col = "CONTRAST_D") # 44,167 transcripts and 56 samples
 dds_D <- DESeqDataSetFromInputs(mtd, raw_count, f_col = "CONTRAST_C") # 110533 transcripts and 56 samples
 
+head(assay(dds_C))
 
 # Generate results 
 get_res <- function(dds, contrast, alpha_cutoff = 0.1, weighted_p = FALSE) {
@@ -339,7 +349,7 @@ get_res <- function(dds, contrast, alpha_cutoff = 0.1, weighted_p = FALSE) {
   
   contrast <- c(contrast, sA, sB)
   
-  res = results(dds, contrast, alpha = 0.1, lfcThreshold = 0)
+  res <- results(dds, contrast, alpha = 0.1, lfcThreshold = 0)
   
   
   baseMeanA <- rowMeans(DESeq2::counts(dds,normalized=TRUE)[,keepA])
@@ -393,14 +403,14 @@ dds2res <- function(dds_path_f, ...) {
   
 }
 
-
+# data viz ----
 rds_f <- list.files(path, pattern = 'CONTRAST_',  full.names = TRUE)
 
 out <- lapply(rds_f, dds2res)
 
 names(out) <- gsub("_DDS.rds", "", basename(rds_f))
 
-res <- bind_rows(out, .id = 'Contrast')
+res <- bind_rows(out, .id = 'Contrast') %>% as_tibble(rownames = "Locus")
 
-
+write_rds(res, file = paste0(path, "MULTIPLE_CONTRAST_RES.rds"))
 
