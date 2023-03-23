@@ -88,7 +88,6 @@ for i in $(cat SraAccList.txt); do fasterq-dump --split-files $i --skip-technica
 
 
 
-
 ```
 Additional tools
 ```bash
@@ -127,8 +126,11 @@ fastqc *.fastq -t 24 --nogroup -o ./fastqc &> fastqc.log &
 mkdir -p multiqc
 multiqc ./fastqc/*zip -o multiqc
 
+# 
+export PATH=$PATH:"/home/rvazquez/seqkit_tool"
+seqkit stat *fastq
+
 ```
-https://github.com/RJEGR/Cancer_sete_T_assembly/blob/main/compile_trimmomatic.md
 
 Identificamos que es necesario remover la presencia del adaptor universal. Hay prencencia de N en entre secuencias pero la calidad de todas las biblitecas es superior a Phred > 30.
 
@@ -146,7 +148,7 @@ do
 withpath="${file}"
 filename=${withpath##*/}
 base="${filename%*_*.fastq}"
-trimmomatic PE -threads 20 -phred33 \
+trimmomatic PE -threads 12 -phred33 \
     ${base}_1.fastq ${base}_2.fastq \
     ${base}_1.P.qtrim.fq.gz ${base}_1.UP.qtrim.fq.gz \
     ${base}_2.P.qtrim.fq.gz ${base}_2.UP.qtrim.fq.gz \
@@ -490,6 +492,7 @@ ln -s /home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1r
 
 ### 6) Annotation
 https://github.com/Trinotate/Trinotate/wiki
+https://github.com/RJEGR/Transcriptomics/blob/master/markdown/trinotate.md
 ```bash
 
 # you may need to install the DBD::SQLite module
@@ -537,6 +540,9 @@ as:
 
 #removing the comment '#' and setting the path to the directory where you installed the software.
 
+# Emmapper: EggNOG-mapper is a tool for fast functional annotation of novel sequences.
+git clone https://github.com/eggnogdb/eggnog-mapper.git
+
 # trinotate:
 wget https://github.com/Trinotate/Trinotate/archive/refs/tags/Trinotate-v4.0.0.tar.gz
 
@@ -553,16 +559,28 @@ https://github.com/RJEGR/Transcriptomics/blob/master/markdown/trinotate.md
 
 ./util/admin/Build_Trinotate_Boilerplate_SQLite_db.pl Trinotate &> build.log &
 
+```
+
+#### Run
+```bash
+# then
+WD=/home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE
+cd $WD
+makeblastdb -in uniprot_sprot.pep -dbtype prot &
+gunzip Pfam-A.hmm.gz &
+srun $HMM/hmmpress Pfam-A.hmm &> hmmpress.log &
+
 # 1) 
 TR_PATH="/home/rvazquez/Trinotate-Trinotate-v4.0.0/"
 TMHMM=$TR_PATH/"tmhmm-2.0c/bin"
 SQLT=$TR_PATH"/sqlite-tools-linux-x86-3410200"
 TRDC=$TR_PATH"/TransDecoder-TransDecoder-v5.7.0"
+EGG=$TR_PATH"eggnog-mapper/" 
 
 export PATH=$PATH:$TMHMM
 export PATH=$PATH:$SQLT
 export PATH=$PATH:$TRDC
-
+export PATH=$PATH:$EGG
 export PATH=$PATH:$TR_PATH
 export PATH=$PATH:$TR_PATH/util
 
@@ -589,29 +607,46 @@ TransDecoder.LongOrfs -t transcripts.fa --gene_trans_map genes_trans_map > trans
 TransDecoder.Predict -t transcripts.fa --cpu 12 >> transdecoder.log & 
 
 # 2.2) 
+                
+DB_DIR=/home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE
+
+mkdir -p $DB_DIR/EGGNOG_DATA_DIR
+
+# run
+WD=/home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/ANNOTATION
+cd $WD
 
 Trinotate --db Trinotate.sqlite \
            --CPU 12 \
            --gene_trans_map genes_trans_map \
            --transcript_fasta transcripts.fa \
-           --transdecoder_pep transcripts.pep \
-           --trinotate_data_dir $PWD/trinotate_data_dir \
-           --run "swissprot_blastp swissprot_blastx pfam tmhmmv2 EggnogMapper"
+           --transdecoder_pep transcripts.fa.transdecoder.pep \
+           --trinotate_data_dir $DB_DIR \
+           --run "swissprot_blastp swissprot_blastx pfam tmhmmv2 EggnogMapper" &> Trinotate.log &
 
-Trinotate --db Trinotate.sqlite --init \
-           --gene_trans_map <file> \
-           --transcript_fasta transcripts.fa \
-           --transdecoder_pep <file>
+# /home/rvazquez/Trinotate-Trinotate-v4.0.0/PerlLib/Pipeliner.pm
 
+# Run independently
 
-# 3)
+blastp -query transcripts.fa.transdecoder.pep -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 12  -max_target_seqs 5 -outfmt 6 -evalue 1e-5 > uniprot_sprot.ncbi.blastp.outfmt6 &> blastp.log &
 
-Trinotate --db <sqlite.db> --CPU <int> \
-               --transcript_fasta <file> \
-               --transdecoder_pep <file> \
-               --trinotate_data_dir /path/to/TRINOTATE_DATA_DIR
-               --run "swissprot_blastp swissprot_blastx pfam EggnogMapper" \
-               --use_diamond 
+# transcripts.fa.transdecoder.cds
+
+blastx -query transcripts.fa -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 1 -max_target_seqs 5 -outfmt 6 -evalue 1e-5 -out uniprot_sprot.ncbi.blastx.outfmt6 &> blastx.log &
+
+# Warning: [blastx] Examining 5 or more matches is recommended
+#terminate called after throwing an instance of 'std::__ios_failure'
+#  what():  basic_ios::clear: iostream error
+#Aborted
+
+# evaluate /home/rvazquez/Trinotate-Trinotate-v4.0.0/util/auto_Trinotate.txt
+
+# rnamer
+
+RNAMMER_TRANS=/LUSTRE/bioinformatica_data/genomica_funcional/bin/Trinotate/util/rnammer_support
+
+RNAMMER=/LUSTRE/bioinformatica_data/genomica_funcional/bin/rnammer/rnammer
+
+srun $RNAMMER_TRANS/RnammerTranscriptome.pl --transcriptome good.Trinity.fasta --path_to_rnammer $RNAMMER &
 
 ```
-
