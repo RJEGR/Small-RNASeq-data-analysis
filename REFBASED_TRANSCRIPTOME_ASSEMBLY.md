@@ -86,6 +86,9 @@ esearch -db sra -query "PRJNA488641" |  efetch -format docsum | xtract -pattern 
 
 for i in $(cat SraAccList.txt); do fasterq-dump --split-files $i --skip-technical -p; done &> fasterq_dump.log
 
+
+
+
 ```
 Additional tools
 ```bash
@@ -488,6 +491,53 @@ ln -s /home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1r
 ### 6) Annotation
 https://github.com/Trinotate/Trinotate/wiki
 ```bash
+
+# you may need to install the DBD::SQLite module
+
+perl -MCPAN -e shell
+install DBD::SQLite
+
+# Transdecoder
+
+https://github.com/TransDecoder/TransDecoder/archive/refs/tags/TransDecoder-v5.7.0.tar.gz
+
+tar xfv TransDecoder-v5.7.0.tar.gz
+cd TransDecoder-TransDecoder-v5.7.0
+
+chmod +x TransDecoder.LongOrfs
+
+
+
+# sqlite
+wget https://www.sqlite.org/2023/sqlite-tools-linux-x86-3410200.zip
+unzip sqlite-tools-linux-x86-3410200.zip
+cd sqlite-tools-linux-x86-3410200/
+
+# HMMER/PFAM Protein Domain Identification:
+
+wget http://eddylab.org/software/hmmer/hmmer.tar.gz
+tar xvf hmmer.tar.gz
+./configure
+make
+make install
+
+# TmHMM
+wget https://services.healthtech.dtu.dk/download/7e62eb60-c1be-404d-9d15-4bddb8600e93/tmhmm-2.0c.Linux.tar.gz
+
+tar xvf tmhmm-2.0c.Linux.tar.gz
+cd tmhmm-2.0c/bin
+#Edit the header lines of the scripts `tmhmm` and `tmhmmformat.pl` to read exactly as:
+
+#!/usr/bin/env perl
+
+#Then, edit line 33 of tmhmm:
+   #$opt_basedir = "/usr/cbs/packages/tmhmm/2.0c/tmhmm-2.0c/";
+as:
+   $opt_basedir = "/path/to/your/directory/containing/basedir/tmhmm-2.0c/"
+
+#removing the comment '#' and setting the path to the directory where you installed the software.
+
+# trinotate:
 wget https://github.com/Trinotate/Trinotate/archive/refs/tags/Trinotate-v4.0.0.tar.gz
 
 tar -xvf Trinotate-v4.0.0.tar.gz
@@ -503,4 +553,65 @@ https://github.com/RJEGR/Transcriptomics/blob/master/markdown/trinotate.md
 
 ./util/admin/Build_Trinotate_Boilerplate_SQLite_db.pl Trinotate &> build.log &
 
+# 1) 
+TR_PATH="/home/rvazquez/Trinotate-Trinotate-v4.0.0/"
+TMHMM=$TR_PATH/"tmhmm-2.0c/bin"
+SQLT=$TR_PATH"/sqlite-tools-linux-x86-3410200"
+TRDC=$TR_PATH"/TransDecoder-TransDecoder-v5.7.0"
+
+export PATH=$PATH:$TMHMM
+export PATH=$PATH:$SQLT
+export PATH=$PATH:$TRDC
+
+export PATH=$PATH:$TR_PATH
+export PATH=$PATH:$TR_PATH/util
+
+cp /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/Trinotate.sqlite .
+
+# optional (not working to me)
+Trinotate_GTF_or_GFF3_annot_prep.pl \
+    --annot Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.gtf \
+    --genome_fa transcripts.fa \
+    --out_prefix out
+
+# 2 Generate genes_trans_map
+
+grep '^>' transcripts.fa |  sed 's/>//g' > transcript.map
+cat transcript.map | awk '{gsub(/\.[0-9]$/,"",$1); print $1}' > genes.map
+paste genes.map transcript.map > genes_trans_map
+rm *.map
+
+
+# 2.1 transdecoder first
+
+TransDecoder.LongOrfs -t transcripts.fa --gene_trans_map genes_trans_map > transdecoder.log &
+
+TransDecoder.Predict -t transcripts.fa --cpu 12 >> transdecoder.log & 
+
+# 2.2) 
+
+Trinotate --db Trinotate.sqlite \
+           --CPU 12 \
+           --gene_trans_map genes_trans_map \
+           --transcript_fasta transcripts.fa \
+           --transdecoder_pep transcripts.pep \
+           --trinotate_data_dir $PWD/trinotate_data_dir \
+           --run "swissprot_blastp swissprot_blastx pfam tmhmmv2 EggnogMapper"
+
+Trinotate --db Trinotate.sqlite --init \
+           --gene_trans_map <file> \
+           --transcript_fasta transcripts.fa \
+           --transdecoder_pep <file>
+
+
+# 3)
+
+Trinotate --db <sqlite.db> --CPU <int> \
+               --transcript_fasta <file> \
+               --transdecoder_pep <file> \
+               --trinotate_data_dir /path/to/TRINOTATE_DATA_DIR
+               --run "swissprot_blastp swissprot_blastx pfam EggnogMapper" \
+               --use_diamond 
+
 ```
+
