@@ -86,6 +86,13 @@ esearch -db sra -query "PRJNA488641" |  efetch -format docsum | xtract -pattern 
 
 for i in $(cat SraAccList.txt); do fasterq-dump --split-files $i --skip-technical -p; done &> fasterq_dump.log
 
+# 
+
+srapath SRR8956779
+
+curl -OJX GET "https://sra-pub-run-odp.s3.amazonaws.com/sra/SRR8956779/SRR8956779"
+
+fasterq-dump --split-files SRR8956779
 
 
 ```
@@ -169,7 +176,7 @@ paste samples_id.tmp reads_in.tmp | column -t; rm *tmp
 ## 3) Align reads to genome (HISAT2)
 
 ```bash
-mkdir GENOME_INDEX;cd GENOME_INDEX
+# mkdir GENOME_INDEX;cd GENOME_INDEX
 
 
 # ln -s /home/rvazquez/GENOME_20230217/ncbi_dataset/data/GCF_023055435.1/GCF_023055435.1_xgHalRufe1.0.p_genomic.newid.fa .
@@ -197,16 +204,16 @@ ln -s /home/rvazquez/RNA_SEQ_ANALYSIS/PROCESSED_LIBS/*P.qtrim.fq.gz
 
 mkdir -p HISAT2_SAM_BAM_FILES
 
-for file in $(ls *_R1.P.qtrim.fq.gz | grep gz)
+for file in $(ls *_1.P.qtrim.fq.gz | grep gz)
 do
 withpath="${file}"
 filename=${withpath##*/}
-base="${filename%*_R*.P.qtrim.fq.gz}"
-hisat2 --phred33 -p 2 -x $idx_file  \
+base="${filename%*_*.P.qtrim.fq.gz}"
+hisat2 --phred33 -p 8 -x $idx_file  \
     --rna-strandness RF \
-    -1 ${base}_R1.P.qtrim.fq.gz -2 ${base}_R2.P.qtrim.fq.gz \
+    -1 ${base}_1.P.qtrim.fq.gz -2 ${base}_2.P.qtrim.fq.gz \
     --rg-id=${base} --rg SM:${base} -S HISAT2_SAM_BAM_FILES/${base}.sam
-done &> hisat2.log &
+done 2> hisat2.log &
 
 for i in $(ls *P.qtrim.fq.gz);do unlink $i; done
 
