@@ -289,7 +289,7 @@ RNA_REF_FASTA=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/multi_genome.newid.
 
 gffread -w transcripts.fa -g $RNA_REF_FASTA transcripts.gtf
 
-grep "^>" -c transcripts.fa # 93,305
+grep "^>" -c transcripts.fa # 93,305 (OR 101,298 FROM 14 SAMPLES)
 
 # awk '{if($3=="transcript") print}' transcripts.gtf | cut -f 1,4,9 | less
 
@@ -311,13 +311,13 @@ cd $WD
 
 ls -1 *_transcripts.gtf > stringtie_gtf_list.txt 
 
-stringtie --rf --merge -p 24 -o transcripts.gtf -G $RNA_REF_GTF stringtie_gtf_list.txt
+stringtie --rf --merge -p 24 -o transcripts_guided.gtf -G $RNA_REF_GTF stringtie_gtf_list.txt
 
 # 2) Get FASTA
 
 gffread -w transcripts.fa -g $RNA_REF_FASTA transcripts.gtf
 
-grep "^>" -c transcripts.fa # 134,293
+grep "^>" -c transcripts.fa # 134,293 (or 149,366 from 14 paired-end samples)
 
 ```
 
