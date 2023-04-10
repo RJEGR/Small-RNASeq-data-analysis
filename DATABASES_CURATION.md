@@ -429,8 +429,16 @@ echo "export PATH=$PATH:/usr/local/RepeatMasker/" >> $HOME/.bash_profile
 libdir=/usr/local/RepeatMasker/Libraries/
 
 # run
+# -gff    creates an additional General Feature Finding format output
 
-RepeatMasker -s -libdir $libdir -gff multi_genome.newid.fa &> RepeatMasker.log &
+RepeatMasker -s -libdir $libdir -gff multi_genome.newid.fa &> RepeatMasker.log2 &
+
+# the above abort because 
+# cat: write error: No space left on device
+# (PRELIMINAR RESULT) zcat /home/rvazquez/TRANSPOSABLE_ELEMENTS/RM_2073304.FriMar171337092023/multi_genome.newid.fa.cat.all.gz | less
+
+RepeatMasker -s -libdir $libdir -gff JALGQA010000001_1.fasta &> RepeatMasker.log &
+
 
 # INCLUDE ALL SPECIES 
 cp RepeatMasker RepeatMasker.bkp
