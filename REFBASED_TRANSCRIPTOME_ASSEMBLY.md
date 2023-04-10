@@ -635,11 +635,11 @@ Trinotate --db Trinotate.sqlite \
 
 # Run independently
 
-blastp -query transcripts.fa.transdecoder.pep -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 12  -max_target_seqs 5 -outfmt 6 -evalue 1e-5 > uniprot_sprot.ncbi.blastp.outfmt6 &> blastp.log &
+blastp -query transcripts.fa.transdecoder.pep -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 12  -max_target_seqs 5 -outfmt 6 -evalue 1e-5 -out uniprot_sprot.ncbi.blastp.outfmt6 2> blastp.log &
 
 # transcripts.fa.transdecoder.cds
 
-blastx -query transcripts.fa -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 1 -max_target_seqs 5 -outfmt 6 -evalue 1e-5 -out uniprot_sprot.ncbi.blastx.outfmt6 &> blastx.log &
+blastx -query transcripts.fa -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 1 -max_target_seqs 5 -outfmt 6 -evalue 1e-5 -out uniprot_sprot.ncbi.blastx.outfmt6 2> blastx.log &
 
 # Warning: [blastx] Examining 5 or more matches is recommended
 #terminate called after throwing an instance of 'std::__ios_failure'
