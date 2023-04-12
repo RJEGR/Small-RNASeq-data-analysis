@@ -637,6 +637,14 @@ Trinotate --db Trinotate.sqlite \
 
 blastp -query transcripts.fa.transdecoder.pep -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 12  -max_target_seqs 5 -outfmt 6 -evalue 1e-5 -out uniprot_sprot.ncbi.blastp.outfmt6 2> blastp.log &
 
+# Pfam: identificación de dominio proteicos
+
+hmmscan --cpu 12 -o hmmscan.out --domtblout TrinotatePFAM.out /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/Pfam-A.hmm transcripts.fa.transdecoder.pep &
+
+# Predicción de dominios transmembranal
+tmhmm --short < transcripts.fa.transdecoder.pep > tmhmm.out &
+
+# 
 # transcripts.fa.transdecoder.cds
 
 blastx -query transcripts.fa -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 1 -max_target_seqs 5 -outfmt 6 -evalue 1e-5 -out uniprot_sprot.ncbi.blastx.outfmt6 2> blastx.log &
@@ -655,5 +663,50 @@ RNAMMER_TRANS=/LUSTRE/bioinformatica_data/genomica_funcional/bin/Trinotate/util/
 RNAMMER=/LUSTRE/bioinformatica_data/genomica_funcional/bin/rnammer/rnammer
 
 srun $RNAMMER_TRANS/RnammerTranscriptome.pl --transcriptome good.Trinity.fasta --path_to_rnammer $RNAMMER &
+
+```
+
+#### LOAD
+```bash
+
+# THEN LOAD PROTEIN RESULTS
+# Initial import of transcriptome and protein data:
+
+# cp /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/Trinotate.sqlite .
+ad=/home/rvazquez/Trinotate-Trinotate-v4.0.0/util/admin/
+$ad/Build_Trinotate_Boilerplate_SQLite_db.pl Trinotate
+# CREATE
+
+trinotate_data_dir=/home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE
+
+Trinotate --create --db myTrinotate.sqlite --trinotate_data_dir $trinotate_data_dir
+
+sqlite=Trinotate.sqlite
+gene_trans_map=genes_trans_map
+transcript_fasta=transcripts.fa
+transdecoder_pep=transcripts.fa.transdecoder.pep
+
+Trinotate --db $sqlite --init --gene_trans_map $gene_trans_map --transcript_fasta $transcript_fasta --transdecoder_pep $transdecoder_pep
+
+# Trinotate --db Trinotate.sqlite --init --gene_trans_map genes_trans_map --transcript_fasta transcripts.fa --transdecoder_pep transcripts.fa.transdecoder.pep
+
+# Transdecoder loading protein search results:
+
+Trinotate --db Trinotate.sqlite --LOAD_swissprot_blastp uniprot_sprot.ncbi.blastp.outfmt6
+
+Trinotate --db Trinotate.sqlite --LOAD_pfam TrinotatePFAM.out
+# Trinotate --db Trinotate.sqlite LOAD_tmhmm tmhmm.out
+
+loaders_dir=/home/rvazquez/Trinotate-Trinotate-v4.0.0/util/trinotateSeqLoader/
+
+$loaders_dir/Trinotate_BLAST_loader.pl --sqlite $sqlite --outfmt6 uniprot_sprot.ncbi.blastp.outfmt6 --prog blastp --dbtype Swissprot
+
+# AND EXPORT
+
+# Trinotate --db Trinotate.sqlite --report --incl_pep > Trinotate.xls
+
+Trinotate --db $sqlite --report > Trinotate.xls
+
+/home/rvazquez/Trinotate-Trinotate-v4.0.0/util/extract_GO_assignments_from_Trinotate_xls.pl --Trinotate_xls Trinotate.xls --gene > Trinotate_report.xls.gene_ontology
 
 ```
