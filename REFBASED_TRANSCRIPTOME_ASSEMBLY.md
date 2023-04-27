@@ -713,7 +713,7 @@ Trinotate --db $sqlite --report > Trinotate.xls
 
 
 ## RSEM (Optional)
-Both, the de novo transcriptome assembly and all pre-processed libraries is going to be used as input to perform a sample-specific expression analysis. All reads need to be aligned back against the indexed de novo transcriptome assembled using Bowtie2 (Langmead and Salzberg, 2012), followed by calculation of gene and isoform expression levels using Expectation-Maximization algorithm embedded in the Trinity differential expression modules within Trinity (`align_and_estimate_abundance.pl`) on a per sample basis.  The chief differences between Bowtie 1 and Bowtie 2 are: For reads longer than about 50 bp Bowtie 2 is generally faster, more sensitive, and uses less memory than Bowtie 1. For relatively short reads (e.g. less than 50 bp) Bowtie 1 is sometimes faster and/or more sensitive.
+Both, the de novo transcriptome assembly and all pre-processed libraries is going to be used as input to perform a sample-specific expression analysis. All reads need to be aligned back against the indexed de novo transcriptome assembled using Bowtie2 (Langmead and Salzberg, 2012), followed by calculation of gene and isoform expression levels using Expectation-Maximization algorithm on a per sample basis.  The chief differences between Bowtie 1 and Bowtie 2 are: For reads longer than about 50 bp Bowtie 2 is generally faster, more sensitive, and uses less memory than Bowtie 1. For relatively short reads (e.g. less than 50 bp) Bowtie 1 is sometimes faster and/or more sensitive.
 
 ```bash
 # 0) LOAD TOOLS
