@@ -710,3 +710,111 @@ Trinotate --db $sqlite --report > Trinotate.xls
 /home/rvazquez/Trinotate-Trinotate-v4.0.0/util/extract_GO_assignments_from_Trinotate_xls.pl --Trinotate_xls Trinotate.xls --gene > Trinotate_report.xls.gene_ontology
 
 ```
+
+
+## RSEM (Optional)
+Both, the de novo transcriptome assembly and all pre-processed libraries is going to be used as input to perform a sample-specific expression analysis. All reads need to be aligned back against the indexed de novo transcriptome assembled using Bowtie2 (Langmead and Salzberg, 2012), followed by calculation of gene and isoform expression levels using Expectation-Maximization algorithm embedded in the Trinity differential expression modules within Trinity (`align_and_estimate_abundance.pl`) on a per sample basis.  The chief differences between Bowtie 1 and Bowtie 2 are: For reads longer than about 50 bp Bowtie 2 is generally faster, more sensitive, and uses less memory than Bowtie 1. For relatively short reads (e.g. less than 50 bp) Bowtie 1 is sometimes faster and/or more sensitive.
+
+```bash
+# 0) LOAD TOOLS
+export PATH=$PATH:"/home/rvazquez/anaconda3/bin/"
+export PATH=$PATH:"/home/rvazquez/ANNOTATION/QUANT/RSEM"
+
+# ===============
+# PARAMETERS 
+
+reference=K127_transcripts_subset.fasta
+db_index_name=${reference%.fasta}
+
+left_file=P1570_SO_L001.qtrim_1P.fq.gz
+right_file=P1570_SO_L001.qtrim_2P.fq.gz
+
+output_prefix=${left_file%.qtrim*}
+
+bam_file=${left_file%.qtrim*}.sorted.bam
+
+thread_count=12
+read_type="-q"
+max_ins_size=800
+
+# TO RSEM
+
+fragment_length=200
+fragment_std=80
+fraglength_info_txt="--fragment-length-mean $fragment_length --fragment-length-sd $fragment_std"
+
+paired_flag_text="--paired-end"  
+no_qualities_string=""
+keep_intermediate_files_opt="--keep-intermediate-files"
+
+# ===============
+
+# 1) INDEX THE REFERENCE
+bowtie2-build $reference $db_index_name
+
+aligner_params="--no-mixed --no-discordant --gbar 1000 --end-to-end -k 200"
+
+# 2) ALIGN READS BACK TO THE REFERENCE
+
+bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file 
+
+# 2.1) PREPARE FILE FORMAT FOR RSEM:
+
+bam_for_rsem=${bam_file%.bam}.rsem
+
+convert-sam-for-rsem -p $thread_count $bam_file $bam_for_rsem
+
+rsem_prefix=$db_index_name
+
+rsem-prepare-reference --transcript-to-gene-map genes_trans_map  $reference $rsem_prefix
+
+# 3) ESTIMATE ABUNDANCE
+
+rsem-calculate-expression $no_qualities_string $paired_flag_text -p $thread_count $fraglength_info_txt $keep_intermediate_files_opt $SS_opt $rsem_bam_flag --bam ${bam_for_rsem}.bam $rsem_prefix $output_prefix
+
+
+# P1570_SO_L001.stat
+# P1570_SO_L001.temp
+
+# 4)
+
+## RSEM:
+
+0       transcript_id
+1       gene_id
+2       length
+3       effective_length
+4       expected_count
+5       TPM
+6       FPKM
+7       IsoPct
+
+```
+
+```bash
+
+rsem-prepare-reference --transcript-to-gene-map genes_trans_map  K127_transcripts_subset.fasta K127_transcripts_subset
+
+rsem-prepare-reference K127_transcripts_subset.fasta K127_transcripts_subset
+```
+
+```bash
+rsem-calculate-expression --
+
+# --alignments
+
+rsem-calculate-expression --phred64-quals -p 2 --append-names --output-genome-bam P1570_SO_L001.qtrim_1P.fq.gz P1570_SO_L001.qtrim_2P.fq.gz K127_transcripts_subset
+
+#
+
+rsem-calculate-expression -p 2 --paired-end P1570_SO_L001.qtrim_1P.fq.gz P1570_SO_L001.qtrim_2P.fq.gz K127_transcripts_subset P1570_SO_L001
+
+# rsem-parse-alignments K127_transcripts_subset P1570_SO_L001.temp/P1570_SO_L001 P1570_SO_L001.stat/P1570_SO_L001 P1570_SO_L001.temp/P1570_SO_L001.bam 3 -tag XM
+
+The SAM/BAM file declares less than one reference sequence!
+"rsem-parse-alignments K127_transcripts_subset P1570_SO_L001.temp/P1570_SO_L001 P1570_SO_L001.stat/P1570_SO_L001 P1570_SO_L001.temp/P1570_SO_L001.bam 3 -tag XM" failed! Plase check if you provide correct parameters/options for the pipeline!
+
+#
+
+
+```
