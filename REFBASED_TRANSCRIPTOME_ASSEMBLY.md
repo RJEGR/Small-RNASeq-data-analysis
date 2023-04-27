@@ -773,48 +773,8 @@ rsem-prepare-reference --transcript-to-gene-map genes_trans_map  $reference $rse
 rsem-calculate-expression $no_qualities_string $paired_flag_text -p $thread_count $fraglength_info_txt $keep_intermediate_files_opt $SS_opt $rsem_bam_flag --bam ${bam_for_rsem}.bam $rsem_prefix $output_prefix
 
 
-# P1570_SO_L001.stat
-# P1570_SO_L001.temp
+# 4) OUTPUT COUNT MATRIX RSEM
 
-# 4)
-
-## RSEM:
-
-0       transcript_id
-1       gene_id
-2       length
-3       effective_length
-4       expected_count
-5       TPM
-6       FPKM
-7       IsoPct
-
-```
-
-```bash
-
-rsem-prepare-reference --transcript-to-gene-map genes_trans_map  K127_transcripts_subset.fasta K127_transcripts_subset
-
-rsem-prepare-reference K127_transcripts_subset.fasta K127_transcripts_subset
-```
-
-```bash
-rsem-calculate-expression --
-
-# --alignments
-
-rsem-calculate-expression --phred64-quals -p 2 --append-names --output-genome-bam P1570_SO_L001.qtrim_1P.fq.gz P1570_SO_L001.qtrim_2P.fq.gz K127_transcripts_subset
-
-#
-
-rsem-calculate-expression -p 2 --paired-end P1570_SO_L001.qtrim_1P.fq.gz P1570_SO_L001.qtrim_2P.fq.gz K127_transcripts_subset P1570_SO_L001
-
-# rsem-parse-alignments K127_transcripts_subset P1570_SO_L001.temp/P1570_SO_L001 P1570_SO_L001.stat/P1570_SO_L001 P1570_SO_L001.temp/P1570_SO_L001.bam 3 -tag XM
-
-The SAM/BAM file declares less than one reference sequence!
-"rsem-parse-alignments K127_transcripts_subset P1570_SO_L001.temp/P1570_SO_L001 P1570_SO_L001.stat/P1570_SO_L001 P1570_SO_L001.temp/P1570_SO_L001.bam 3 -tag XM" failed! Plase check if you provide correct parameters/options for the pipeline!
-
-#
-
+rsem-generate-data-matrix *isoforms.results > isoforms.counts.matrix
 
 ```
