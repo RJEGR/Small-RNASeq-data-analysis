@@ -13,7 +13,7 @@ library(tidyverse)
 
 wd <- "~/Documents/MIRNA_HALIOTIS/"
 
-ref_path <- paste0(wd, "/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/ANNOTATION/")
+ref_path <- paste0(wd, "RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/ANNOTATION/OUTPUTS/")
 
 annot_f <- list.files(path = ref_path, pattern = "Trinotate.xls", full.names = T)
 
@@ -40,17 +40,21 @@ annot <- annot %>% drop_na(sprot_Top_BLASTP_hit)
 
 names(annot)[1] <- "gene_id"
 
-annot %>% head() %>% view()
+# annot %>% head() %>% view()
 
 blastp_df <- split_blast(annot, hit = "BLASTP")
 
+blastx_df <- split_blast(annot, hit = "BLASTX")
+
 go_df <- split_gene_ontology(annot, hit = "BLASTP")
+
+pfam_df <- split_pfam(annot)
 
 # EXPLORATORY   ======
 
 go_df %>% count(ontology)
 
-hist(blastp_df$identity)
+# hist(blastp_df$identity)
 
 prot_list <- c("Perlucin", "Protein PIF", "Carbonic anhydrase", "Chitin synthase", "Insoluble matrix shell protein")
 
@@ -69,6 +73,8 @@ str(query_protein <- blastp_df %>%
   filter_all(any_vars(grepl(prot_list, .))) %>%
   distinct(protein) %>% pull())
 
+pfam_df %>% filter(protein %in% query_protein) %>% view()
+go_df %>% filter(protein %in% query_protein) %>% view()
 
 f <- list.files(path = ref_path, pattern = "transcripts.fa.transdecoder.rmdup.cds", full.names = T)
 
@@ -85,6 +91,9 @@ sum(keep <- keep %in% query_protein)
 
 subseqs <- seqs[keep]# <--------
 
+
+
+
 # blastp_df %>% distinct(name) %>% view()
 
 blastp_df %>% distinct(uniprot) %>% view()
@@ -98,6 +107,32 @@ blastp_df %>%
 
 blastp_df %>% 
   filter_all(any_vars(grepl("Mollusca", .))) %>% view()
+
+
+# MAKE UTR SUBSET
+# awk '{print $3}' transcripts.fa.transdecoder.gff3 | sort | uniq -c
+
+# 108812 CDS
+# 108812 exon
+# 87680 five_prime_UTR
+# 108812 gene
+# 108812 mRNA
+# 8424 start
+# 100219 three_prime_UTR
+
+# cat transcripts.fa.transdecoder.cds | seqkit replace -p "\s.+" > transcripts.fa.transdecoder.renamed.cds
+
+# genome=transcripts.fa.transdecoder.renamed.cds
+
+# gtf=transcripts.fa.transdecoder.gff3
+# bed=transcripts.fa.transdecoder.bed
+
+
+# cat $gtf | grep "_prime_UTR" > prime_UTR.gff3
+# cat $bed | grep "prime" > prime_UTR.bed
+
+# seqkit subseq --gtf prime_UTR.gff3 $genome --gtf-tag "Parent" --update-faidx -o prime_UTR.cds
+
 
 
 
