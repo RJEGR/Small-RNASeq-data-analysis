@@ -681,10 +681,11 @@ trinotate_data_dir=/home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE
 
 Trinotate --create --db myTrinotate.sqlite --trinotate_data_dir $trinotate_data_dir
 
-sqlite=Trinotate.sqlite
+sqlite=Trinotate.sqlite2
 gene_trans_map=genes_trans_map
 transcript_fasta=transcripts.fa
 transdecoder_pep=transcripts.fa.transdecoder.pep
+
 
 Trinotate --db $sqlite --init --gene_trans_map $gene_trans_map --transcript_fasta $transcript_fasta --transdecoder_pep $transdecoder_pep
 
@@ -693,6 +694,8 @@ Trinotate --db $sqlite --init --gene_trans_map $gene_trans_map --transcript_fast
 # Transdecoder loading protein search results:
 
 Trinotate --db Trinotate.sqlite --LOAD_swissprot_blastp uniprot_sprot.ncbi.blastp.outfmt6
+
+Trinotate --db Trinotate.sqlite --LOAD_swissprot_blastx  uniprot_sprot.ncbi.blastx.outfmt6
 
 Trinotate --db Trinotate.sqlite --LOAD_pfam TrinotatePFAM.out
 # Trinotate --db Trinotate.sqlite LOAD_tmhmm tmhmm.out
@@ -705,12 +708,32 @@ $loaders_dir/Trinotate_BLAST_loader.pl --sqlite $sqlite --outfmt6 uniprot_sprot.
 
 # Trinotate --db Trinotate.sqlite --report --incl_pep > Trinotate.xls
 
-Trinotate --db $sqlite --report > Trinotate.xls
+Trinotate --db Trinotate.sqlite.bkp --report > Trinotate.xls
 
 /home/rvazquez/Trinotate-Trinotate-v4.0.0/util/extract_GO_assignments_from_Trinotate_xls.pl --Trinotate_xls Trinotate.xls --gene > Trinotate_report.xls.gene_ontology
 
 ```
 
+#### From local disk
+```bash
+# https://github.com/RJEGR/Transcriptomics/blob/master/markdown/trinotate.md
+
+~/Documents/Tools/Trinotate-Trinotate-v3.2.1/Trinotate Trinotate.sqlite init --gene_trans_map genes_trans_map --transcript_fasta transcripts.fa --transdecoder_pep transcripts.fa.transdecoder.pep
+
+~/Documents/Tools/Trinotate-Trinotate-v3.2.1/Trinotate Trinotate.sqlite  LOAD_swissprot_blastx uniprot_sprot.ncbi.blastx.outfmt6
+
+~/Documents/Tools/Trinotate-Trinotate-v3.2.1/Trinotate Trinotate.sqlite  LOAD_swissprot_blastp uniprot_sprot.ncbi.blastp.outfmt6
+
+~/Documents/Tools/Trinotate-Trinotate-v3.2.1/Trinotate Trinotate.sqlite LOAD_pfam TrinotatePFAM.out
+
+~/Documents/Tools/Trinotate-Trinotate-v3.2.1/Trinotate Trinotate.sqlite report > Trinotate.xls 
+
+GO_NAME=~/Documents/Tools/Trinotate-Trinotate-v3.2.1/util/
+
+$GO_NAME/extract_GO_assignments_from_Trinotate_xls.pl  --Trinotate_xls Trinotate.xls -T > Trinotate_report.xls.gene_ontology
+
+
+```
 
 ## RSEM (Optional)
 Both, the de novo transcriptome assembly and all pre-processed libraries is going to be used as input to perform a sample-specific expression analysis. All reads need to be aligned back against the indexed de novo transcriptome assembled using Bowtie2 (Langmead and Salzberg, 2012), followed by calculation of gene and isoform expression levels using Expectation-Maximization algorithm on a per sample basis.  The chief differences between Bowtie 1 and Bowtie 2 are: For reads longer than about 50 bp Bowtie 2 is generally faster, more sensitive, and uses less memory than Bowtie 1. For relatively short reads (e.g. less than 50 bp) Bowtie 1 is sometimes faster and/or more sensitive.
