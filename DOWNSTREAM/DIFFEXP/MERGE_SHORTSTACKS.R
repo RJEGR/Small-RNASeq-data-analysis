@@ -16,6 +16,9 @@ count_f <- list.files(path = path, pattern = "Counts.txt", full.names = T)
 
 res_f <- list.files(path = path, pattern = "Results.txt", full.names = T)
 
+MTD_f <- list.files(path = path, pattern = "METADATA.tsv", full.names = T)
+
+MTD <- read_tsv(MTD_f)
 
 RESULTS <- read_tsv(res_f)
 
@@ -27,6 +30,11 @@ names(COUNTS)[names(COUNTS) %in% colNames] <- gsub(".clean.newid.subset", "", co
 
 colNames <- COUNTS %>% select_if(is.double) %>% names()
 
+# #d73027
+
+pHpalette <- c(`Low`="#ad1f1f", `Control`= "#4575b4")
+
+
 # Sanity check
 
 identical(RESULTS$Locus, COUNTS$Coords)
@@ -35,46 +43,35 @@ identical(RESULTS$Name, COUNTS$Name)
 # cbind()
 
 # PREVALENCE ----
+
 nrow(raw_count <- COUNTS[colNames]) # 66,226
 
 head(raw_count <- as.data.frame(raw_count, row.names = COUNTS$Name))
+
+rownames(raw_count) <- COUNTS$Name
 
 apply(raw_count, 1, function(x) sum(x > 0)) %>% table()
 
 prevelancedf = apply(raw_count, 1, function(x) sum(x > 0))
 
-mean_se = apply(raw_count, 1, function(x) mean_se(x)) %>% do.call(rbind, .)
+# mean_se = apply(raw_count, 1, function(x) mean_se(x)) %>% do.call(rbind, .)
 
 data.frame(Prevalence = prevelancedf, 
-  TotalAbundance = rowSums(raw_count),
-  mean_se) %>% 
+  TotalAbundance = rowSums(raw_count)) %>% # mean_se
   as_tibble(rownames = "Name") %>%
   arrange(desc(TotalAbundance)) -> prevelancedf
 
-prevelancedf <- prevelancedf %>% left_join(RESULTS %>% select(Name, MIRNA))
+prevelancedf <- prevelancedf %>% left_join(RESULTS %>% select(Name, MIRNA, KnownRNAs, Strand, DicerCall))
 
 prevelancedf %>% 
-  mutate(MIRNA = factor(MIRNA, levels = c("Y","N") )) %>%
-  # filter(MIRNA == "Y") %>%
-  ggplot(aes(TotalAbundance, Prevalence/12)) +
-  geom_point(aes(color = MIRNA), alpha = 0.2) +
-  # stat_density2d(aes(alpha = ..density..), geom = "tile", contour = FALSE) +
-  scale_x_log10("Total Abundance (log10 scale)", labels = scales::comma) +  
-  scale_y_continuous("Prevalence [Frac. Samples]", 
-    labels = scales::percent_format(scale = 100)) +
-  theme_classic(base_family = "GillSans") +
-  theme(legend.position="top") + 
-  facet_grid(~ MIRNA) 
-  # scale_color_manual(values = c("red", "grey"))
+  count(Prevalence) %>% 
+  ggplot(aes(Prevalence, n)) + geom_col() +
+  theme_classic(base_family = "GillSans") + 
+  scale_y_continuous("Number of sRNAs", labels = scales::comma) +
+  scale_x_continuous(breaks = 1:12) -> ps
 
-prevelancedf %>% 
-  mutate(MIRNA = factor(MIRNA, levels = c("Y","N") )) %>%
-  # filter(MIRNA == "Y") %>%
-  ggplot(aes(log10(TotalAbundance), color  = MIRNA, fill = MIRNA)) +
-  # scale_x_continuous() +
-  stat_ecdf() 
-  # geom_density(alpha = 0.3)
-
+ggsave(ps, filename = 'prevalence_hist.png', 
+  path = path, width = 3, height = 2, device = png)
 
 prevelancedf %>% 
   arrange(Prevalence) %>%
@@ -91,21 +88,245 @@ dat_text <- prevelancedf %>% group_by(Prevalence) %>% tally() %>%
 
 p1 <- p1 + geom_text(
   data    = dat_text, family = "GillSans",
-  mapping = aes(x = -Inf, y = -Inf, label = paste0(n, " genes")),
-  hjust   = -1, vjust   = -2, label.size = 0.2) + 
+  mapping = aes(x = -Inf, y = -Inf, label = paste0(n, " sRNAs")),
+  hjust   = -1, vjust   = -2.5, size = 2.5) + 
   theme_classic(base_size = 7, base_family = "GillSans") +
-  labs(x = expression(~Log[2]~('TotalAbundance'~+1)), y = "")
+  labs(x = expression(~Log[2]~('TotalAbundance'~+1)), y = "") +
+  scale_y_continuous("Number of sRNAs", labels = scales::comma)
+
+
+ggsave(p1, filename = 'prevalence_hist_facet.png', 
+  path = path, width = 7, height = 4, device = png)
+
+
+prevelancedf %>% 
+  mutate(MIRNA = factor(MIRNA, levels = c("Y","N") )) %>%
+  # filter(MIRNA == "Y") %>%
+  ggplot(aes(TotalAbundance, Prevalence/12)) +
+  # geom_point(aes(color = MIRNA), alpha = 0.2) +
+  stat_density2d(aes(alpha = ..density..), geom = "tile", contour = FALSE) +
+  scale_x_log10("Total Abundance (log10 scale)", labels = scales::comma) +  
+  scale_y_continuous("Prevalence [Frac. Samples]", 
+    labels = scales::percent_format(scale = 100)) +
+  theme_classic(base_family = "GillSans") +
+  theme(legend.position="top") -> ps
+  # facet_grid(~ MIRNA) 
+  # scale_color_manual(values = c("red", "grey"))
+
+
+ggsave(ps, filename = 'prevalence.png', 
+  path = path, width = 4, height = 4, device = png)
+
+
+prevelancedf %>% 
+  mutate(Prevalence = factor(Prevalence)) %>%
+  # filter(MIRNA == "Y") %>%
+  ggplot(aes(log10(TotalAbundance), color  = Prevalence, fill = Prevalence)) +
+  # scale_x_continuous() +
+  stat_ecdf() 
+  # geom_density(alpha = 0.3)
+
+
+# BOXPLOT ====
+# 
+# prevelancedf = apply(raw_count, 1, function(x) sum(x > 0))
+# 
+# mean_se = apply(raw_count, 1, function(x) mean_se(x)) %>% do.call(rbind, .)
+
+qprobs <- function(x) { 
+  x <- x[x > 1]
+  quantile(x, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+}
+
+apply(log2(raw_count+1), 2, qprobs) %>% 
+  t() %>%
+  as_tibble(rownames = 'LIBRARY_ID') %>%
+  left_join(MTD) -> probs_df
+
+probs_df %>%
+  ggplot(., 
+    aes(x = LIBRARY_ID, ymin = `5%`, lower = `25%`,
+      middle = `50%`, upper = `75%`, ymax = `95%`)) +
+  geom_errorbar(width = 0.3, position = position_dodge(0.6)) +
+  geom_boxplot(aes(fill = pH), width = 0.5, stat = 'identity', 
+    position = position_dodge(0.6)) +
+  labs(y = expression(log[2]~ 'Abundance'), x = '') +
+  theme_classic(base_family = "GillSans") +
+  scale_color_manual("", values = rev(pHpalette)) +
+  scale_fill_manual("", values = rev(pHpalette)) +
+  theme(
+    legend.position = 'top',
+    panel.border = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.line.x = element_blank()) -> ptop
+
+ptop <- ptop + facet_grid(~ hpf, scales = 'free') +
+  theme(
+    strip.background = element_rect(fill = 'grey', color = 'white'))
+
+# BOTTOM ====
+
+apply(raw_count, 2, function(x) sum(x > 0)) -> Total_genes
+
+# Filter data by removing low-abundance genes
+
+keep <- rowSums(edgeR::cpm(raw_count) > 1) >= 2
+
+
+nrow(count <- raw_count[keep,])
+
+# How singletones are per sample? ----
+
+apply(count, 2, function(x) sum(x > 0)) -> filtered_genes
+
+cbind(as_tibble(Total_genes, rownames = 'name'), as_tibble(filtered_genes)) -> n_genes
+
+names(n_genes) <- c('LIBRARY_ID','Raw', 'Filt')
+
+n_genes %>% mutate(pct_genes_retained = Filt/Raw) -> n_genes
+
+n_genes %>%
+  left_join(MTD) %>%
+  mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = unique(LIBRARY_ID))) %>%
+  ggplot() + 
+  geom_col(aes(x = LIBRARY_ID, y = Raw, fill = pH)) + 
+  # geom_errorbar(aes(x = LIBRARY_ID, y = Filt, group = pH, ymin = Filt, ymax = Filt), color = 'black')
+  labs(x = 'Samples', y = 'Total sRNAs') +
+  scale_y_continuous(labels = scales::comma) +
+  scale_color_manual("", values = rev(pHpalette)) +
+  scale_fill_manual("", values = rev(pHpalette)) +
+  theme_classic(base_family = "GillSans") +
+  theme(legend.position = 'none',
+    axis.text.x = element_text(angle = 45,
+      hjust = 1, vjust = 1, size = 10)) -> pbottom
+  
+pbottom <- pbottom + facet_grid(~ hpf, scales = 'free') +
+  theme(
+    strip.background = element_blank(), 
+    strip.text = element_blank())
+
+library(patchwork)
+
+ps <- ptop / pbottom + patchwork::plot_layout(heights = c(1,1.2))
+
+
+ggsave(ps, filename = "transcripts_and_reads_plots.png", 
+  path = path, width = 5, height = 4.5, device = png)
+
+
+# PCA =====
+
+# ncol(data <- log2(count+1))
+
+ncol(data <- edgeR::cpm(raw_count+1))
+
+PCA = prcomp(t(data), center = FALSE, scale. = FALSE)
+
+percentVar <- round(100*PCA$sdev^2/sum(PCA$sdev^2),1)
+
+sd_ratio <- sqrt(percentVar[2] / percentVar[1])
+
+PCAdf <- data.frame(PC1 = PCA$x[,1], PC2 = PCA$x[,2])
+
+# library(mclust)
+
+# d_clust <- mclust::Mclust(as.matrix(PCAdf), G=1:4, modelNames = mclust.options("emModelNames"))
+# plot(d_clust)
+# d_clust$BIC
+# k <- d_clust$G
+# names(k) <- d_clust$modelName
+
+PCAdf %>% 
+  dist(method = "euclidean") %>% 
+  hclust() %>% 
+  cutree(., k) %>% 
+  as_tibble(rownames = 'LIBRARY_ID') %>% 
+  mutate(cluster = paste0('C', value)) %>% 
+  dplyr::select(-value) -> hclust_res
+
+
+PCAdf %>%
+  mutate(LIBRARY_ID = rownames(.)) %>%
+  # mutate(g = substr(sample_id, 1,1)) %>%
+  # left_join(hclust_res) %>%
+  left_join(MTD) %>%
+  ggplot(., aes(PC1, PC2)) +
+  # coord_fixed(ratio = sd_ratio)
+  geom_abline(slope = 0, intercept = 0, linetype="dashed", alpha=0.5) +
+  geom_vline(xintercept = 0, linetype="dashed", alpha=0.5) +
+  # ggforce::geom_mark_ellipse(aes(group = as.factor(cluster)),
+  #   fill = 'grey', con.colour = 'grey') +
+  geom_point(size = 7, alpha = 0.7, aes(color = pH)) +
+  geom_text( family = "GillSans",
+    mapping = aes(label = paste0(hpf, " hpf")), size = 2.5) +
+  labs(caption = '') +
+  xlab(paste0("PC1, VarExp: ", percentVar[1], "%")) +
+  ylab(paste0("PC2, VarExp: ", percentVar[2], "%")) +
+  scale_color_manual("", values = rev(pHpalette)) +
+  scale_fill_manual("", values = rev(pHpalette)) +
+  theme_classic(base_family = "GillSans") +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = 'top') -> pcaplot
+
+pcaplot
+
+ggsave(pcaplot, 
+  filename = "PCA.png", path = path, 
+  width = 10, height = 7)
+
+# Correlation heatmap ----
+
+sample_cor = cor(data, method='pearson', use='pairwise.complete.obs')
+sample_dist = dist(t(data), method='euclidean')
+hc_samples = hclust(sample_dist, method='complete')
+
+hc_order <- hc_samples$labels[hc_samples$order]
+
+sample_cor %>% 
+  as_tibble(rownames = 'LIBRARY_ID') %>%
+  pivot_longer(cols = colnames(sample_cor), values_to = 'cor') %>%
+  left_join(MTD) %>% 
+  mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = hc_order)) -> sample_cor_long
+
+# sample_cor_long %>% distinct(sample_id, Diagnosis) %>% mutate(col = ifelse(g %in% 'C', 'red', 'blue')) -> coldf 
+
+n <- length(unique(sample_cor_long$pH))
+
+library(ggh4x)
+
+sample_cor_long %>%
+  ggplot(aes(x = LIBRARY_ID, y = name, fill = cor)) + 
+  # geom_tile(color = 'white', size = 0.2) +
+  geom_raster() + 
+  # geom_text(aes(label = cor), color = 'white') +
+  scale_fill_viridis_c(option = "B", name = "Pearson", direction = 1) +
+  scale_x_discrete(position = 'top') +
+  ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
+  ggh4x::scale_y_dendrogram(hclust = hc_samples) +
+  theme_classic(base_size = 7, base_family = "GillSans") +
+  labs(x = '', y = '') +
+  theme(axis.text.x = element_text(angle = 90,
+    hjust = 1, vjust = 1, size = 7, color = pHpalette),
+    axis.text.y = element_text(color = pHpalette),
+    axis.ticks.length = unit(5, "pt")) -> pheat
+
+# pheat +  ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') -> pheat
+
+ggsave(pheat, 
+  filename = "cor_data_matrix.png", path = path, 
+  width = 6, height = 5)
+
 
 
 # TEST DESEQ2 ----
 
-mtd <- read_tsv(list.files(path = path, pattern = 'METADATA', full.names = T))
+# mtd <- read_tsv(list.files(path = path, pattern = 'METADATA', full.names = T))
 
 # nrow(raw_count <- COUNTS[colNames])
 
 # x) Choose contrast  ----
 
-colData <- mtd
+colData <- MTD
 
 f_col <- "CONTRAST_A"
 
