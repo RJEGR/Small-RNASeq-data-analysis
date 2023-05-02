@@ -3,7 +3,7 @@
 
 split_blast <- function (x, hit = "BLASTP") {
   
-  # Upgrade function form trinotateR package:
+  # Upgraded function form trinotateR package:
   
   require(tidyverse)
   
@@ -61,6 +61,8 @@ split_blast <- function (x, hit = "BLASTP") {
 
 split_gene_ontology <- function(x, hit = "BLASTP") {
   
+  # Upgraded function form trinotateR package:
+  
   require(tidyverse)
   
   gene_ontology_hit <-  paste("gene_ontology_", hit, sep = "")
@@ -89,7 +91,48 @@ split_gene_ontology <- function(x, hit = "BLASTP") {
   
 }
 
-split_KEGG <- function (x, hit = "Kegg")  {
+split_pfam <- function(x, hit = "Pfam"){
+  
+  # Upgraded function form trinotateR package:
+  
+  require(tidyverse)
+  
+  which_vars <- c(hit, "gene_id", "transcript_id", "prot_id")
+  
+  y <- x %>% select_at(vars(all_of(which_vars))) %>% drop_na(any_of(hit))
+  
+  z <- y %>% pull(hit)
+  z <- strsplit(z, "`")
+
+  n <- sapply(z, length)
+  
+  # split annotation into 5 columns
+  
+  z <- strsplit( unlist(z), "\\^" )
+  
+  gene <- rep(y$gene_id, n)
+  
+  transcript <- rep(y$transcript_id, n)
+  
+  protein <- rep(gsub(".*\\|", "", y$prot_id), n)
+  
+  pfam <- gsub("\\.[0-9]*", "", sapply(z, "[", 1))
+  
+  x1 <- data.frame(gene, 
+    transcript, protein, pfam, 
+    symbol = sapply(z, "[", 2), 
+    name = sapply(z, "[", 3), 
+    align = sapply(z, "[", 4), 
+    evalue = as.numeric(gsub("E:", "", sapply(z, "[", 5) )), 
+    stringsAsFactors = FALSE)
+  
+  message(nrow(x1), " ", hit, " annotations")
+  
+  as_tibble(x1)
+  
+}
+
+split_kegg <- function (x, hit = "Kegg")  {
   library(data.table)
   y <- x[!is.na(get(hit)), .(get(hit), gene_id, transcript_id, 
     prot_id)]
@@ -103,3 +146,4 @@ split_KEGG <- function (x, hit = "Kegg")  {
   message(nrow(x1), " ", hit, " annotations")
   data.table(x1)
 }
+
