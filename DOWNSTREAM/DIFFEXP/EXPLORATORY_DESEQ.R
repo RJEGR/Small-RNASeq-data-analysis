@@ -28,7 +28,7 @@ Countdf %>% dplyr::count(MIRNA)
 
 # count %>% distinct(`#miRNA`)
 
-count <- count %>% filter(total > 0)
+count <- Countdf %>% dplyr::filter(total > 0)
 
 names(count)
 
