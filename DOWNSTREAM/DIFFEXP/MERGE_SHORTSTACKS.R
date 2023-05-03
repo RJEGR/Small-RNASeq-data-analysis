@@ -280,7 +280,10 @@ sample_cor = cor(data, method='pearson', use='pairwise.complete.obs')
 sample_dist = dist(t(data), method='euclidean')
 hc_samples = hclust(sample_dist, method='complete')
 
+
 hc_order <- hc_samples$labels[hc_samples$order]
+
+heatmap(sample_cor, col = cm.colors(12))
 
 sample_cor %>% 
   as_tibble(rownames = 'LIBRARY_ID') %>%
@@ -296,25 +299,23 @@ library(ggh4x)
 
 sample_cor_long %>%
   ggplot(aes(x = LIBRARY_ID, y = name, fill = cor)) + 
-  # geom_tile(color = 'white', size = 0.2) +
-  geom_raster() + 
+  geom_tile(color = 'white', size = 0.2) +
+  # geom_raster() + 
   # geom_text(aes(label = cor), color = 'white') +
   scale_fill_viridis_c(option = "B", name = "Pearson", direction = 1) +
   scale_x_discrete(position = 'top') +
-  ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
-  ggh4x::scale_y_dendrogram(hclust = hc_samples) +
-  theme_classic(base_size = 7, base_family = "GillSans") +
+  # ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
+  # ggh4x::scale_y_dendrogram(hclust = hc_samples) +
+  theme_classic(base_size = 12, base_family = "GillSans") +
   labs(x = '', y = '') +
-  theme(axis.text.x = element_text(angle = 90,
-    hjust = 1, vjust = 1, size = 7, color = pHpalette),
-    axis.text.y = element_text(color = pHpalette),
-    axis.ticks.length = unit(5, "pt")) -> pheat
+  theme(axis.text.x = element_text(angle = 45,
+    hjust = -0.15, vjust = 1)) -> pheat
 
 # pheat +  ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') -> pheat
 
 ggsave(pheat, 
   filename = "cor_data_matrix.png", path = path, 
-  width = 6, height = 5)
+  width = 6, height = 5, device = png)
 
 
 
