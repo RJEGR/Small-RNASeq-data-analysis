@@ -22,6 +22,7 @@ library(tidyverse)
 wd <- "~/Documents/MIRNA_HALIOTIS/"
 
 query_path <- paste0(wd, "/SHORTSTACKS/ShortStack_20230315_out/")
+
 ref_path <- paste0(wd, "/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/ANNOTATION/")
 
 res_f <- list.files(path = query_path, pattern = "Results.txt", full.names = T)
