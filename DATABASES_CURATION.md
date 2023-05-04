@@ -47,7 +47,7 @@ wget https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-56/metazoa/fasta/haliotis_
 
 **cds.all.fa.gz:** : These files hold the coding sequences corresponding to Ensembl genes. Note: CDS does not contain UTR or intronic sequence (Ex. `Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.cds.all.fa.gz`)
 
-**cdna.all.fa.gz**: These files hold the cDNA sequences corresponding to Ensembl genes, excluding ncRNA genes, which are in a separate 'ncrna' Fasta file. cDNA consists of transcript sequences for actual and possible genes, including pseudogenes, NMD and the like. See the file names  explanation below for different subsets of both known and predicted transcripts (ex. `Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.cds.all.fa.gz`)
+**cdna.all.fa.gz**: These files hold the cDNA sequences corresponding to Ensembl genes, excluding ncRNA genes, which are in a separate 'ncrna' Fasta file. cDNA consists of transcript sequences for actual and possible genes, including pseudogenes, NMD and the like. See the file names  explanation below for different subsets of both known and predicted transcripts (ex. `Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.cdna.all.fa.gz`)
 
 ```bash
 grep -c "^>" *.cdna.all.fa # 57,675
