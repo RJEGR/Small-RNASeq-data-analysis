@@ -10,6 +10,7 @@ if(!is.null(dev.list())) dev.off()
 options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 current_ref <- '~/Documents/MIRNA_HALIOTIS/TRASH/GCF_023055435.1/ncbi_dataset/data/GCF_023055435.1/'
+
 # prev_ref <- '~/Documents/MIRNA_HALIOTIS/GCF_003343065.1/ncbi_dataset/data/GCF_003343065.1/'
 # current_ref <- "/Users/cigom/Documents/MIRNA_HALIOTIS/MGCounts/mgcount_tutorial/annotations_gtf/"
 # review report at https://www.ncbi.nlm.nih.gov/genome/annotation_euk/Haliotis_rufescens/101/
@@ -18,6 +19,7 @@ file <- list.files(path = current_ref, pattern = "genomic.gff", full.names = T)
 
 # library(Biostrings)
 # library(rstatix)
+
 library(tidyverse)
 
 # https://edinburgh-genome-foundry.github.io/DnaFeaturesViewer/ (compare viz with this)
@@ -61,6 +63,7 @@ saveRDS(gff_rna, file = paste0(path, "gff_rna.rds"))
 # For GCF_003343065.1 = 8,371 (?) and 1,279,302 genomic features
 
 gff %>% count(source) #%>% view()
+
 gff %>% count(type) #%>% view()
 
 gff %>% count(strand)
@@ -77,26 +80,34 @@ library(chromoMap)
 
 # chr_file_1 = arf[, c(6,8,9)]
 
-chr.data <- gff_rna %>% filter(grepl("^X", Parent)) %>% select(Parent, start, end)
+chr.data <- gff_rna %>% 
+  filter(grepl("^X", Parent)) %>% 
+  select(Parent, start, end)
 
 # chr_file_1 %>% distinct(Parent)
 
-# chromosome name: a character representing the chromosome/contig/region name like ‘chr1’ or ‘1’ or ‘ch1’
+# chromosome name: a character representing the chromosome/contig/region name like ‘chr1’ or ‘1’ or ‘ch1’.
+
 # chromosome start: a numeric value to specify chromosome (or chromosome region) start position. If you are considering entire chromosome this value is typically 1.
+
 # chromsome end: a numeric value specifying chromosome/contig/region end position. Again, if you are considering entire chromosome, then this value is the length of chromosome.
+
 # centromere start (optional): centromeres will be added automatically if you provide the its start cordinates.
 
 # annotation files
 
-anno.data <- arf[,c(1,6,8,9, 11, 12)] 
+anno.data <- arf[,c(1,6,8,9, 11, 12)]
 
 names(anno.data) <- c("id", "Parent", "start", "end", "strand", "mismatch")
 
 # annot.data <- anno.data %>% separate(id, into = c("Sample", "id"), sep = "_")
 
-chr.features <- gff_rna %>% filter(grepl("^X", Parent)) %>% distinct(Parent, type, product)
+chr.features <- gff_rna %>% 
+  filter(grepl("^X", Parent)) %>% 
+  distinct(Parent, type, product)
 
-anno.data <- anno.data %>% left_join(chr.features, by = "Parent")
+anno.data <- anno.data %>% 
+  left_join(chr.features, by = "Parent")
 
 # Element Name: a character specifying (uniquely) the elements. This can be identifiers,symbols etc.
 # Chromosome Name: a character specifying the chromosome name. [NOTE: the chromosome names should be consistent in chromosome and data files.]
