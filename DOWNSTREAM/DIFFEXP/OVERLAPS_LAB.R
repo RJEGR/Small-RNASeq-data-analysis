@@ -31,60 +31,320 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 library(GenomicRanges)
 library(tidyverse)
 
+read_gene_features <- function(f) {
+  
+  require(GenomicRanges)
+  require(tidyverse)
+  
+  col_names <- c("seqname", 
+    "source", 
+    "feature", 
+    "start", 
+    "end", 
+    "score", 
+    "strand", 
+    "frame", 
+    "attribute")
+  
+  df <- read_tsv(f, col_names = F, comment = "#", na = ".")
+  
+  names(df) <- col_names
+  
+  # start_ <- df$start
+  # 
+  # end_ <- df$end
+  # 
+  ranges_ <- IRanges(start = df$start, end = df$end)
+  
+  seqnames_ <- df$seqname
+  
+  # score_ <- df$score
+  # 
+  # strand_ <- df$strand
+  
+  # strand_ <- gsub("[.]", "*", strand_)
+  
+  gr <- GRanges(Rle(seqnames_), 
+    ranges = ranges_, strand = df$strand, score = df$score, 
+    attribute = df$attribute, feature = df$feature)
+  
+  # genome(gr) <- basename(f)
+  
+  return(gr)
+}
+
+# RANGE 0 ====
+# GENOMIC COORDS
+
+path <- '/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/'
+
+f <- list.files(path = path, pattern = "multi_genome.newid.gtf", full.names = T)
+
+# gr <- read_gene_features(f)
+
+# gr %>% as_tibble() %>% group_by(type) %>% count(gene_biotype) %>% view()
+
+gr <- rtracklayer::import(f)
+
+
+# Let's transform to up and downstream from the gene to define region to find miRNA source
+# This step is to find sRNA targets sites in further steps (so omit now)
+
+srna_promoters <- promoters(gr[gr$type == 'exon'], upstream = 1e3, downstream = 1e3)
+
+# filter by something (Ex. feature) ?:
+
+
+# gr[seqnames(gr) %in% "JALGQA010000001.1"]
+
+# seqlengths(gr)
+# seqinfo(gr)
+
+#=====
+
+
+which_att <- c("gene_id", "gene_biotype")
+
+.attr <- df$attribute
+
+split_attr <- function(s, which_att = c("gene_id", "gene_biotype")) {
+  
+  # s <- df$attribute
+  
+  s <- sapply(strsplit(s, ";"), `[`, )
+  
+  keep <- grepl(paste0(which_att, collapse = "|"), s)
+  
+  s <- s[keep]
+  
+  s <- gsub(paste0(which_att, collapse = "|"), "", s)
+  
+  bind <- data.frame(t(s))
+  
+  names(bind) <- which_att
+  
+  return(bind)
+}
+
+df_sub <- df %>% filter(seqname %in% "JALGQA010000001.1")
+
+.attr <- df_sub$attribute
+
+att_df <- lapply(.attr, split_attr) # <- take long time if rows > 1000
+att_df <- do.call(rbind, att_df)
+
+df_sub <- cbind(df_sub, att_df) %>% as_tibble()
+
+df_sub %>% count(gene_biotype)
+
+which_feat <- "transcript"
+
+df_sub %>% filter(grepl(which_feat, feature))
+
+df_sub %>% group_by(feature) %>% distinct(start, end) %>% view()
+
+
+df_sub %>% filter(start >= 44946 & end <= 72500)
+
+# https://github.com/wilkox/gggenes
+# https://bernatgel.github.io/karyoploter_tutorial/
+
+library(gggenes)
+
+set.seed(202355)
+
+df_sub %>% 
+  filter(start >= 44946 & end <= 72500) %>% view()
+  # group_by(gene_biotype) %>% distinct(start, end) %>%
+  ggplot(aes(xmin = start, xmax = end, y = feature, forward = F, fill = gene_biotype)) +
+  geom_gene_arrow() 
+# facet_grid(~ seqname)
+
+
+# df_sub %>% filter(start >= 44946 & end <= 72500) %>%
+df %>% group_by(seqname, feature) %>% sample_n(1) %>%
+  # distinct(feature, .keep_all = T) %>% filter(feature != "gene") %>%
+  # group_by(gene_biotype) %>% distinct(start, end) %>%
+  ggplot(aes(xmin = start, xmax = end, y = seqname, forward = F, fill = feature)) +
+  geom_gene_arrow() 
+  # facet_grid(~ seqname)
+
+
+gggenes::example_dummies %>%
+  ggplot(aes(xmin = start, xmax = end, y = molecule,fill = gene)) +
+  geom_gene_arrow()
 
 # RANGE 1 ====
+
+# After running shortstacks, lets to used the GenomicRanges to get the coordinates of the sRNA source within the genome. After obtaining the coordinates we used the GenomicRanges (Lawrence et al., 2013) resize function with the parameters fix = "center", width=100, this allowed us to get a window of interaction between sRNAs and genome
+
+path <- '/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out'
+
 srna_f <- list.files(path = path, pattern = "Results.gff3", full.names = T)
 
-srna_df <- read_tsv(srna_f, col_names = F)
+# The 'score' column in the Results.gff3 format stores the number of sRNA-seq aligned reads at that locus.
 
-srna_elements <- srna_df %>% distinct(X3) %>% pull()
+# gr2 <- read_gene_features(srna_f) 
 
-start_ <- srna_df$X4
+gr2 <- rtracklayer::import(srna_f)
 
-end_ <- srna_df$X5
+# Q: EN CUANTOS SCAFFOLDS DEL GENOMA DEL ABULON () SE ANOTARON FUENTES DE SRNAS FUNCIONALES ====
 
-ranges_ <- IRanges(start = start_, end = end_)
+sum(seqlevels(gr2) %in% seqlevels(gr)) # 205 / 221 scaffolds
 
-seqnames_ <- srna_df$X1
+length(gr) # 1,613,804
 
-score_ <- srna_df$X6
+length(gr <- gr[seqnames(gr) %in% seqlevels(gr2)]) # 1,610,150
 
-strand_ <- srna_df$X7
+length(gr2) # 66,488
 
-strand_ <- gsub("[.]", "*", strand_)
+not_founded <- gr2[!seqnames(gr2) %in% seqlevels(gr)]
 
-Rle(seqnames_)
+length(gr2 <- gr2[seqnames(gr2) %in% seqlevels(gr)]) # 66,449
 
-gr <- GRanges(Rle(seqnames_), ranges = ranges_, strand = strand_)
+sum(seqlevels(gr2) %in% seqlevels(gr)) # 205 / 221 scaffolds
 
-# a DataFrame object containing the metadata columns. Columns cannot be named "seqnames", "ranges", "strand", "seqlevels", "seqlengths", "isCircular", "start", "end", "width", or "element".
+srna_to_genome_ov <- findOverlaps(gr2, gr, minoverlap = 1)
 
-# GRanges(seqnames = "chrZ", IRanges(start=c(5,10),end=c(35,45)),
-  # strand="+", seqlengths=c(chrZ=100L))
+# overlaps functions are strand-specific, although findOverlaps has an ignore.strand option.
+
+hist(countOverlaps(gr2, gr, minoverlap = 1))
+
+table(countOverlaps(gr2, gr))
+
+# Hits object with 55030 hits and 0 metadata columns:
+
+# Q: DONDE SE ORIGINAN LOS SRNAS? ====
+
+to_index <- unique(subjectHits(srna_to_genome_ov)) # position vector where coordinates from subject is found
+
+df <- gr[sort(to_index)] %>% 
+  as_tibble() %>%
+  group_by(type) %>%
+  count(gene_biotype) %>% 
+  mutate(type = as.character(type)) %>%
+  # mutate(gene_biotype = ifelse(gene_biotype %in% "protein_coding", type, gene_biotype)) %>%
+  drop_na() %>%
+  arrange(desc(n)) %>%
+  mutate(gene_biotype = factor(gene_biotype, levels = unique(gene_biotype)))
+
+
+
+df %>%
+  ggplot() +
+  geom_col(aes(y = gene_biotype, x = n), fill = "grey20") +
+  geom_col(data = subset(df, gene_biotype == "protein_coding"), 
+    aes(y = gene_biotype, x = n,fill = type), 
+    position = position_stack(reverse = T)) +
+  # geom_text(aes(label = n), size = 2, hjust = -0.05, family = "GillSans") +
+  scale_x_continuous(labels = scales::comma) +
+  theme_bw(base_family = "GillSans", base_size = 14) +
+  ggsci::scale_fill_aaas() +
+  theme(
+    # axis.text.x = element_text(angle = 45, 
+    # hjust = 1, vjust = 1, size = 14), # color = axis_col
+    axis.ticks.length = unit(10, "pt"),
+    legend.position = 'top',
+    panel.border = element_blank(),
+    # axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank()) 
+
+# 2)
+
+miRNAs_loc <- c("MIRNA_hairpin", "mature_miRNA", "miRNA-star")
+
+# Q: Que tipo de srnas fueron sobrelapados en regiones diferentes de "protein_coding"? ======
+
+# .gr <- gr[sort(to_index)]
+
+keep <- which(!gr$gene_biotype == "protein_coding" )
+
+.gr <- gr[keep]
+
+table(.gr$gene_biotype)
+
+ov <- findOverlaps(gr2, .gr, minoverlap = 1)
+
+from_index <- unique(queryHits(ov)) # position vector where coordinates from query is found
+
+gr2[sort(from_index)] %>% 
+  as_tibble() %>% 
+  group_by(type, strand) %>% 
+  summarise(n = n(), TotalReads = sum(score)) %>% view()
+  mutate(col = type) %>% 
+  ungroup() %>% mutate_if(is.factor, as.character) %>%
+  mutate(col = ifelse(col %in% miRNAs_loc, "miRNA_locus", col)) %>%
+  mutate(col = ifelse(grepl("siRNA", col), "siRNA_locus", col)) %>%
+  mutate(pct = n / sum(n)) %>%
+  ggplot() +
+  facet_grid(~ col, scales = "free", space = "free") +
+  geom_col(aes(y = n, x = type, fill = strand), 
+    position = position_dodge(width = 0.5), width = 0.4) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, 
+    hjust = 1, vjust = 1, size = 14))
+
+# OMIT =====
+# For a GRangesList, overlap detection reports a hit at the element level, i.e., when any range within an element overlaps a query range. This semantic is convenient, for example, when counting the total number of RNA-seq read pairs overlapping the exonic regions of each transcript. In that case, both the reads and the transcripts are GRangesList objects.
+
+GRangesList(gr2, gr)
+
+# overlaps <- countOverlaps(gr2, gr)
+
+# gr2 %>% head(10)
+
+# head(fo <- findOverlaps(gr2, gr))
+# head(countOverlaps(gr2, gr))
+
+
+queryHits(fo) # position vector where coordinates from query is found
+
+subjectHits(fo) # position vector where coordinates from subject is found
+
+# ranges from the query for which we found a hit in the subject
+
+index = queryHits(fo)
+
+ovlps <- gr[index,]
+
+srna_df[index,]
+
+
+
+# GRangesList(gr, gr2)
+
+coverage(gr)
+
+
+
+
+# strand_ <- gsub("[.]", "*", strand_)
 
 miRNAs_loc <- c("MIRNA_hairpin", "mature_miRNA", "miRNA-star")
 
 table(srna_df$X3)
 
-srna_df %>% group_by(X3, X7) %>% 
-  # tally(X6, sort = T) %>%
-  group_by(X3, X7) %>% 
-  summarise(n = n(), TotalReads = sum(X6)) %>%
-  mutate(col = X3) %>% 
+gr2 %>% as_tibble() %>% 
+  group_by(feature, strand) %>% 
+  # tally(score, sort = T) %>%
+  # group_by(X3, X7) %>% 
+  summarise(n = n(), TotalReads = sum(score)) %>%
+  mutate(col = feature) %>% 
   mutate(col = ifelse(col %in% miRNAs_loc, "miRNA_locus", col)) %>%
   mutate(col = ifelse(grepl("siRNA", col), "siRNA_locus", col)) %>%
   ungroup() %>%
   mutate(pct = n / sum(n)) %>%
   ggplot() +
   facet_wrap(~ col, scales = "free") +
-  geom_col(aes(y = n, x = X3, fill = X7), 
+  geom_col(aes(y = n, x = feature, fill = strand), 
     position = position_dodge(width = 0.5), width = 0.4) +
   theme_bw(base_family = "GillSans", base_size = 12) +
   theme(axis.text.x = element_text(angle = 45, 
     hjust = 1, vjust = 1, size = 14))
 
 
-# THIS STEP IS TO FILTER ACCORDING TO SRNA UPPRESSED BY CONDITION
+# THIS STEP IS TO FILTER ACCORDING TO SRNA UP-XPRESSED BY CONDITION
 
 srna_df %>% select(X9) %>% 
   separate(col =X9, sep = ";", into = c("Name", "DicerCall", "MIRNA")) %>%
@@ -97,38 +357,27 @@ path <- "/Users/cigom/Documents/MIRNA_HALIOTIS/RNA_SEQ_ANALYSIS/REPEAT_MASKER_OU
 
 mask_f <- list.files(path = path, pattern = "multi_genome.newid.fa.out.gff", full.names = T)
 
-mask_df <- read_tsv(mask_f, col_names = F, comment = "#")
+# gr3 <- read_gene_features(mask_f) 
+gr3 <- rtracklayer::import(mask_f)
 
-table(mask_df$X4)
-
-start_ <- mask_df$X4
-
-end_ <- mask_df$X5
-
-score_ <- mask_df$X6
-
-ranges_ <- IRanges(start = start_, end = end_)
-
-seqnames_ <- mask_df$X1
-
-strand_ <- mask_df$X7
-
-strand_ <- gsub("[.]", "*", strand_)
-
-gr2 <- GRanges(Rle(seqnames_), ranges = ranges_, strand = strand_)
+# mask_df <- read_tsv(mask_f, col_names = F, comment = "#")
 
 # SEARCH OVERLAPS
 
 # gr %over% gr2
 # gr1[gr1 %over% gr2]
 
-fo <- findOverlaps(gr, gr2, minoverlap = 1)
+srna_to_genome_ov
+
+# te_to_genome_ov <- findOverlaps(gr3, gr, minoverlap = 1)
+
+srna_to_te_ov <- findOverlaps(gr2, gr3, minoverlap = 1)
 
 # Hits object with 2656 hits and 0 metadata columns:
 
-queryHits(fo) # position vector where coordinates from query is found
+unique(queryHits(fo)) # position vector where coordinates from query is found
 
-subjectHits(fo) # position vector where coordinates from subject is found
+unique(subjectHits(fo)) # position vector where coordinates from subject is found
 
 # ranges from the query for which we found a hit in the subject
 
