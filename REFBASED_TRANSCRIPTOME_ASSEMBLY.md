@@ -749,18 +749,52 @@ export PATH=$PATH:"/home/rvazquez/ANNOTATION/QUANT/RSEM"
 reference=K127_transcripts_subset.fasta
 db_index_name=${reference%.fasta}
 
-left_file=P1570_SO_L001.qtrim_1P.fq.gz
-right_file=P1570_SO_L001.qtrim_2P.fq.gz
+# 1) INDEX THE REFERENCE
+bowtie2-build $reference $db_index_name
 
-output_prefix=${left_file%.qtrim*}
+rsem-prepare-reference --transcript-to-gene-map genes_trans_map  $reference $db_index_name
 
-bam_file=${left_file%.qtrim*}.sorted.bam
+# 1.1) PARAMETERS
+
+# ===============
+
+aligner_params="--no-mixed --no-discordant --gbar 1000 --end-to-end -k 200"
+
+read_type="-q"
 
 thread_count=12
-read_type="-q"
+
 max_ins_size=800
 
-# TO RSEM
+# 2) ALIGN READS BACK TO THE REFERENCE
+
+for i in $(ls *.qtrim_1P.fq.gz);
+do
+withpath="${i}"
+filename=${withpath##*/}
+base="${filename%.qtrim_1P.fq.gz}"
+
+left_file=${base}.qtrim_1P.fq.gz
+right_file=${base}.qtrim_2P.fq.gz
+
+bam_file=${base}.sorted.bam
+
+bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file
+
+done
+
+# left_file=P1570_SO_L001.qtrim_1P.fq.gz
+# right_file=P1570_SO_L001.qtrim_2P.fq.gz
+# output_prefix=${left_file%.qtrim*}
+
+# bam_file=${left_file%.qtrim*}.sorted.bam
+
+
+#bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file 
+
+# 2.1) PREPARE FILE FORMAT FOR RSEM AND RUN ESTIMATION ABUNDANCE:
+
+# RSEM PARAM
 
 fragment_length=200
 fragment_std=80
@@ -770,30 +804,21 @@ paired_flag_text="--paired-end"
 no_qualities_string=""
 keep_intermediate_files_opt="--keep-intermediate-files"
 
-# ===============
-
-# 1) INDEX THE REFERENCE
-bowtie2-build $reference $db_index_name
-
-aligner_params="--no-mixed --no-discordant --gbar 1000 --end-to-end -k 200"
-
-# 2) ALIGN READS BACK TO THE REFERENCE
-
-bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file 
-
-# 2.1) PREPARE FILE FORMAT FOR RSEM:
-
-bam_for_rsem=${bam_file%.bam}.rsem
-
-convert-sam-for-rsem -p $thread_count $bam_file $bam_for_rsem
-
 rsem_prefix=$db_index_name
+thread_count=12
 
-rsem-prepare-reference --transcript-to-gene-map genes_trans_map  $reference $rsem_prefix
+for i in $(ls *.sorted.bam);
+do
 
-# 3) ESTIMATE ABUNDANCE
+bam_for_rsem=${i%.bam}.rsem
+
+output_prefix="${i%.sorted.bam}"
+
+convert-sam-for-rsem -p 12 $i $bam_for_rsem
 
 rsem-calculate-expression $no_qualities_string $paired_flag_text -p $thread_count $fraglength_info_txt $keep_intermediate_files_opt $SS_opt $rsem_bam_flag --bam ${bam_for_rsem}.bam $rsem_prefix $output_prefix
+
+done
 
 
 # 4) OUTPUT COUNT MATRIX RSEM
