@@ -42,6 +42,53 @@ identical(RESULTS$Name, COUNTS$Name)
 
 # cbind()
 
+# UNIQ AND MULTIMAP READS ====
+
+# Reads: Number of aligned sRNA-seq reads that overlap this locus.
+# UniqueReads: Number of uniquely aligned (e.g. not multi-mapping) reads that overlap this locus.
+
+RESULTS %>%
+  mutate(MIRNA = ifelse(!is.na(KnownRNAs), "Y", MIRNA)) %>%
+  count(MIRNA)
+
+RESULTS <- RESULTS %>% 
+  mutate(MIRNA = ifelse(!is.na(KnownRNAs), "Y", MIRNA)) %>%
+  mutate(MIRNA = factor(MIRNA, levels = c("Y", "N")))
+
+RESULTS %>% 
+  ggplot(aes(Reads, UniqueReads)) + 
+  facet_grid(~ Strand) +
+  scale_y_log10() + scale_x_log10() +
+  geom_point(data = subset(RESULTS, MIRNA == "N"), color = "red",alpha = 0.1) + 
+  geom_point(data = subset(RESULTS, MIRNA == "Y"), color = "blue")
+  #stat_smooth(method = "lm")
+
+RESULTS %>% distinct(MajorRNA)
+
+RESULTS %>% 
+  mutate(KnownRNAs = ifelse(is.na(KnownRNAs) & MIRNA == "Y", Name, KnownRNAs)) %>%
+  mutate(MIRNA = ifelse(!is.na(KnownRNAs), "Y", MIRNA)) %>%
+  select(Name, Chrom, KnownRNAs, MIRNA) %>%
+  drop_na(KnownRNAs) %>%
+  mutate(KnownRNAs = ifelse(grepl("Cluster_", KnownRNAs), "Novel", "known")) %>%
+  count(KnownRNAs)
+
+
+RESULTS %>% 
+  filter(MIRNA == "Y") %>% distinct(Chrom) 
+
+RESULTS %>% 
+  # filter(MIRNA == "Y") %>%
+  # filter(Chrom == "JALGQA010000001.1") %>%
+  pivot_longer(cols = c("Start", "End"), names_to = "names", values_to = "Coords") %>%
+  ggplot(aes(x = Coords, y = log10(Reads))) + 
+  theme_minimal() + facet_grid( MIRNA ~ .) +
+  geom_line(colour="grey50", lineend = "round") +
+  geom_area(fill="grey", alpha=0.6) +
+  geom_hline(yintercept = 2, colour = "grey60", size = 0.5)
+  
+
+
 # PREVALENCE ----
 
 nrow(raw_count <- COUNTS[colNames]) # 66,226
