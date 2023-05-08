@@ -100,7 +100,7 @@ srna_promoters <- promoters(gr[gr$type == 'exon'], upstream = 1e3, downstream = 
 # seqlengths(gr)
 # seqinfo(gr)
 
-#=====
+#===== (Omit)
 
 
 which_att <- c("gene_id", "gene_biotype")
@@ -181,12 +181,27 @@ gggenes::example_dummies %>%
 path <- '/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out'
 
 srna_f <- list.files(path = path, pattern = "Results.gff3", full.names = T)
+res_f <- list.files(path = path, pattern = "Results.txt", full.names = T)
+
+# MTD_f <- list.files(path = path, pattern = "METADATA.tsv", full.names = T)
+# MTD <- read_tsv(MTD_f)
 
 # The 'score' column in the Results.gff3 format stores the number of sRNA-seq aligned reads at that locus.
 
 # gr2 <- read_gene_features(srna_f) 
 
 gr2 <- rtracklayer::import(srna_f)
+
+# FILTER BY TRUE MIRNS (NOVEL AND KNOWN)
+
+query.ids <- read_tsv(res_f) %>%
+  mutate(KnownRNAs = ifelse(is.na(KnownRNAs) & MIRNA == "Y", Name, KnownRNAs)) %>%
+  mutate(MIRNA = ifelse(!is.na(KnownRNAs), "Y", MIRNA)) %>%
+  drop_na(KnownRNAs) %>% pull(Name)
+  # mutate(MIRNA = factor(MIRNA, levels = c("Y", "N")))
+
+gr2 <- gr2[gr2$ID %in% query.ids]
+
 
 # Q: EN CUANTOS SCAFFOLDS DEL GENOMA DEL ABULON () SE ANOTARON FUENTES DE SRNAS FUNCIONALES ====
 
@@ -271,7 +286,7 @@ from_index <- unique(queryHits(ov)) # position vector where coordinates from que
 gr2[sort(from_index)] %>% 
   as_tibble() %>% 
   group_by(type, strand) %>% 
-  summarise(n = n(), TotalReads = sum(score)) %>% view()
+  summarise(n = n(), TotalReads = sum(score)) %>% # view()
   mutate(col = type) %>% 
   ungroup() %>% mutate_if(is.factor, as.character) %>%
   mutate(col = ifelse(col %in% miRNAs_loc, "miRNA_locus", col)) %>%
@@ -459,3 +474,22 @@ mask_df %>%
   filter(X1 %in% "JALGQA010000616.1") %>%
   group_by(X3) %>%
   summarise(n = n(), TotalReads = sum(X6))
+
+
+# karyoploteR ====
+
+library(karyoploteR)
+
+# cd /usr/local/lib
+# sudo ln -s /usr/local/gfortran/lib/libquadmath.0.dylib .
+# sudo ln -s /usr/local/gfortran/lib/libgfortran.5.dylib
+
+gr2 <- gr2[gr2$ID %in% query.ids]
+gr <- gr[seqnames(gr) == "JALGQA010000001.1"]
+regions <- createRandomRegions(nregions=400, length.mean = 3e6, mask=NA, non.overlapping = FALSE)
+
+# GRange object with seqnames, ranges and strand cols at least
+
+kp <- plotKaryotype(genome = gr) # good!
+
+kpPlotRegions(kp, data = gr2[seqnames(gr2) == "JALGQA010000001.1"])
