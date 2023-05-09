@@ -77,8 +77,12 @@ read_gene_features <- function(f) {
 # GENOMIC COORDS
 
 path <- '/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/'
+# 
+#pattern <- "multi_genome.newid.gff3$" # <- to get sequence-region per chromosome
 
-f <- list.files(path = path, pattern = "multi_genome.newid.gtf", full.names = T)
+pattern <- "multi_genome.newid.gtf"
+
+f <- list.files(path = path, pattern = pattern, full.names = T)
 
 # gr <- read_gene_features(f)
 
@@ -86,6 +90,7 @@ f <- list.files(path = path, pattern = "multi_genome.newid.gtf", full.names = T)
 
 gr <- rtracklayer::import(f)
 
+# gr <- gr[gr$type == "region"]
 
 # Let's transform to up and downstream from the gene to define region to find miRNA source
 # This step is to find sRNA targets sites in further steps (so omit now)
@@ -200,16 +205,16 @@ query.ids <- read_tsv(res_f) %>%
   drop_na(KnownRNAs) %>% pull(Name)
   # mutate(MIRNA = factor(MIRNA, levels = c("Y", "N")))
 
-gr2 <- gr2[gr2$ID %in% query.ids]
+# gr2 <- gr2[gr2$ID %in% query.ids]
 
 
 # Q: EN CUANTOS SCAFFOLDS DEL GENOMA DEL ABULON () SE ANOTARON FUENTES DE SRNAS FUNCIONALES ====
 
-sum(seqlevels(gr2) %in% seqlevels(gr)) # 205 / 221 scaffolds
+sum(seqlevels(gr2) %in% seqlevels(gr)) # 221 / 616 cromosomas
 
-length(gr) # 1,613,804
+length(gr) # 1,613,804 (GTF) y 616 (GFF3)
 
-length(gr <- gr[seqnames(gr) %in% seqlevels(gr2)]) # 1,610,150
+length(gr <- gr[seqnames(gr) %in% seqlevels(gr2)]) # 221 GFF3
 
 length(gr2) # 66,488
 
@@ -220,6 +225,41 @@ length(gr2 <- gr2[seqnames(gr2) %in% seqlevels(gr)]) # 66,449
 sum(seqlevels(gr2) %in% seqlevels(gr)) # 205 / 221 scaffolds
 
 srna_to_genome_ov <- findOverlaps(gr2, gr, minoverlap = 1)
+
+# FIND OVERLAPS BY CHROMOSOME
+
+## optional, if you want a genomic order of the chromosomes
+gr0 = sortSeqlevels(gr2)
+
+## split into a GRangesList
+## where each element has all ranges for one chromosome
+grl = split(gr0, seqnames(gr0))
+
+x <- grl[[2]]
+
+
+find_chr_overlaps <- function(x) {
+  
+  gr <- sortSeqlevels(gr)
+  
+  gr0 <- gr[seqnames(gr) == as.character(seqnames(x)@values)]
+  
+  fo <- findOverlaps(x, gr0, minoverlap = 1)
+  
+  return(fo)
+  
+}
+
+
+## apply a function to the ranges of each chromosome
+res = lapply(grl, find_chr_overlaps)
+
+
+res[[1]]
+
+res %>% as_tibble()
+
+findOverlaps(gr2, gr, minoverlap = 1)
 
 # overlaps functions are strand-specific, although findOverlaps has an ignore.strand option.
 
@@ -479,17 +519,53 @@ mask_df %>%
 # karyoploteR ====
 
 library(karyoploteR)
-
+# https://bernatgel.github.io/karyoploter_tutorial//Tutorial/PlotDensity/PlotDensity.html
+# PLOT DENSITY AND REGIONS
 # cd /usr/local/lib
 # sudo ln -s /usr/local/gfortran/lib/libquadmath.0.dylib .
 # sudo ln -s /usr/local/gfortran/lib/libgfortran.5.dylib
 
-gr2 <- gr2[gr2$ID %in% query.ids]
-gr <- gr[seqnames(gr) == "JALGQA010000001.1"]
-regions <- createRandomRegions(nregions=400, length.mean = 3e6, mask=NA, non.overlapping = FALSE)
+# srna_to_genome_ov <- findOverlaps(gr2, gr, minoverlap = 1)
+
+# to_index <- unique(subjectHits(srna_to_genome_ov)) # WHICH IN THE GENOME 
+# from_index <- unique(queryHits(srna_to_genome_ov)) # WHICH IN THE SRNAS
+
+# genome <- gr[sort(to_index)]
+
+# query.locus <- seqnames(genome)@values[seqnames(genome)@lengths > 1]
+
+# gr2 <- gr2[gr2$ID %in% query.ids]
+
+# query.locus <- seqnames(gr2)@values[seqnames(gr2)@lengths > 1]
+
+viz <- gr2 %>% as_tibble() %>% 
+  group_by(seqnames) %>%
+  summarise(n = n(), TotalReads = sum(score)) %>% 
+  arrange(desc(n)) 
+
+viz %>%
+  ggplot(aes(log10(n), log10(TotalReads))) + geom_point()
+
+query.locus <- viz %>% pull(seqnames) %>% head(30)
 
 # GRange object with seqnames, ranges and strand cols at least
 
-kp <- plotKaryotype(genome = gr) # good!
+genome <- gr[seqnames(gr) %in% unique(unfactor(query.locus))]
 
-kpPlotRegions(kp, data = gr2[seqnames(gr2) == "JALGQA010000001.1"])
+seqlevels(genome) <- unique(unfactor(seqnames(genome)@values))
+
+chr.names <- as.character(GenomeInfoDb::seqnames(genome))
+any(duplicated(chr.names))
+
+kp <- plotKaryotype(genome = genome, chromosomes = query.locus) 
+
+# kp <- plotKaryotype(genome, plot.type=2, chromosomes = "JALGQA010000015.1")
+
+data <- gr2 # gr2[gr2$ID %in% query.ids]
+
+kpPlotDensity(kp, data=data)
+
+kpPlotRegions(kp, data=data, data.panel=1, avoid.overlapping = T, num.layers = 10)
+
+kp <- plotKaryotype(genome, plot.type=2, chromosomes = "JALGQA010000015.1")
+kpPlotCoverage(kp, data=data)
