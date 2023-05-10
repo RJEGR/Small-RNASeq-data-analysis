@@ -748,7 +748,7 @@ export PATH=$PATH:"/home/rvazquez/anaconda3/bin/"
 export PATH=$PATH:"/home/rvazquez/ANNOTATION/QUANT/RSEM"
 
 # ===============
-# PARAMETERS 
+# INPUTS
 
 reference=K127_transcripts_subset.fasta
 db_index_name=${reference%.fasta}
@@ -790,9 +790,16 @@ bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_f
 
 done
 
-# 2.1) PREPARE FILE FORMAT FOR RSEM AND RUN ESTIMATION ABUNDANCE:
+# 2.1) GENERATE RSEM FILES:
 
-# RSEM PARAM
+for i in $(ls *.sorted.bam);
+do
+bam_for_rsem=${i%.bam}.rsem
+convert-sam-for-rsem -p 12 $i $bam_for_rsem
+done
+
+# 3) RUN ESTIMATION ABUNDANCE
+# 3.1) RSEM PARAM
 
 fragment_length=200
 fragment_std=80
@@ -810,15 +817,8 @@ rsem_prefix=${reference%.fasta}
 thread_count=12
 
 
-# 2.2) GENERATE RSEM FILES:
 
-for i in $(ls *.sorted.bam);
-do
-bam_for_rsem=${i%.bam}.rsem
-convert-sam-for-rsem -p 12 $i $bam_for_rsem
-done
-
-# 2.3) ESTIMATE ABUNDANCE:
+# ESTIMATE ABUNDANCE:
 
 for i in $(ls *.rsem.bam);
 do
@@ -829,9 +829,9 @@ rsem-calculate-expression $no_qualities_string $paired_flag_text -p $thread_coun
 
 done
         
-# 4) OUTPUT COUNT MATRIX RSEM
-ls -ltrh *isoforms.results
+# 4) OUTPUT COUNT MATRIX TO DIFFERENTIAL EXPRESSION ANALYSIS\
 
+ls -ltrh *isoforms.results
 rsem-generate-data-matrix *isoforms.results > isoforms.counts.matrix
 
 ```
