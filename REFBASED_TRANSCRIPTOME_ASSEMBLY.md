@@ -804,19 +804,31 @@ paired_flag_text="--paired-end"
 no_qualities_string=""
 keep_intermediate_files_opt="--keep-intermediate-files"
 
+SS_opt="--forward-prob 1.0"
+rsem_bam_flag="--no-bam-output"
+
 rsem_prefix=$db_index_name
 thread_count=12
 
+
+# 2.2) GENERATE RSEM FILES:
+
 for i in $(ls *.sorted.bam);
 do
-
 bam_for_rsem=${i%.bam}.rsem
-
-output_prefix="${i%.sorted.bam}"
-
 convert-sam-for-rsem -p 12 $i $bam_for_rsem
+done
 
-rsem-calculate-expression $no_qualities_string $paired_flag_text -p $thread_count $fraglength_info_txt $keep_intermediate_files_opt $SS_opt $rsem_bam_flag --bam ${bam_for_rsem}.bam $rsem_prefix $output_prefix
+# 2.3) ESTIMATE ABUNDANCE:
+
+for i in $(ls *.rsem.bam);
+do
+output_prefix=${i%.rsem.bam}
+
+# $SS_opt 
+# $rsem_bam_flag
+
+rsem-calculate-expression $no_qualities_string $paired_flag_text -p $thread_count $fraglength_info_txt $keep_intermediate_files_opt --bam $i $rsem_prefix $output_prefix
 
 done
 
