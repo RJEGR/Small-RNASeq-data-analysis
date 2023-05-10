@@ -122,6 +122,13 @@ cp /home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1rs.x
 
 tail -n1 $mtGTF >> multi_genome.newid.gtf
 
+# GFF3 (gene-region info)
+mtGFF=HR_mtDNA_whole_genome_shotgun_sequence_JALGQA010000616.1.gff3
+
+cp ./home/rvazquez/GENOME_20230217/ENSEMBLE/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.gff3.gz multi_genome.newid.gff3.gz
+gunzip multi_genome.newid.gff3.gz
+tail -n1 $mtGFF >> multi_genome.newid.gff3
+
 ```
  
 
