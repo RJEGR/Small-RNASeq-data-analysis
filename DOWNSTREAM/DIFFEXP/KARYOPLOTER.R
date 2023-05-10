@@ -191,7 +191,7 @@ path <- '/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_o
 
 bam_f <- list.files(pattern = ".subset.bam$", path = path, full.names = T)
 
-kp <- plotKaryotype(genome = genome,  plot.type=4,  labels.plotter = NULL) 
+kp <- plotKaryotype(genome = genome,  plot.type=4,  labels.plotter = NULL, chromosomes = query.locus[1:110]) 
 
 # kpAddBaseNumbers(kp, tick.dist = 25000, add.units = TRUE)
 
