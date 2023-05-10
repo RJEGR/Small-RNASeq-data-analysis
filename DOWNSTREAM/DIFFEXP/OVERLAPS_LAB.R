@@ -565,7 +565,10 @@ data <- gr2 # gr2[gr2$ID %in% query.ids]
 
 kpPlotDensity(kp, data=data)
 
-kpPlotRegions(kp, data=data, data.panel=1, avoid.overlapping = T, num.layers = 10)
+kpPlotRegions(kp, data=data, data.panel=1, avoid.overlapping = T)
 
 kp <- plotKaryotype(genome, plot.type=2, chromosomes = "JALGQA010000015.1")
+
 kpPlotCoverage(kp, data=data)
+
+kpPlotDensity(kp, data=data, data.panel=2)
