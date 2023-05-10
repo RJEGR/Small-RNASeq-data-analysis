@@ -769,11 +769,8 @@ rsem-prepare-reference --transcript-to-gene-map genes_trans_map  $reference $db_
 # ===============
 
 aligner_params="--no-mixed --no-discordant --gbar 1000 --end-to-end -k 200"
-
 read_type="-q"
-
 thread_count=12
-
 max_ins_size=800
 
 # 2) ALIGN READS BACK TO THE REFERENCE
@@ -789,18 +786,9 @@ right_file=${base}.qtrim_2P.fq.gz
 
 bam_file=${base}.sorted.bam
 
-echo bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file
+bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file
 
 done
-
-# left_file=P1570_SO_L001.qtrim_1P.fq.gz
-# right_file=P1570_SO_L001.qtrim_2P.fq.gz
-# output_prefix=${left_file%.qtrim*}
-
-# bam_file=${left_file%.qtrim*}.sorted.bam
-
-
-#bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file 
 
 # 2.1) PREPARE FILE FORMAT FOR RSEM AND RUN ESTIMATION ABUNDANCE:
 
