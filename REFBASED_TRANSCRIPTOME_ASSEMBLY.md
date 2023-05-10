@@ -740,6 +740,10 @@ Both, the de novo transcriptome assembly and all pre-processed libraries is goin
 
 ```bash
 # 0) LOAD TOOLS
+# git clone https://github.com/deweylab/RSEM.git
+# make
+# make install
+
 export PATH=$PATH:"/home/rvazquez/anaconda3/bin/"
 export PATH=$PATH:"/home/rvazquez/ANNOTATION/QUANT/RSEM"
 
@@ -748,6 +752,12 @@ export PATH=$PATH:"/home/rvazquez/ANNOTATION/QUANT/RSEM"
 
 reference=K127_transcripts_subset.fasta
 db_index_name=${reference%.fasta}
+
+grep '^>' $reference |  sed 's/>//g' > transcript.map
+cat transcript.map | awk '{gsub(/\.[0-9]$/,"",$1); print $1}' > genes.map
+paste genes.map transcript.map > genes_trans_map
+rm *.map
+
 
 # 1) INDEX THE REFERENCE
 bowtie2-build $reference $db_index_name
@@ -779,7 +789,7 @@ right_file=${base}.qtrim_2P.fq.gz
 
 bam_file=${base}.sorted.bam
 
-bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file
+echo bowtie2 $aligner_params $read_type -X $max_ins_size -x $db_index_name -1 $left_file -2 $right_file -p $thread_count | samtools view -@ $thread_count -F 4 -S -b | samtools sort -@ $thread_count -n -o $bam_file
 
 done
 
@@ -807,7 +817,8 @@ keep_intermediate_files_opt="--keep-intermediate-files"
 SS_opt="--forward-prob 1.0"
 rsem_bam_flag="--no-bam-output"
 
-rsem_prefix=$db_index_name
+reference=K127_transcripts_subset.fasta
+rsem_prefix=${reference%.fasta}
 thread_count=12
 
 
@@ -823,17 +834,15 @@ done
 
 for i in $(ls *.rsem.bam);
 do
-output_prefix=${i%.rsem.bam}
+output_prefix=${i%.sorted.rsem.bam}
 
-# $SS_opt 
-# $rsem_bam_flag
 
-rsem-calculate-expression $no_qualities_string $paired_flag_text -p $thread_count $fraglength_info_txt $keep_intermediate_files_opt --bam $i $rsem_prefix $output_prefix
+rsem-calculate-expression $no_qualities_string $paired_flag_text -p $thread_count $fraglength_info_txt $keep_intermediate_files_opt $SS_opt $rsem_bam_flag --bam $i $rsem_prefix $output_prefix
 
 done
-
-
+        
 # 4) OUTPUT COUNT MATRIX RSEM
+ls -ltrh *isoforms.results
 
 rsem-generate-data-matrix *isoforms.results > isoforms.counts.matrix
 
