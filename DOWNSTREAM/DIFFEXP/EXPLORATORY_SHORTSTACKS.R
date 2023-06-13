@@ -10,7 +10,7 @@ library(tidyverse)
 
 # path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230308_test/"
 # path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230314_test/"
-path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out//"
+path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 list.files(path = path, pattern = "txt")
 
@@ -31,17 +31,17 @@ Results <- read_tsv(res_f)
 
 Results %>% dplyr::count(MIRNA)
 Results %>% drop_na(KnownRNAs) %>% dplyr::count(MIRNA)
-
-Results %>% filter(MIRNA == "N" & is.na(KnownRNAs) == F) %>% view()
-
-Results %>% filter(MIRNA == "Y" & is.na(KnownRNAs) == T) %>% view()
-
-Results %>% filter(MIRNA == "Y") %>% drop_na(KnownRNAs) %>% view()
+# 
+# Results %>% filter(MIRNA == "N" & is.na(KnownRNAs) == F) %>% view()
+# 
+# Results %>% filter(MIRNA == "Y" & is.na(KnownRNAs) == T) %>% view()
+# 
+# Results %>% filter(MIRNA == "Y") %>% drop_na(KnownRNAs) %>% view()
 
 # PIRNAS -----
 
 Results %>% filter(grepl("piR-",KnownRNAs)) %>% count(MIRNA)
-Results %>% filter(grepl("piR-",KnownRNAs) & MIRNA == "Y" ) %>% view()
+# Results %>% filter(grepl("piR-",KnownRNAs) & MIRNA == "Y" ) %>% view()
 
 
 # Using follow columns to generate fasta headers: (not requiered for shortstacks 4.0)
@@ -57,14 +57,28 @@ names(Results)
 
 fasta_prep <- Results %>%
   # select()
-  unite("headers", c("Name", "#Locus"), sep = "|") 
+  unite("headers", c("Name", "Locus"), sep = "|") %>%
+  arrange(headers)
 
-fasta_prep %>% arrange(headers) %>% distinct(headers) 
+fasta_prep %>% distinct(headers) 
 
+fasta_prep %>% head() %>% view()
 
+srna_seqs <- fasta_prep %>% pull(MajorRNA)
+srna_headers <- fasta_prep %>% pull(headers)
+
+srna_fasta <- c(rbind(srna_headers, srna_seqs))
+
+write(srna_fasta, file= paste0(path, "MajorRNA.fasta"))
 # Results %>% head() %>% view()
 
-
+Results %>% 
+  distinct(MajorRNA, .keep_all = T) %>%
+  mutate(color = "Novel") %>%
+  mutate(color = ifelse(grepl("piR",KnownRNAs), "piR", color)) %>%
+  mutate(color = ifelse(grepl("Mir",KnownRNAs), "miR", color)) %>% 
+  # count(color)
+  ggplot(aes(Length, Reads, color = color)) + geom_point() + facet_grid(MIRNA ~ color)
 
 # Polarity distribution of transcript-mapped sRNAs ----
 # 21: Number of 21 nucleotide reads aligned to the locus.
@@ -86,7 +100,7 @@ Results %>%
   mutate(Length = ifelse(Length < 20, "<20", ifelse(Length > 24, ">24", Length))) %>%
   count(Length, Strand) %>% mutate(frac = n/sum(n)) %>% 
   ggplot(aes(x = Length, y = frac, fill = Strand)) +
-  geom_col()
+  geom_col(position = "dodge2")
 
 
 # Radar charts show the fractions of sRNAs in each of the 21 possible phasing registers; the registers highlighted in magenta are those predicted by the miRNA target sites.
@@ -112,6 +126,7 @@ recode_to <- c(`U` = "Uniquely ", `P`= "Multimapper (mmap)",`R` = "Random mmap",
 path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out//"
 
 f <- list.files(path = path, pattern = "alignment_details.tsv", full.names = T)
+
 alignment_details <- read_tsv(f)
 
 readfile <- gsub(".clean.newid.subset.bam", "", basename(alignment_details$readfile))
