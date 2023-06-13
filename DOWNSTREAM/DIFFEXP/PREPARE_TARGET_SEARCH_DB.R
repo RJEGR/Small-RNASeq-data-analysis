@@ -11,6 +11,10 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 library(tidyverse)
 
+url <- "https://raw.githubusercontent.com/RJEGR/Small-RNASeq-data-analysis/master/FUNCTIONS.R"
+
+source(url)
+
 wd <- "~/Documents/MIRNA_HALIOTIS/"
 
 ref_path <- paste0(wd, "RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/ANNOTATION/OUTPUTS/")
@@ -32,7 +36,7 @@ readMappings <-  function (file, sep = "\t", IDsep = ",")  {
     split = IDsep)[[1]])))
 }
 
-# MAP <- readMappings(go_f)
+MAP <- readMappings(go_f)
 
 annot <- read_tsv(annot_f, na = ".")
 
@@ -44,11 +48,32 @@ names(annot)[1] <- "gene_id"
 
 blastp_df <- split_blast(annot, hit = "BLASTP")
 
+str(query.ids <- blastp_df %>% distinct(transcript) %>% pull(transcript)) 
+
+# MAP <- MAP[names(MAP) %in% query.ids]
+
+# go_id <- unlist(MAP)
+
+# as.data.frame(go_id) %>% as_tibble(rownames = "transcript") %>% right_join(blastp_df)
+
+# blastp_df <- blastp_df %>%
+#   group_by(transcript) %>% 
+#   arrange(identity) %>%
+#   sample_n(1) %>%
+#   ungroup()
+
+blastp_df
+# write_rds(blastp_df, file = paste0(ref_path, "blastp_df.rds"))
+
 blastx_df <- split_blast(annot, hit = "BLASTX")
+
+# write_rds(blastx_df, file = paste0(ref_path, "blastx_df.rds"))
 
 go_df <- split_gene_ontology(annot, hit = "BLASTP")
 
 pfam_df <- split_pfam(annot)
+
+save(blastp_df, blastx_df, go_df, pfam_df, file = paste0(ref_path, "annot.Rdata"))
 
 # EXPLORATORY   ======
 
@@ -128,17 +153,25 @@ blastp_df %>%
 # bed=transcripts.fa.transdecoder.bed
 
 
-# cat $gtf | grep "_prime_UTR" > prime_UTR.gff3
+# cat $gtf | grep "three_prime_UTR" > prime_UTR.gff3
+
+# cat prime_UTR.gff3.tmp | sed 's/$/";/' | sed 's/Parent=/Parent "/' > prime_UTR.gtf
+
 # cat $bed | grep "prime" > prime_UTR.bed
 
 # seqkit subseq --gtf prime_UTR.gff3 $genome --gtf-tag "Parent" --update-faidx -o prime_UTR.cds
 
+# sequence () not found in file: transcripts.fa.transdecoder.renamed.cds
 
+# But working:
 
+# seqkit subseq --bed prime_UTR.gff3 $genome --chr transdecoder --update-faidx -o prime_UTR.cds
 
+# cat prime_UTR.cds | seqkit rmdup -s -P -D duplicated_detail.txt -d duplicates.fasta -o utr_rmdup.fa
 
 
 # GROUP GENES BY THEMATIC COMPONENTS ======
+
 # EX. KEGG, BIOLOGICAL PROCESSS, CELLULAR COMPONENTS OR MOLEC. FUNCTION.
 
 # GENE SAMPLE ABUNDANCE  ======
