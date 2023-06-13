@@ -360,15 +360,20 @@ export PATH=$PATH:"/home/rvazquez/miRanda-1.9-i686-linux-gnu/bin"
 export PATH=$PATH:"/home/rvazquez/RNAhybrid-2.1.2/src/"
 
 ln -s /home/rvazquez/SHORTSTACKS/knownsRNA.fa
-ln -s /home/rvazquez/SHORTSTACKS/ShortStack_20230314_test1/mir.fasta
+ln -s /home/rvazquez/SHORTSTACKS/ShortStack_20230315_out/mir.fasta/mir.fasta
 
+# ln -s /home/rvazquez/GENOME_20230217/ENSEMBLE/utr.fa .
+ln -s /home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/utr_rmdup.fa .
 
-target=/home/rvazquez/GENOME_20230217/ENSEMBLE/utr.fa
+ln -s /home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/three_prime_utr_rmdup.fa .
+
+target=utr_rmdup.fa
 query=mir.fasta
 
+output=${query%.*}_vs_${target%.*}
 
-
-miranda $query $target > miranda.out &
+# miranda $query $target > miranda.out &
+miranda $query $target -quiet -out ${output}_miranda.out
 
 # free(): invalid next size (fast)
 # [1]+  Aborted                 (core dumped) miranda $query $target > miranda.out
@@ -379,7 +384,19 @@ miranda $query $target > miranda.out &
 # 2) (RNAHYB Tiene sezgos debido a sus calibraciones en el flag -s, ademas no sabemos los rangos del flag -d que omite a -s)
 
 # RNAhybrid [options] [target sequence] [query sequence].
-RNAhybrid -t $target -m 20000 -q $query -n 50 -f 2,8 -s 3utr_human > RNAhybrid.out &
+
+RNAhybrid -t $target -m 20000 -q $query -n 50 -f 2,8 -s 3utr_human > ${output}_RNAhybrid.out &
+
+# Create table based on output:
+grep -E "target|miRNA|mfe|p-value|position"
+target
+miRNA
+mfe
+p-value
+position
+# evalute if significance:
+
+# grep "p-value:" mir_vs_utr_rmdup_RNAhybrid.out  | cut -f2 -d ":" | sort -n | head
 
 # seqkit stats $target # 16,632 max len
 # seqkit stats $query # 49 max len
@@ -394,4 +411,64 @@ RNAhybrid -t $target -m 20000 -q $query -n 50 -f 2,8 -s 3utr_human > RNAhybrid.o
 
 # (-d <xi>,<theta>) <xi> and <theta> are the position and shape parameters, respectively, of the extreme value distribution assumed for p-value calculation. If omitted, they are estimated from the maximal duplex energy of the query. In that case, a data set name has to be given with the -s flag.
 
+
+# TARGETSCAN
+
+target=three_prime_utr_rmdup.fa # utr_rmdup.fa
+query=mir.fasta
+
+prefix=${target%.*}
+
+# 1) align UTR
+# contains three fields (tab-delimited):
+# a. Gene/UTR ID or name
+# b. Species ID for this gene/UTR (must match ID in miRNA file)
+# c. Aligned UTR or gene (with gaps from alignment)
+# ex:
+# BMP8B	9606	GUCCACCCGCCCGGC
+# BMP8B	9615	-GUG--CUGCCCACC
+
+# Muscle for low number of seqs
+# Mafft for high n 
+
+mafft --thread 8 $target > ${prefix}.aln &>> "mafft"$(date +%Y%m%d)".log" &
+
+# # to kill the process related to it ps -o pid=pidid | xargs kill
+
+##format for targetscan
+cat ${prefix}.aln | grep ">" | sed 's/>//g' > id.tmp
+cat ${prefix}.aln | grep -v ">" > seq.tmp
+paste id.tmp seq.tmp | awk -v OFS="\t" '{print $1, "0000", $2}' > ${prefix}_ts.txt
+
+# 2) - miRNA_file    => miRNA families by species
+# contains three fields (tab-delimited):
+# a. miRNA family ID/name
+# b. seed region (7mer) for this miRNA
+# c. semicolon-delimited list of species IDs in which this miRNA has been annotated
+# ex:
+# let-7/98	GAGGUAG	9606;10090;10116
+# miR-127/127-3p	GAGGUAG	9606;10090
+
+## Convert to TargetScan
+# https://github.com/nf-core/circrna/blob/master/bin/targetscan_format.sh
+
+## Isolate the sequences
+grep -v ">" $MATURE > mature_sequence
+## Extract seed sequence (7bp after 1st)
+awk '{print substr($1, 2, 7)}' mature_sequence > seed_sequence
+## Isolate ID (awk last field (NF))
+grep ">" $MATURE | awk -F ' ' '{print $NF}' > miR_ID
+## Combine
+paste miR_ID seed_sequence > targetscan_tmp.txt
+## Correct delimiter, add dummy species
+awk -v OFS="\t" '{print $1, $2, "0000"}' targetscan_tmp.txt > mature.txt
+
+
+targetscan_format.sh $mature
+
+# ./targetscan_70.pl miRNA_file UTR_file PredictedTargetsOutputFile
+targetscan_70.pl mature.txt ${prefix}_ts.txt ${prefix}.txt
+
 ```
+
+# 
