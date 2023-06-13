@@ -273,10 +273,11 @@ do
 withpath="${i}"
 filename=${withpath##*/}
 bs="${filename%*.sorted.bam}"
-stringtie --rf -p 2 -l $bs -o DENOVO_MODE/${bs}_transcripts.gtf $i
+stringtie --rf -p 12 -l $bs -o DENOVO_MODE/${bs}_transcripts.gtf $i
 done
 
 # 2) MERGE
+cd DENOVO_MODE
 
 ls -1 *_transcripts.gtf > stringtie_gtf_list.txt
 
@@ -311,13 +312,13 @@ cd $WD
 
 ls -1 *_transcripts.gtf > stringtie_gtf_list.txt 
 
-stringtie --rf --merge -p 24 -o transcripts_guided.gtf -G $RNA_REF_GTF stringtie_gtf_list.txt
+stringtie --rf --merge -p 24 -o transcripts.gtf -G $RNA_REF_GTF stringtie_gtf_list.txt
 
 # 2) Get FASTA
 
 gffread -w transcripts.fa -g $RNA_REF_FASTA transcripts.gtf
 
-grep "^>" -c transcripts.fa # 134,293 (or 149,366 from 14 paired-end samples)
+grep "^>" -c transcripts.fa # 134,293 (or 106,608 from 14 paired-end samples)
 
 ```
 
@@ -400,8 +401,9 @@ echo "$bs" `printf "$PWD/${bs}_eB_dir/$fname"`
 done > samples.txt
 
 # GaD, continuar aqui 17/03/23
+cat samples.txt /home/rvazquez/RNA_SEQ_ANALYSIS/RAW_LIBS/ADD_LIBS/ASSEMBLY/HISAT2_SAM_BAM_FILES/DENOVO_MODE/QUANTIFICATION/samples.txt > samples.txt2
 
-prepDE.py3 -i samples.txt  -v
+prepDE.py3 -i samples.txt2  -v
 
 # ..writing transcript_count_matrix.csv
 # ..writing gene_count_matrix.csv
