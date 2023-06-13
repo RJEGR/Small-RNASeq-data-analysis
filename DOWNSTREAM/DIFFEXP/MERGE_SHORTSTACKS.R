@@ -47,6 +47,7 @@ identical(RESULTS$Name, COUNTS$Name)
 # Reads: Number of aligned sRNA-seq reads that overlap this locus.
 # UniqueReads: Number of uniquely aligned (e.g. not multi-mapping) reads that overlap this locus.
 
+
 RESULTS %>%
   mutate(MIRNA = ifelse(!is.na(KnownRNAs), "Y", MIRNA)) %>%
   count(MIRNA)
@@ -78,9 +79,10 @@ RESULTS %>%
   filter(MIRNA == "Y") %>% distinct(Chrom) 
 
 RESULTS %>% 
-  # filter(MIRNA == "Y") %>%
-  # filter(Chrom == "JALGQA010000001.1") %>%
-  pivot_longer(cols = c("Start", "End"), names_to = "names", values_to = "Coords") %>%
+  filter(MIRNA == "Y") %>%
+  filter(Chrom == "JALGQA010000001.1") %>%
+  pivot_longer(cols = c("Start", "End"), 
+    names_to = "names", values_to = "Coords") %>%
   ggplot(aes(x = Coords, y = log10(Reads))) + 
   theme_minimal() + facet_grid( MIRNA ~ .) +
   geom_line(colour="grey50", lineend = "round") +
@@ -351,8 +353,8 @@ sample_cor_long %>%
   # geom_text(aes(label = cor), color = 'white') +
   scale_fill_viridis_c(option = "B", name = "Pearson", direction = 1) +
   scale_x_discrete(position = 'top') +
-  # ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
-  # ggh4x::scale_y_dendrogram(hclust = hc_samples) +
+  ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
+  ggh4x::scale_y_dendrogram(hclust = hc_samples) +
   theme_classic(base_size = 12, base_family = "GillSans") +
   labs(x = '', y = '') +
   theme(axis.text.x = element_text(angle = 45,
