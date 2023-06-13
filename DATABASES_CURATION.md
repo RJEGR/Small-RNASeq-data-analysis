@@ -61,18 +61,33 @@ awk '{print $3}' *.gtf| sort | grep "utr" | uniq -c
 ```
 Subseq UTR sequences 
 ```bash
-gtf=Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.56.gtf
+export PATH=$PATH:"/home/rvazquez/seqkit_tool"
+
+WD=/home/rvazquez/GENOME_20230217/SHORTSTACKS_REF
+gtf=$WD/multi_genome.newid.gtf
 genome=multi_genome.newid.fa
+
+# cat $gtf | grep "utr" | awk '{print $3}' | sort | uniq -c
+# 77553 five_prime_utr
+# 54432 three_prime_utr
 
 cat $gtf | grep "utr" > utr.gtf
 
 seqkit subseq --gtf utr.gtf $genome --gtf-tag "gene_id" -o utr.fa
+
+cat $gtf | grep "three_prime_utr" > three_prime_utr.gtf
+
+seqkit subseq --gtf three_prime_utr.gtf $genome --gtf-tag "gene_id" -o three_prime_utr.fa
 
 # REMOVING DUPLICATED sequences (-s) in --only-positive-strand (-P)
 
 cat utr.fa | seqkit rmdup -s -P -D duplicated_detail.txt -d duplicates.fasta -o utr_rmdup.fa
 
 # [INFO] 49035 duplicated records removed
+
+cat three_prime_utr.fa | seqkit rmdup -s -P -D duplicated_detail.txt -d duplicates.fasta -o three_prime_utr_rmdup.fa 
+
+# [INFO] 23561 duplicated records removed
 
 # FOR --gtf-tag choose one of the follow:
 #gene_id "GeneID_125373053"; 
