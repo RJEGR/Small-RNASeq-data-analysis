@@ -352,8 +352,19 @@ https://bitbucket.org/leslielab/chimiric/src/master/
 
 ###  RUNNING TOOLS
 
+```bash
+# vi linearizefasta.awk
+/^>/ {printf("%s%s\t",(N>0?"\n":""),$0);N++;next;}
+     {printf("%s",$0);}
+END  {printf("\n");}
+
+# 
+
+awk -f linearizefasta.awk < three_prime_utr_rmdup.aln
+```
 
 ```bash
+export PATH=$PATH:"/home/rvazquez/seqkit_tool"
 
 export PATH=$PATH:"/home/rvazquez/miRanda-1.9-i686-linux-gnu/bin"
 
@@ -367,8 +378,14 @@ ln -s /home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/utr_rmdup.fa .
 
 ln -s /home/rvazquez/GENOME_20230217/SHORTSTACKS_REF/three_prime_utr_rmdup.fa .
 
-target=utr_rmdup.fa
-query=mir.fasta
+# Prepare mir.fasta
+# mir.fasta: This is a FASTA formatted file containing hairpin, mature miRNA, and miRNA* sequences derived from ShortStack's identification of MIRNA loci.
+
+seqkit grep -r -p "mature|star" mir.fasta > mature_star_mir.fa
+
+target=three_prime_utr.fa
+
+query=mature_star_mir.fa
 
 output=${query%.*}_vs_${target%.*}
 
@@ -388,20 +405,38 @@ miranda $query $target -quiet -out ${output}_miranda.out
 RNAhybrid -t $target -m 20000 -q $query -n 50 -f 2,8 -s 3utr_human > ${output}_RNAhybrid.out &
 
 # Create table based on output:
-grep -E "target|miRNA|mfe|p-value|position"
-target
-miRNA
-mfe
-p-value
-position
+# grep -E "target:|miRNA :|mfe|p-value|length|position"
+
+grep -E "target:|miRNA :|mfe|p-value|length|position" mir_vs_utr_rmdup_RNAhybrid.out > mir_vs_utr_rmdup_RNAhybrid.out.Lines
+
+FILE=mir_vs_utr_rmdup_RNAhybrid.out.Lines
+
+grep -E "target:" $FILE | sed 's/target: //g' > TARGET.tmp
+grep -E "miRNA :" $FILE | sed 's/miRNA : //g' > QUERY.tmp
+grep -E "mfe" $FILE |sed 's/mfe: //g'  | sed 's/kcal\/mol//g' > MFE.tmp
+grep -E "p-value" $FILE | sed 's/p-value: //g' > PVAL.tmp
+# grep -E "length" $FILE | sed 's/length: //g' > LEN.tmp
+grep -E "position" $FILE | sed 's/position //g' > POS.tmp
+
+# how to split LEN-2-rows in two cols (LEN.tmp)
+#
+
+grep -A1 "target:" $FILE | grep "length:" | sed 's/length: //g' > TLEN.tmp
+
+grep -A1 "miRNA :" $FILE | grep "length:" | sed 's/length: //g' > QLEN.tmp
+ 
+paste TLEN.tmp QLEN.tmp > LEN.tmp
+
+paste TARGET.tmp QUERY.tmp MFE.tmp PVAL.tmp POS.tmp LEN.tmp | tr -s '[:blank:]' > mir_vs_utr_rmdup_RNAhybrid.out.tsv
+
+rm *.tmp
+
+scp rvazquez@200.23.162.234:/home/rvazquez/MIRS_FUNCTIONAL_ANNOT/mir_vs_utr_rmdup_RNAhybrid.out.tsv .
+
 # evalute if significance:
 
 # grep "p-value:" mir_vs_utr_rmdup_RNAhybrid.out  | cut -f2 -d ":" | sort -n | head
 
-# seqkit stats $target # 16,632 max len
-# seqkit stats $query # 49 max len
-# -m <max targetlength>
-# -n <max query length>
   
 # -s (3utr_fly|3utr_worm|3utr_human)
 
@@ -412,18 +447,25 @@ position
 # (-d <xi>,<theta>) <xi> and <theta> are the position and shape parameters, respectively, of the extreme value distribution assumed for p-value calculation. If omitted, they are estimated from the maximal duplex energy of the query. In that case, a data set name has to be given with the -s flag.
 
 
+```
+# TEST TARGET SCAN
+```bash
+
 # TARGETSCAN
 
 target=three_prime_utr_rmdup.fa # utr_rmdup.fa
-query=mir.fasta
+query=query=mature_star_mir.fa
 
 prefix=${target%.*}
 
 # 1) align UTR
 # contains three fields (tab-delimited):
+
 # a. Gene/UTR ID or name
 # b. Species ID for this gene/UTR (must match ID in miRNA file)
 # c. Aligned UTR or gene (with gaps from alignment)
+
+# Generate aligned UTR or gene (with gaps from alignment)
 # ex:
 # BMP8B	9606	GUCCACCCGCCCGGC
 # BMP8B	9615	-GUG--CUGCCCACC
@@ -431,14 +473,22 @@ prefix=${target%.*}
 # Muscle for low number of seqs
 # Mafft for high n 
 
-mafft --thread 8 $target > ${prefix}.aln &>> "mafft"$(date +%Y%m%d)".log" &
+cat $target | seqkit sample -n 1000 -o ${prefix}.subset.fa
+# --globalpair # flag hard to run
+# fast way to align:
+mafft --thread 12 ${prefix}.subset.fa > ${prefix}.aln &
 
-# # to kill the process related to it ps -o pid=pidid | xargs kill
+# ps -u rvazquez
+# # to kill the process related to it ls -ltpidid | xargs kill
 
 ##format for targetscan
-cat ${prefix}.aln | grep ">" | sed 's/>//g' > id.tmp
-cat ${prefix}.aln | grep -v ">" > seq.tmp
-paste id.tmp seq.tmp | awk -v OFS="\t" '{print $1, "0000", $2}' > ${prefix}_ts.txt
+align=three_prime_utr_rmdup.aln
+
+awk -f linearizefasta.awk < $align > align.tmp
+
+cat $align | grep ">" | sed 's/>//g' > id.tmp
+cat $align | grep -v ">" > seq.tmp
+paste id.tmp seq.tmp | awk -v OFS="\t" '{print $1, "0000", $2}' > ${align%.*}_ts.txt
 
 # 2) - miRNA_file    => miRNA families by species
 # contains three fields (tab-delimited):
@@ -453,22 +503,16 @@ paste id.tmp seq.tmp | awk -v OFS="\t" '{print $1, "0000", $2}' > ${prefix}_ts.t
 # https://github.com/nf-core/circrna/blob/master/bin/targetscan_format.sh
 
 ## Isolate the sequences
-grep -v ">" $MATURE > mature_sequence
+query=mir.fasta
+grep -v ">" $query > mature_sequence
 ## Extract seed sequence (7bp after 1st)
 awk '{print substr($1, 2, 7)}' mature_sequence > seed_sequence
 ## Isolate ID (awk last field (NF))
-grep ">" $MATURE | awk -F ' ' '{print $NF}' > miR_ID
+grep ">" $query | awk -F ' ' '{print $NF}' > miR_ID
 ## Combine
 paste miR_ID seed_sequence > targetscan_tmp.txt
 ## Correct delimiter, add dummy species
 awk -v OFS="\t" '{print $1, $2, "0000"}' targetscan_tmp.txt > mature.txt
 
-
-targetscan_format.sh $mature
-
 # ./targetscan_70.pl miRNA_file UTR_file PredictedTargetsOutputFile
-targetscan_70.pl mature.txt ${prefix}_ts.txt ${prefix}.txt
-
-```
-
-# 
+./targetscan_70.pl mature.txt ${prefix}_ts.txt ${prefix}.txt
