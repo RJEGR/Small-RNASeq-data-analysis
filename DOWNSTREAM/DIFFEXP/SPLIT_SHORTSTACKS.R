@@ -16,7 +16,7 @@ res_f <- list.files(path = path, pattern = "Results.txt", full.names = T)
 RESULTS <- read_tsv(res_f)
 
 
-RESULTS %>% count(MIRNA) # 978 True miRs
+RESULTS %>% count(MIRNA) # 131 True miRs
 
 # Number of novel and know miRs annotated
 
@@ -28,6 +28,9 @@ RES <- RESULTS %>%
   mutate(Type = ifelse(grepl("Cluster_", KnownRNAs), "Novel", "known"))
 
 RES %>% count(Type)
+
+
+RES %>% head() %>% view()
 
 # PREPARE FASTA  =====
 
