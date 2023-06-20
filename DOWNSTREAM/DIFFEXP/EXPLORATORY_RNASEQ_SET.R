@@ -189,6 +189,10 @@ coords %>% dplyr::count(strand)
 
 coords %>% arrange(desc(strand)) %>% distinct(Parent)
 
+coords %>% filter(seqnames %in% "MSTRG.15170.2")
+
+seqs[names(seqs) %in% "MSTRG.15170.2"]
+
 # subseq
 
 n <- nrow(coords)
@@ -221,9 +225,12 @@ for(j in 1:n) {
   
 }
 
-head(out)
+unlist(out)
 
-out[[i]]
+write(fasta, file= paste0(path, "MajorRNA.fasta"))
+
+
+
 
 
 
