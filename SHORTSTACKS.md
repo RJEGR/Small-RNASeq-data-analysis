@@ -186,6 +186,18 @@ ShortStack --readfile  HR110761.clean.newid.subset.fasta HR110762.clean.newid.su
 #ShortStack --readfile HR110761.clean.newid.fa HR110762.clean.newid.fa --outdir ShortStack_"$(date +%Y%m%d)"_test --genomefile ${reference} --bowtie_cores 20 --sort_mem 60G --mismatches 0 --dicermax 30 --mmap u --mincov 1 --pad 1 2> "ShortStack_"$(date +%Y%m%d)".log" &
 
 
+grep "^Aligning" ShortStack_20230315.log
+grep '# reads processed:' ShortStack_20230315.log
+grep '# reads with at least one alignment' ShortStack_20230315.log | cut -f2 -d":"
+grep "Uniquely mapped (U) reads:" ShortStack_20230315.log | cut -f2 -d":"
+grep 'Multi-mapped reads placed (P) with guidance:' ShortStack_20230315.log | cut -f2 -d":"
+
+grep 'Multi-mapped reads randomly (R) placed:' ShortStack_20230315.log | cut -f2 -d":"
+
+grep 'Very highly (H) multi-mapped reads (>=50 hits):' ShortStack_20230315.log | cut -f2 -d":"
+
+grep 'Not mapped (N) reads (no hits):' ShortStack_20230315.log | cut -f2 -d":"
+
 
 exit
 
@@ -460,8 +472,14 @@ Assembly name: hr_multigenome_ensemble
 Consider https://gmod.github.io/JBrowseR/
 
 ```bash
-printf "$PWD/%s\n" *.bam
+printf "$PWD/%s\n" *.bam > BAMLIST.csv
+
+# also TEST sRNA_Viewer
+export PATH=$PATH:"/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/sRNA_Viewer"
+ 
+./sRNA_Viewer -c JALGQA010000003.1:15754304-15754400 -b BAMLIST.csv -p sRNA_Viewer.pdf
 ```
+
 
 
 
