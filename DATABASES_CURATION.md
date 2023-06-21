@@ -39,6 +39,9 @@ wget https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-56/metazoa/fasta/haliotis_
 
 wget https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-56/metazoa/fasta/haliotis_rufescens_gca023055435v1rs/ncrna/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.ncrna.fa.gz
 
+# 
+wget https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-56/metazoa/fasta/haliotis_rufescens_gca023055435v1rs/cds/Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.cds.all.fa.gz
+
 
 
 ```
