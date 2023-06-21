@@ -8,10 +8,10 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 
 library(tidyverse)
+
 library(GenomicRanges)
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT"
-
 
 # GET gene features from locus ====
 
@@ -19,16 +19,17 @@ pattern <- "multi_genome.newid.gff3$"
 
 genome <- list.files(path = wd, pattern = pattern, full.names = T)
 
-gr <- rtracklayer::import(genome)
+.gr <- rtracklayer::import(genome)
 
-# gr %>% as_tibble() %>% drop_na(description) %>% dplyr::count(biotype)
+# .gr %>% as_tibble() %>% dplyr::count(type)
+# .gr %>% as_tibble() %>% drop_na(description) %>% dplyr::count(biotype)
 
 # ...
 # 4 protein_coding 31171 # <---
 # ...
 #
 
-gr <- gr[which(gr$type == "gene")]
+gr <- .gr[which(.gr$type == "gene")]
 
 gr <- gr[which(gr$biotype == "protein_coding")]
 
@@ -38,13 +39,14 @@ gr <- gr[which(gr$biotype == "protein_coding")]
 gr %>% as_tibble() %>% drop_na(description) %>% dplyr::count(biotype) 
 
 
-which_cols <- c("seqnames", "start", "end", "width", "strand", "gene_id","description", "type", "biotype")
+which_cols <- c("seqnames", "gene_coords", "gene_id","description", "type", "biotype")
 
 gene_features <- gr %>% as_tibble() %>% 
-  drop_na(description) %>% 
-  select_at(all_of(vars(which_cols)))
+  drop_na(description) %>%
+  mutate(gene_coords = paste(start, end, strand, sep = ":")) %>%
+  select_at(all_of((which_cols)))
 
-gene_features <- gene_features %>% distinct(gene_id, description)
+# gene_features <- gene_features %>% distinct(gene_id, description)
 
 # from gene feature to UTR (flat information)
 
@@ -81,6 +83,10 @@ f <- list.files(path = wd, pattern = pattern, full.names = T)
 
 df <- read_tsv(f)
 
+# str(targetsids <- df %>% distinct(target) %>% pull(target))
+
+# write_lines(targetsids, file = paste0(gsub(".tsv", "", f), ".ids"))
+
 # df <- df %>% filter(pval < 0.05)
 
 # write_tsv(df, file = paste0(gsub(".tsv", "", f), ".psig.tsv"))
@@ -90,6 +96,7 @@ df <- read_tsv(f)
 
 nrow(df %>% distinct(target)) #  37,663
 nrow(df %>% distinct(query)) # 261 from 393 clusters from mir.fasta
+
 
 # Q: how many were 5' and 3' UTR? ====
 
@@ -162,13 +169,58 @@ p2 <- mir_sites %>%
   geom_histogram() +
   # stat_ecdf(linewidth = 2, alpha = 0.5) +
   theme_bw(base_size = 16, base_family = "GillSans") +
-  labs(x = "binding miRs per target", y = "Target gene") +
+  labs(x = "binding miRs per target") +
+  scale_y_continuous("Target gene", labels = scales::comma) +
   theme(legend.position = "none")
 
 library(patchwork)
 
-p1/p2
+# p1/p2
 
+# Q: how many chromosomes were binding sites for mirs? ====
+
+# chromosome_df <- df %>% 
+#   separate(col = target, into = c("seqnames", "ranges"), sep = "_") %>%
+#   count(seqnames)
+
+chromosome_df <- howmirs %>%
+  mutate(UTR = ifelse(target %in% three_prime_utr, 
+    "three_prime_utr", "five_prime_utr")) %>%
+  separate(col = target, into = c("seqnames", "ranges"), sep = "_") %>%
+  group_by(MIRNA, UTR) %>%
+  count(seqnames) %>%
+  ungroup()
+
+
+length(unique(chromosome_df$seqnames)) # 243
+
+chromosome_df %>% pull(n) %>% sum() # 90918
+
+chromosome_df <- .gr[.gr$type == "region"] %>% 
+  as_tibble() %>% select(seqnames, width) %>%
+  left_join(chromosome_df) %>% drop_na()
+
+# mith? zero <--
+
+chromosome_df %>% filter(seqnames %in% "JALGQA010000616.1")
+
+p3 <- chromosome_df %>%
+  ggplot(aes(width, n, color = UTR)) +
+  facet_grid(~ MIRNA) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", linetype="dashed", size = 0.5, alpha=0.5,
+    se = F, na.rm = TRUE) +
+  ggpubr::stat_cor(method = "spearman", cor.coef.name = "R", p.accuracy = 0.001) +
+  theme_bw(base_size = 16, base_family = "GillSans") +
+  theme(legend.position = "top") +
+  scale_y_continuous("Binding sites (UTR targets)", labels = scales::comma) +
+  scale_x_continuous("Chromosome width (Nucleotides)", 
+    labels = scales::number_format(scale = 1/1000000, suffix = " Gb")) +
+  theme(legend.position = "none")
+
+library(patchwork)
+
+p1/p2/p3
 
 # Join features to miRNA:mRNA target prediction ====
 
@@ -185,7 +237,7 @@ llist <- function(x) {
 # x <- "Cluster_286.mature::JALGQA010000001.1:13045384-13045405(+)"
 # sapply(strsplit(x, "[.]"), `[`, 1)
 
-sapply(strsplit(x, "::"), `[`, 1) 
+# sapply(strsplit(x, "::"), `[`, 1) 
 
 
 df_drop <- df %>%
@@ -199,36 +251,6 @@ df_drop <- utr_source %>% right_join(df_drop)
 
 saveRDS(df_drop, file = paste0(wd, "/mir_vs_utr_rmdup_RNAhybrid.out.psig.gene_features.rds"))
 
-# UNNEST DATA
-
-df_drop %>%
-  drop_na(gene_id) %>%
-  mutate(query = strsplit(query, ";")) %>%
-  unnest(query) %>% distinct(query)
-
-df_drop %>% drop_na(gene_id) 
-
-# GET BACK GENE ONTOLOGY FROM TRANSCRIPTOMIC DATA USING gene_id
-
-# OR RERUN BLASTX (AGAINST UNIPROT OR TRANSCRIPTOME) USING THOSE GENE_ID LOCUS 
-
-transcr_wd <- "~/Documents/MIRNA_HALIOTIS/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/ANNOTATION/OUTPUTS/"
-
-f <- list.files(path = transcr_wd, pattern = "annot.Rdata", full.names = T)
-
-load(f)
-
-# NO HAY IDENTIDAD DE LOS IDS DEL GENOMA Y TRANSCRIPTOMA, HABRA QUE CORRER BLAST VS UNIPROT OR TRANSCRIPTOME
-# O USAR COORDENADAS PARA DEVOLVER LA IDENTIDAD
-
-filter(blastp_df, grepl("LOC", gene)) %>% 
-  mutate(gene = gsub("_df_pt", "", gene)) %>% 
-  filter(gene %in% unique(df_drop$gene_id))
-
-
-head(unique(df_drop$gene_id))
-
-# sum(blastp_df$gene %in% df_drop$gene_id)
 
 # KARYOPLOTER (OMIT) ====
 # seqnames      ranges strand
@@ -247,6 +269,7 @@ seqnames_ <- df$seqnames
 grr <- GRanges(Rle(seqnames_), 
   ranges = ranges_, strand = df$strand, 
   mfe = df$mfe, pval = df$pval, query = df$query)
+
 
 
 # Find overlaping features (OMIT) ====
