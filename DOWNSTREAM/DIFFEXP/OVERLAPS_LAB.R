@@ -238,13 +238,16 @@ grl = split(gr0, seqnames(gr0))
 x <- grl[[2]]
 
 
-find_chr_overlaps <- function(x) {
+
+find_chr_overlaps <- function(query_gr, subject_gr) {
+  
+  gr <- subject_gr
   
   gr <- sortSeqlevels(gr)
   
-  gr0 <- gr[seqnames(gr) == as.character(seqnames(x)@values)]
+  gr <- gr[seqnames(gr) == as.character(seqnames(query_gr)@values)]
   
-  fo <- findOverlaps(x, gr0, minoverlap = 1)
+  fo <- findOverlaps(query_gr, gr, minoverlap = 1)
   
   return(fo)
   
