@@ -452,11 +452,21 @@ scp rvazquez@200.23.162.234:/home/rvazquez/MIRS_FUNCTIONAL_ANNOT/mir_vs_utr_rmdu
 ```bash
 
 # TARGETSCAN
+# After rnahybrid, > 90K utr sequences were significant targeted by mirs:
 
-target=three_prime_utr_rmdup.fa # utr_rmdup.fa
-query=query=mature_star_mir.fa
+
+
+file=mir_vs_utr_rmdup_RNAhybrid.out.psig.ids # 37 663 unique 
+
+seqkit replace -p "\s.+" utr_rmdup.fa | seqkit grep -f $file > ${file%.ids}.fa
+
+grep -c "^>" ${file%.ids}.fa
+
+target=mir_vs_utr_rmdup_RNAhybrid.out.psig.fa # utr_rmdup.fa
+query=mature_star_mir.fa
 
 prefix=${target%.*}
+output=${query%.*}_vs_$prefix
 
 # 1) align UTR
 # contains three fields (tab-delimited):
@@ -473,22 +483,26 @@ prefix=${target%.*}
 # Muscle for low number of seqs
 # Mafft for high n 
 
-cat $target | seqkit sample -n 1000 -o ${prefix}.subset.fa
+# cat $target | seqkit sample -n 1000 -o ${prefix}.subset.fa
 # --globalpair # flag hard to run
 # fast way to align:
-mafft --thread 12 ${prefix}.subset.fa > ${prefix}.aln &
+
+mafft --thread 20 $target > ${prefix}.aln &
 
 # ps -u rvazquez
-# # to kill the process related to it ls -ltpidid | xargs kill
+# # to kill the process related to ps -o pid=pidid | xargs kill
 
 ##format for targetscan
-align=three_prime_utr_rmdup.aln
+
+align=${prefix}.aln
 
 awk -f linearizefasta.awk < $align > align.tmp
+cat align.tmp | cut -f2 > seq.tmp
 
-cat $align | grep ">" | sed 's/>//g' > id.tmp
-cat $align | grep -v ">" > seq.tmp
+cat $align | grep ">" | sed 's/>//g' | sed 's/ /;/' > id.tmp
+
 paste id.tmp seq.tmp | awk -v OFS="\t" '{print $1, "0000", $2}' > ${align%.*}_ts.txt
+
 
 # 2) - miRNA_file    => miRNA families by species
 # contains three fields (tab-delimited):
@@ -503,16 +517,46 @@ paste id.tmp seq.tmp | awk -v OFS="\t" '{print $1, "0000", $2}' > ${align%.*}_ts
 # https://github.com/nf-core/circrna/blob/master/bin/targetscan_format.sh
 
 ## Isolate the sequences
-query=mir.fasta
+query=mature_star_mir.fa
+
 grep -v ">" $query > mature_sequence
 ## Extract seed sequence (7bp after 1st)
 awk '{print substr($1, 2, 7)}' mature_sequence > seed_sequence
 ## Isolate ID (awk last field (NF))
-grep ">" $query | awk -F ' ' '{print $NF}' > miR_ID
+grep ">" $query | awk -F ' ' '{print $NF}' | sed 's/>//g' > miR_ID
 ## Combine
 paste miR_ID seed_sequence > targetscan_tmp.txt
 ## Correct delimiter, add dummy species
 awk -v OFS="\t" '{print $1, $2, "0000"}' targetscan_tmp.txt > mature.txt
 
 # ./targetscan_70.pl miRNA_file UTR_file PredictedTargetsOutputFile
-./targetscan_70.pl mature.txt ${prefix}_ts.txt ${prefix}.txt
+./targetscan_70.pl mature.txt ${align%.*}_ts.txt ${output}_targetscan.out &> targetscan.log &
+
+# Processing JALGQA010000008.1_47463137-47463197:+;LOC125376846
+#  ....
+
+scp rvazquez@200.23.162.234:/home/rvazquez/MIRS_FUNCTIONAL_ANNOT/TARGETSCAN/mature_star_mir_vs_mir_vs_utr_rmdup_RNAhybrid.out.psig_targetscan.out .
+# /home/rvazquez/MIRS_FUNCTIONAL_ANNOT/TARGETSCAN
+
+# RUNNING /home/rvazquez/MIRS_FUNCTIONAL_ANNOT/BLAST_FROM_PREDICTED_TARGETS
+
+# creating a diamond-formatted database file
+# https://github.com/bbuchfink/diamond/wiki
+
+mkdir DATABASE
+cd DATABASE
+ln -s /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep .
+
+cd ..
+
+query=mir_vs_utr_rmdup_RNAhybrid.out.psig.gene_features_known_annot.fa
+
+../diamond makedb --in uniprot_sprot.pep -d uniprot_sprot
+
+# running a search in blastx mode (less than 1 min)
+
+./diamond blastx -d DATABASE/uniprot_sprot -q $query -o uniprot_sprot.ncbi.blastx.tsv
+
+scp rvazquez@200.23.162.234:/home/rvazquez/MIRS_FUNCTIONAL_ANNOT/BLAST_FROM_PREDICTED_TARGETS/uniprot_sprot.ncbi.blastx.tsv .
+
+# blastx -query $query -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 1 -max_target_seqs 1 -outfmt 6 -evalue 1e-5 -out uniprot_sprot.ncbi.blastx.outfmt6 2> blastx.log &
