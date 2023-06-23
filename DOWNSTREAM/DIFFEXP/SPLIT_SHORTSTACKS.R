@@ -15,10 +15,7 @@ res_f <- list.files(path = path, pattern = "Results.txt", full.names = T)
 
 RESULTS <- read_tsv(res_f)
 
-
-RESULTS %>% count(MIRNA) # 131 True miRs
-
-# Number of novel and know miRs annotated
+# Q: Number of novel and know miRs annotated
 
 RES <- RESULTS %>% 
   select(Name, Chrom, KnownRNAs, MIRNA, Reads, UniqueReads, MajorRNA) %>%
@@ -27,12 +24,36 @@ RES <- RESULTS %>%
   drop_na(KnownRNAs) %>%
   mutate(Type = ifelse(grepl("Cluster_", KnownRNAs), "Novel", "known"))
 
+# count number of true novel + homology-identify sRNA locus
+
 RES %>% count(Type)
 
+SEQS <- RESULTS %>% select(Name, MajorRNA)
 
-RES %>% head() %>% view()
+# Q: HOW MANY KNOW PI/MIRNAS WERE IDENTIFY ====
 
-# PREPARE FASTA  =====
+bind_srnas <- function(x) {
+  x <- paste(x, sep = '-', collapse = '-')
+}
+
+SPLIT <- RESULTS %>%
+  select(Name, KnownRNAs, MIRNA) %>%
+  drop_na(KnownRNAs) %>% 
+  mutate(KnownRNAs = strsplit(KnownRNAs, ";")) %>%
+  unnest(KnownRNAs) %>% 
+  mutate(biotype = ifelse(grepl("^piR-", KnownRNAs), "piRNA", "Mir"))
+
+SPLIT %>% 
+  filter(MIRNA == "Y") %>%   # filter(MIRNA == "N") %>% # SWICHT TO "Y" 
+  distinct(Name, biotype) %>% 
+  group_by(Name) %>%
+  summarise(across(biotype, .fns = bind_srnas), .groups = "drop_last") %>%
+  count(biotype)
+
+# # SPLIT NOVEL/KNOWN MIRNAS ====
+
+# WHICH CLUSTERS ARE MIRS EITHER: 
+# HOMOLOGY-BASED:SHORTSCACKS PREDICTED AND HOMOLOGY-BASED TYPES ====
 
 paste_headers <- function(x) {
   x <- paste(x, sep = '|', collapse = '|')
@@ -40,22 +61,129 @@ paste_headers <- function(x) {
   # x <- unlist(x)
 }
 
-fasta_prep <- RES %>%
-  group_by(MajorRNA) %>%
-  summarise(across(Name, .fns = paste_headers), .groups = "drop_last") %>% 
-  ungroup() %>% filter( nchar(MajorRNA) > 17) %>% arrange(MajorRNA)
+MIRS <- SPLIT %>% 
+  # filter(MIRNA == "N") %>% # <- OMIT TO SAVE BOTH TYPES
+  filter(biotype == "Mir") %>% 
+  group_by(Name) %>%
+  summarise(across(KnownRNAs, .fns = paste_headers), n = n(), .groups = "drop_last") 
+
+# INCLUDE THE PIR-HOMOLOGY-BASED:SHORTSCACKS PREDICTED ==== 
+
+MIRS <- SPLIT %>% 
+  filter(MIRNA == "Y" & biotype == "piRNA") %>%
+  group_by(Name) %>%
+  summarise(across(KnownRNAs, .fns = paste_headers), n = n(), .groups = "drop_last") %>%
+  filter(!Name %in% MIRS$Name) %>%
+  rbind(MIRS) 
+
+.MIRS <- MIRS %>% left_join(SEQS, by = "Name")
+
+MIRS <- MIRS %>% 
+  mutate(KnownRNAs = ifelse(n > 5, paste0("Highly_conserved|", n), KnownRNAs)) %>%
+  select(-n)
+
+# PROCESS FASTA FORMAT ====
+
+MIRS <- MIRS %>%
+  left_join(SEQS, by = "Name") %>%
+  mutate(Name = paste0(">", Name)) %>%
+  unite("Name", Name:KnownRNAs, sep = " ") 
+
+
+# INCLUDE NOVEL SHORTSCACKS PREDICTED
+
+NOVEL_MIRS <- RESULTS %>% 
+  filter(is.na(KnownRNAs)) %>% 
+  filter(MIRNA == "Y") %>% 
+  mutate(Name = paste0(">", Name)) %>%
+  mutate(Name = paste(Name, Start, End, Strand, sep = ":")) %>%
+  select(Name, MajorRNA) 
+
+# 
+
+fasta_prep <- NOVEL_MIRS %>% rbind(MIRS)
+
+NOVEL_MIRS %>% rbind(MIRS) %>% distinct(MajorRNA)
+
+RESULTS %>% 
+  # filter(is.na(KnownRNAs)) %>% 
+  filter(MIRNA == "Y") %>% distinct(MajorRNA)
+
+# MajorRNA: Sequence of the single most abundant RNA sequence at the locus
+
+# AUNQUE HAY SECUENCIAS UNICAS, RECORDAR QUE EL MajorRNA ES LA SECUENCIA REPRESENTATIVA, SUGIRIENDO ISOFORMAS
+
+# WRITE MIRNA FASTA ==== 
 
 seqs <- fasta_prep %>% pull(MajorRNA)
 
-headers <- fasta_prep %>% mutate(Name = paste0(">", Name)) %>% pull(Name) 
+headers <- fasta_prep %>% pull(Name) 
 
 fasta <- c(rbind(headers, seqs))
 
-write(fasta, file= paste0(path, "MajorRNA.fasta"))
+write(fasta, file= paste0(path, "KNOWN_AND_NOVEL_MIRS_MajorRNA.fasta"))
 
-#
-# scp -r MajorRNA.fasta rvazquez@200.23.162.234://home/rvazquez/MIRS_FUNCTIONAL_ANNOT/
-# 
+# PIRNAS TO FURTHER ANALYSIS W/ PIRSCAN ======
+
+SPLIT %>% 
+  filter(MIRNA == "N") %>%  
+  distinct(Name, biotype) %>% 
+  group_by(Name) %>%
+  summarise(across(biotype, .fns = bind_srnas), .groups = "drop_last") %>%
+  count(biotype)
+
+PIRNAS <- SPLIT %>% 
+  filter(MIRNA == "N") %>% # <- OMIT TO SAVE BOTH TYPES
+  filter(biotype == "piRNA") %>% 
+  filter(!Name %in% .MIRS$Name) # EXCLUDE MIR:PIRS
+
+# Because only 164 unique sequence from 831 CLUSTERS:
+
+PIRNAS %>% left_join(SEQS, by = "Name") %>% distinct(MajorRNA)
+
+.PIRNAS <- PIRNAS %>% 
+  group_by(Name) %>%
+  summarise(
+    across(KnownRNAs, .fns = paste_headers),n = n(), .groups = "drop_last") %>%
+  left_join(SEQS, by = "Name")
+
+# USE CLUSTER NAME INSTEAD OF PIRNA NAME:
+
+PIRNAS <- PIRNAS %>% 
+  left_join(SEQS, by = "Name") %>% 
+  group_by(MajorRNA) %>%
+  distinct(Name) %>%
+  summarise(
+    # across(KnownRNAs, .fns = paste_headers),
+    across(Name, .fns = paste_headers), n = n(), .groups = "drop_last")
+
+
+# PROCESS FASTA FORMAT ====
+
+PIRNAS <- PIRNAS %>% 
+  mutate(Name = ifelse(n > 5, paste0("MultiLocus|", n), Name))
+
+PIRNAS <- PIRNAS %>%  mutate(Name = paste0(">", Name)) 
+
+
+
+# WRITE PIRNA FASTA ==== 
+
+seqs <- PIRNAS %>% pull(MajorRNA)
+
+headers <- PIRNAS %>% pull(Name) 
+
+fasta <- c(rbind(headers, seqs))
+
+write(fasta, file= paste0(path, "KNOWN_PIRS_MajorRNA.fasta"))
+
+
+write_rds(rbind(.PIRNAS, .MIRS), file = paste0(path, "KNOWN_CLUSTERS_MIRS_PIRS.rds"))
+
+
+
+
+# OMIT  =====
 
 # FURTHER STATS ====
 
