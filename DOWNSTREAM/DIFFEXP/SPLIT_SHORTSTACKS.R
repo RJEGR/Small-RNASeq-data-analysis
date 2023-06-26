@@ -20,7 +20,7 @@ RESULTS <- read_tsv(res_f)
 RES <- RESULTS %>% 
   select(Name, Chrom, KnownRNAs, MIRNA, Reads, UniqueReads, MajorRNA) %>%
   mutate(KnownRNAs = ifelse(is.na(KnownRNAs) & MIRNA == "Y", Name, KnownRNAs)) %>%
-  mutate(MIRNA = ifelse(!is.na(KnownRNAs), "Y", MIRNA)) %>%
+  # mutate(MIRNA = ifelse(!is.na(KnownRNAs), "Y", MIRNA)) %>%
   drop_na(KnownRNAs) %>%
   mutate(Type = ifelse(grepl("Cluster_", KnownRNAs), "Novel", "known"))
 
@@ -180,8 +180,44 @@ write(fasta, file= paste0(path, "KNOWN_PIRS_MajorRNA.fasta"))
 
 write_rds(rbind(.PIRNAS, .MIRS), file = paste0(path, "KNOWN_CLUSTERS_MIRS_PIRS.rds"))
 
+# Q: Which other loci were for siRNA locus ====
 
+.PIRNAS 
 
+.MIRS
+
+pattern <- "Results.gff3"
+
+f <- list.files(path = path, pattern = pattern, full.names = T)
+
+assembly <- rtracklayer::import(f)
+
+# Assembly track is different in nrows because Parent clusters
+
+df <- assembly %>% as_tibble() %>% 
+  select(ID, width, type) %>%
+  right_join(RES, by = c("ID"="Name"))
+
+df %>% 
+  group_by(type, MIRNA, Type) %>% 
+  summarise(n = n(), Reads = sum(Reads)) %>% 
+  arrange(desc(n)) %>% view()
+
+# The majority of homology-based piRNAs loci are Unknown Unknown_sRNA_locus, followed by 27 to 29 siRNA_locus and 
+
+df <- assembly %>% as_tibble() %>% 
+  # select(ID, width, type) %>%
+  anti_join(RES, by = c("ID"="Name"))
+
+df %>% select(Parent) %>% arrange(desc(Parent)) %>% head() %>% pull()
+
+# score: number of sRNA-seq aligned reads at that locus.
+
+df %>% group_by(type, MIRNA) %>% 
+  summarise(n = n(), Reads = sum(score)) %>% 
+  arrange(desc(n)) %>% view()
+
+# For a detailed analysis of the challenges of calling phasing of siRNA clusters in genome-wide analyses, see Polydore et al. (2018).
 
 # OMIT  =====
 
