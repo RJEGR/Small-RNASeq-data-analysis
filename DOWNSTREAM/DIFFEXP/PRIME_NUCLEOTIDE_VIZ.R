@@ -61,35 +61,42 @@ rbind(PRIME5_KNOWN, PRIME5_UNKNOWN) %>%
   geom_col(width = 0.85) +
   see::scale_fill_social(reverse = T) +
   theme_bw(base_family = "GillSans", base_size = 11) +
-  # scale_y_continuous(ylab, labels = scales::percent) +
   scale_y_continuous(ylab, labels = scales::comma)
 # scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 1)) +
 
 
-rbind(PRIME5_KNOWN, PRIME5_UNKNOWN) %>%
-  ggplot(aes(MajorRNAReads, n, color = biotype)) +
-  # facet_wrap(~ Length, scales = "free") +
-  geom_point(size = 5, alpha = 0.7) +
-  labs(caption = "Diff piR pattern expression from novel and miRs")
+# rbind(PRIME5_KNOWN, PRIME5_UNKNOWN) %>%
+#   ggplot(aes(MajorRNAReads, n, color = biotype)) +
+#   # facet_wrap(~ Length, scales = "free") +
+#   geom_point(size = 5, alpha = 0.7) +
+#   labs(caption = "Diff piR pattern expression from novel and miRs")
 
 
 p1 <- rbind(PRIME5_KNOWN, PRIME5_UNKNOWN) %>%
+  filter(biotype != "Unknown") %>%
   group_by(biotype) %>%
   mutate(MajorRNAReads = MajorRNAReads/sum(MajorRNAReads), n = n/sum(n)) %>%
   ggplot(aes(y = n, x = biotype, fill = first_nuc)) +
   geom_col(width = 0.85) +
   see::scale_fill_social(reverse = T) +
-  labs(y = "Reads (%)") +
-  theme_bw(base_family = "GillSans", base_size = 12)
+  labs(y = "Reads proprotion (%)") +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(legend.position = "top")
+
+
+
+recode_to <- c(`MajorRNAReads` = "Number of reads ", `n`= "n clusters")
 
 p2 <- rbind(PRIME5_KNOWN, PRIME5_UNKNOWN) %>%
+  filter(biotype != "Unknown") %>%
   pivot_longer(cols = c("MajorRNAReads","n")) %>%
+  dplyr::mutate(name = dplyr::recode_factor(name, !!!recode_to)) %>%
   ggplot(aes(y = value, x = biotype, fill = first_nuc)) +
   facet_grid(name ~., scales = "free_y") +
   geom_col(width = 0.85) +
   see::scale_fill_social(reverse = T) +
   theme_bw(base_family = "GillSans", base_size = 12) +
-  scale_y_continuous(ylab, labels = scales::comma) +
+  scale_y_continuous("", labels = scales::comma) +
   theme(legend.position = "none")
 
 p2
