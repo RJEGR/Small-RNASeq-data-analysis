@@ -55,15 +55,15 @@ gr3 <- rtracklayer::import(mask_f)
 viz <- gr2 %>% as_tibble() %>% 
   # filter(seqnames %in% query.locus[1:105]) %>%
   # filter(MIRNA == "Y") %>% # SWITCH OR NOT
-  group_by(seqnames) %>%
+  group_by(seqnames, MIRNA, type) %>%
   summarise(n = n(), TotalReads = sum(score)) %>% 
   arrange(desc(n))
 
 # viz %>% view()
 
-viz %>% ggplot(aes(n, TotalReads, color = MIRNA)) + geom_point() + scale_y_log10() + scale_x_log10() 
+viz %>% ggplot(aes(n, TotalReads, color = MIRNA)) + geom_point() + scale_y_log10() + scale_x_log10() + facet_grid(~ type)
 
-query.locus <- viz %>% distinct(seqnames) %>% pull()
+str(query.locus <- viz %>% distinct(seqnames) %>% pull())
 
 str(query.locus <- unfactor(query.locus))
 
@@ -186,6 +186,8 @@ kpAxis(kp, ymin = 0, ymax= 20, numticks = 2, r0 = 0.8, r1=1)
 
 # Example 4 (using bam as input)
 # https://bernatgel.github.io/karyoploter_tutorial//Tutorial/PlotBAMCoverage/PlotBAMCoverage.html
+
+library(karyoploteR)
 
 path <- '/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/'
 
