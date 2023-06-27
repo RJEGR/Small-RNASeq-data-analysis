@@ -22,6 +22,18 @@ SRNAS <- read_rds(paste0(wd, "/KNOWN_CLUSTERS_MIRS_PIRS.rds"))
 str(which_pirs <- SRNAS %>% filter(grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
 str(which_mirs <- SRNAS %>% filter(!grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
 
+
+# LOAD MODULES 
+
+bwnet <- readRDS(paste0(wd, "/2023-06-26/bwnet.rds"))
+
+bwmodules = WGCNA::labels2colors(bwnet$colors)
+
+names(bwmodules) <- names(bwnet$colors)
+
+table(bwmodules)
+
+
 # SRNA-SEQ TRANSCRIPTOME ====
 
 pattern <- "Results.gff3"
