@@ -89,8 +89,7 @@ MIRS <- MIRS %>%
   mutate(Name = paste0(">", Name)) %>%
   unite("Name", Name:KnownRNAs, sep = " ") 
 
-
-# INCLUDE NOVEL SHORTSCACKS PREDICTED
+# INCLUDE NOVEL MIRS SHORTSCACKS PREDICTED ====
 
 NOVEL_MIRS <- RESULTS %>% 
   filter(is.na(KnownRNAs)) %>% 
@@ -99,19 +98,26 @@ NOVEL_MIRS <- RESULTS %>%
   mutate(Name = paste(Name, Start, End, Strand, sep = ":")) %>%
   select(Name, MajorRNA) 
 
+# RBIND TO KNOWN DF BACKUP
+
+.MIRS <- NOVEL_MIRS %>% 
+  mutate(KnownRNAs = "Novel", n = 1) %>% 
+  select(names(.MIRS)) %>%
+  rbind(.MIRS)
+
 # 
 
 fasta_prep <- NOVEL_MIRS %>% rbind(MIRS)
 
 NOVEL_MIRS %>% rbind(MIRS) %>% distinct(MajorRNA)
 
-RESULTS %>% 
-  # filter(is.na(KnownRNAs)) %>% 
-  filter(MIRNA == "Y") %>% distinct(MajorRNA)
+fasta_prep %>% distinct(MajorRNA)
 
+#  117/ FROM 147 SEQUENCES, BUT:
 # MajorRNA: Sequence of the single most abundant RNA sequence at the locus
 
-# AUNQUE HAY SECUENCIAS UNICAS, RECORDAR QUE EL MajorRNA ES LA SECUENCIA REPRESENTATIVA, SUGIRIENDO ISOFORMAS
+# AUNQUE HAY SECUENCIAS UNICAS 117/147, 
+# RECORDAR QUE EL MajorRNA ES LA SECUENCIA REPRESENTATIVA, SUGIRIENDO ISOFORMAS
 
 # WRITE MIRNA FASTA ==== 
 
@@ -165,8 +171,6 @@ PIRNAS <- PIRNAS %>%
 
 PIRNAS <- PIRNAS %>%  mutate(Name = paste0(">", Name)) 
 
-
-
 # WRITE PIRNA FASTA ==== 
 
 seqs <- PIRNAS %>% pull(MajorRNA)
@@ -177,14 +181,15 @@ fasta <- c(rbind(headers, seqs))
 
 write(fasta, file= paste0(path, "KNOWN_PIRS_MajorRNA.fasta"))
 
-
 write_rds(rbind(.PIRNAS, .MIRS), file = paste0(path, "KNOWN_CLUSTERS_MIRS_PIRS.rds"))
 
 # Q: Which other loci were for siRNA locus ====
 
-.PIRNAS 
+SRNAS <- read_rds(paste0(path, "KNOWN_CLUSTERS_MIRS_PIRS.rds"))
 
-.MIRS
+# str(which_pirs <- SRNAS %>% filter(grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
+# str(which_mirs <- SRNAS %>% filter(!grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
+
 
 pattern <- "Results.gff3"
 
@@ -193,31 +198,50 @@ f <- list.files(path = path, pattern = pattern, full.names = T)
 assembly <- rtracklayer::import(f)
 
 # Assembly track is different in nrows because Parent clusters
+# WHAT TYPE OF LOCUS WAS USED TO LABEL PIRS AND MIRS? ====
 
 df <- assembly %>% as_tibble() %>% 
   select(ID, width, type) %>%
-  right_join(RES, by = c("ID"="Name"))
+  right_join(SRNAS, by = c("ID"="Name"))
 
 df %>% 
   group_by(type, MIRNA, Type) %>% 
   summarise(n = n(), Reads = sum(Reads)) %>% 
-  arrange(desc(n)) %>% view()
+  arrange(desc(n))
 
 # The majority of homology-based piRNAs loci are Unknown Unknown_sRNA_locus, followed by 27 to 29 siRNA_locus and 
 
+# SPLIT OTHER SIRNA LOCUS ====
+
 df <- assembly %>% as_tibble() %>% 
   # select(ID, width, type) %>%
-  anti_join(RES, by = c("ID"="Name"))
+  anti_join(SRNAS, by = c("ID"="Name"))
 
-df %>% select(Parent) %>% arrange(desc(Parent)) %>% head() %>% pull()
+# CHECK WHY Results.gff3 AND Results.tsv are different rows
+# A: BECAUSE PARENT CLUSTERS SUCH AS STAR/MATURE MIRS:
+
+df %>% select(Parent) %>% 
+  arrange(desc(Parent)) %>% head() %>% pull()
 
 # score: number of sRNA-seq aligned reads at that locus.
 
 df %>% group_by(type, MIRNA) %>% 
   summarise(n = n(), Reads = sum(score)) %>% 
-  arrange(desc(n)) %>% view()
+  arrange(desc(n)) 
+
+df <- df %>% filter(!type %in% 
+    c("mature_miRNA", "miRNA-star", "MIRNA_hairpin"))
+
+
+df %>% 
+  mutate(Name = paste0(">", ID)) %>%
+  mutate(Name = paste(Name, Start, End, Strand, sep = ":")) %>%
+  select(Name, MajorRNA)
 
 # For a detailed analysis of the challenges of calling phasing of siRNA clusters in genome-wide analyses, see Polydore et al. (2018).
+
+# We define a cluster of microRNAs as a group of microRNA precursors with an inter-microRNA distance of <10 kb on the same genomic strand (Marco et al 2014, 10.1093/nar/gkt534)
+
 
 # OMIT  =====
 
