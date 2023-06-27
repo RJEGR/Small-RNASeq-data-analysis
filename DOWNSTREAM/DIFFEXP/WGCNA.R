@@ -67,7 +67,7 @@ sft = pickSoftThreshold(datExpr,
   corFnc = cor_method,
   corOptions = corOptionsList,
   verbose = 5, 
-  networkType = "unsigned")
+  networkType = "signed")
 
 saveRDS(sft, file = paste0(path, 'SoftThreshold_',cor_method, '.rds'))
 
@@ -164,3 +164,135 @@ bwnet <- blockwiseModules(datExpr,
   verbose = 3)
 
 saveRDS(bwnet, "bwnet.rds")
+
+# 2) ======
+
+# bwnet <- readRDS(paste0(path, "bwnet.rds"))
+
+bwmodules = labels2colors(bwnet$colors)
+
+names(bwmodules) <- names(bwnet$colors)
+
+table(bwmodules)
+
+count %>% select(all_of(which_cols))
+
+datExpr[1:12,1:3]
+
+reads <- colSums(datExpr)
+Total <- sum(reads)
+
+sum(sort(names(colSums(datExpr))) %in% sort(names(bwmodules)))
+
+data.frame(reads, bwmodules) %>% 
+  as_tibble() %>% 
+  group_by(bwmodules) %>% 
+  summarise(n = n(), reads = sum(reads)) %>%
+  dplyr::rename('module' = 'bwmodules') -> stats
+
+# DATA-TRAIT
+
+datTraits <- gsub(".clean.newid.subset", "", rownames(datExpr))
+
+HR11076 <- grepl('HR11076', datTraits)
+HR1108 <- grepl('HR1108', datTraits)
+
+HR2476 <- grepl('HR2476', datTraits)
+HR248 <- grepl('HR248', datTraits)
+
+datTraits <- data.frame(HR11076, HR1108, HR2476, HR248)
+
+datTraits <- 1*datTraits
+
+rownames(datTraits) <- rownames(datExpr)
+
+# Recalculate MEs with color labels
+
+MEs0 = moduleEigengenes(datExpr, bwmodules)$eigengenes
+
+MEs = orderMEs(MEs0)
+
+# rownames(MEs) <- str_replace_all(rownames(MEs), '^ME', '')
+names(MEs) <- str_replace_all(names(MEs), '^ME', '')
+
+moduleTraitCor = cor(MEs, datTraits, use= "p")
+
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(datTraits))
+
+
+moduleTraitCor %>% as_tibble(rownames = 'module') %>% 
+  pivot_longer(-module, values_to = 'moduleTraitCor') -> df1
+
+moduleTraitPvalue %>% as_tibble(rownames = 'module') %>% 
+  pivot_longer(-module, values_to = 'corPvalueStudent') %>%
+  right_join(df1) -> df1
+
+hclust <- hclust(dist(moduleTraitCor), "complete")
+
+# plot(hclust)
+
+# SPLIT CLUSTERS BY MIRS/PIRS/SIRS
+
+SRNAS <- read_rds(paste0(path, "KNOWN_CLUSTERS_MIRS_PIRS.rds"))
+
+str(which_pirs <- SRNAS %>% filter(grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
+str(which_mirs <- SRNAS %>% filter(!grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
+
+
+bwmodules %>% 
+  as_tibble(., rownames = 'Name') %>%
+  mutate(biotype = ifelse(Name %in% which_mirs, 'miR', 
+    ifelse(Name %in% which_pirs, 'piR', 'siRs'))) %>%
+  dplyr::rename('module' = 'value') -> bwModuleCol
+
+# bwModuleCol %>%  group_by(module) %>% count(sort = T) %>% left_join(stats)
+
+bwModuleCol %>% 
+  group_by(module, biotype) %>% count(sort = T) -> bwModuleDF
+
+bwModuleDF %>% mutate(module = factor(module, levels = hclust$labels[hclust$order])) -> bwModuleDF
+
+bwModuleDF %>% group_by(module) %>% mutate(pct = n / sum(n)) -> bwModuleDF
+
+df1 %>%
+  mutate(star = ifelse(corPvalueStudent <.001, "***", 
+    ifelse(corPvalueStudent <.01, "**",
+      ifelse(corPvalueStudent <.05, "*", "")))) -> df1
+
+df1 %>%
+  # mutate(name = factor(name, levels = c('Boquita', 'Carrizales', 'Green', 'Brown'))) %>%
+  mutate(facet = ifelse(name %in% c('HR11076', 'HR2476'), 'Low pH', 'Control')) %>%
+  mutate(moduleTraitCor = round(moduleTraitCor, 2)) %>%
+  # mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), moduleTraitCor)) %>%
+  mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), '')) %>%
+  ggplot(aes(y = module, x = name, fill = moduleTraitCor)) +
+  # geom_tile(color = 'black', size = 0.5, width = 0.7) + 
+  geom_raster() +
+  geom_text(aes(label = star),  vjust = 0.5, hjust = 0.5, size= 5, family =  "GillSans") +
+  ggsci::scale_fill_gsea(name = "", reverse = T, na.value = "white") +
+  # scale_fill_viridis_c(name = "Membership", na.value = "white") +
+  ggh4x::scale_y_dendrogram(hclust = hclust) +
+  labs(x = '', y = 'Module') +
+  guides(fill = guide_colorbar(barwidth = unit(3, "in"),
+    alignd = 0.5,
+    ticks.colour = "black", ticks.linewidth = 0.5,
+    frame.colour = "black", frame.linewidth = 0.5,
+    label.theme = element_text(size = 12))) +
+  theme_classic(base_size = 12, base_family = "GillSans") +
+  theme(legend.position = "top",
+    strip.background = element_rect(fill = 'white', color = 'white'),
+    axis.line.y = element_line(color = 'white'),
+    axis.text.y = element_text(hjust = 1.2),
+    axis.ticks.length = unit(5, "pt")) +
+  facet_wrap(~ facet, scales = 'free_x') -> p1 
+
+p1 <- p1 + theme(
+  # axis.ticks.x = element_blank(), 
+  # axis.text.x = element_blank(), 
+  axis.line.x = element_blank())
+
+p1 <- p1 + theme(panel.spacing.x = unit(0, "mm"))
+
+# ggsave(p1, filename = 'ModuleTraitRelationship_1.png', 
+#   path = path, width = 5, height = 5, dpi = 1000)
+
