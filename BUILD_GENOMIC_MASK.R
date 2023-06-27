@@ -50,9 +50,10 @@ ensemble_gff %>% count(source)
 # disjoin (---)(---)(-)(-----)(--)    (---)
 # 
 # GenomicRanges::setdiff(range(input),input)
-#                                 (--)
+
 # Intra-range features:
 # input
+#                                 (--)
 #                         (----)
 #                         .    .
 # resize                  (--------)
