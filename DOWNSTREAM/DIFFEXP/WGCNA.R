@@ -15,6 +15,7 @@ if(!is.null(dev.list())) dev.off()
 path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 count_f <- list.files(path = path, pattern = "Counts.txt", full.names = T)
+
 count <- read_tsv(count_f)
 
 
@@ -26,6 +27,8 @@ datExpr <- count %>% select(all_of(which_cols))
 datExpr <- as(datExpr, "matrix")
 
 rownames(datExpr) <- count$Name
+
+.datExpr <- datExpr
 
 datExpr <- log2(datExpr+1)
 
@@ -48,7 +51,22 @@ if (!gsg$allOK) {
 }
 
 
-# detect max power ----
+# Simulated-05-NetworkConstruction.pdf (Horvath and Langfelder, 2011)
+
+# When you have a lot of genes use the following code
+k=softConnectivity(datE=datExpr,power=6)
+# Plot a histogram of k and a scale free topology plot
+sizeGrWindow(10,5)
+par(mfrow=c(1,2))
+hist(k)
+scaleFreePlot(k, main="Check scale free topology\n")
+
+# Debemos señalar que no es necesario que una red satisfaga una topología libre de escala; La topología libre de escala puede no satisfacerse si los datos están compuestos por grupos de muestras globalmente muy distintos (por ejemplo, diferentes tipos de tejidos).
+
+# DEBIDO A LA CANTIDAD DE DATOS MASIVOS. NO PODEMOS GENERAR: Average linkage hierachical clustering with adjacency-based dissimilarity
+
+
+# 1) Detect max power ----
 
 max_power <- 30
 
@@ -71,8 +89,7 @@ sft = pickSoftThreshold(datExpr,
 
 saveRDS(sft, file = paste0(path, 'SoftThreshold_',cor_method, '.rds'))
 
-# Construct a gene co-expression matrix and generate modules ----
-# 
+sft <- read_rds(paste0(path, 'SoftThreshold_',cor_method, '.rds'))
 
 soft_values <- abs(sign(sft$fitIndices[,3])*sft$fitIndices[,2])
 
@@ -119,7 +136,9 @@ ggsave(psave, path = path, filename = 'SoftThreshold.png', width = 7, height = 4
 # The assumption on that by raising the correlation to a power will reduce the noise of 
 # the correlations in the adjacency matrix
 
-# Blockwise construction ----
+
+# 2) Construct a gene co-expression matrix and generate modules ----
+# Using Blockwise construction
 
 # Call the network topology analysis function
 
@@ -147,7 +166,7 @@ system(paste0('mkdir ', wd))
 
 setwd(wd)
 
-# START: 
+# RUN: 
 
 bwnet <- blockwiseModules(datExpr, 
   maxBlockSize = 5000,
@@ -165,9 +184,10 @@ bwnet <- blockwiseModules(datExpr,
 
 saveRDS(bwnet, "bwnet.rds")
 
-# 2) ======
+# 3) Output exploratory ----
 
-# bwnet <- readRDS(paste0(path, "bwnet.rds"))
+
+bwnet <- readRDS(paste0(path, "2023-06-26/bwnet.rds"))
 
 bwmodules = labels2colors(bwnet$colors)
 
@@ -175,14 +195,25 @@ names(bwmodules) <- names(bwnet$colors)
 
 table(bwmodules)
 
-count %>% select(all_of(which_cols))
 
-datExpr[1:12,1:3]
+# (TEST) Plot the dendrogram and the module colors underneath for block 1
 
-reads <- colSums(datExpr)
+# i <- 8
+# 
+# plotDendroAndColors(bwnet$dendrograms[[i]], bwmodules[bwnet$blockGenes[[i]]],
+#   "Module colors", main = "Gene dendrogram and module colors in block i",
+#   dendroLabels = FALSE, hang = 0.03,
+#   addGuide = TRUE, guideHang = 0.05)
+
+
+
+reads <- rowSums(.datExpr)
+
 Total <- sum(reads)
 
-sum(sort(names(colSums(datExpr))) %in% sort(names(bwmodules)))
+# Sanity check:
+
+identical(names(colSums(datExpr)), names(bwmodules))
 
 data.frame(reads, bwmodules) %>% 
   as_tibble() %>% 
@@ -190,14 +221,16 @@ data.frame(reads, bwmodules) %>%
   summarise(n = n(), reads = sum(reads)) %>%
   dplyr::rename('module' = 'bwmodules') -> stats
 
-# DATA-TRAIT
+# Prep binary datTraits
 
 datTraits <- gsub(".clean.newid.subset", "", rownames(datExpr))
 
 HR11076 <- grepl('HR11076', datTraits)
+
 HR1108 <- grepl('HR1108', datTraits)
 
 HR2476 <- grepl('HR2476', datTraits)
+
 HR248 <- grepl('HR248', datTraits)
 
 datTraits <- data.frame(HR11076, HR1108, HR2476, HR248)
@@ -212,7 +245,6 @@ MEs0 = moduleEigengenes(datExpr, bwmodules)$eigengenes
 
 MEs = orderMEs(MEs0)
 
-# rownames(MEs) <- str_replace_all(rownames(MEs), '^ME', '')
 names(MEs) <- str_replace_all(names(MEs), '^ME', '')
 
 moduleTraitCor = cor(MEs, datTraits, use= "p")
@@ -228,6 +260,9 @@ moduleTraitPvalue %>% as_tibble(rownames = 'module') %>%
   right_join(df1) -> df1
 
 hclust <- hclust(dist(moduleTraitCor), "complete")
+
+# # BASED ON THE dendogram from the heatmap, WE REALIZE THAN "tan" (2n clade), "magenta" (2n clade), "greenyellow" (1st clade) are within same cluster than grey module in the dendo.
+
 
 # plot(hclust)
 
@@ -245,14 +280,33 @@ bwmodules %>%
     ifelse(Name %in% which_pirs, 'piR', 'siRs'))) %>%
   dplyr::rename('module' = 'value') -> bwModuleCol
 
+# ADD COUNT INFO:
+# reads <- rowSums(datExpr)
+# Total <- sum(reads)
+
+bwModuleCol <- data.frame(reads) %>% 
+  as_tibble(rownames = "Name") %>% 
+  right_join(bwModuleCol) 
+  
+
 # bwModuleCol %>%  group_by(module) %>% count(sort = T) %>% left_join(stats)
 
 bwModuleCol %>% 
-  group_by(module, biotype) %>% count(sort = T) -> bwModuleDF
+  group_by(module, biotype) %>% 
+  summarise(reads = sum(reads), n = n()) %>% 
+  arrange(desc(n)) -> bwModuleDF
 
-bwModuleDF %>% mutate(module = factor(module, levels = hclust$labels[hclust$order])) -> bwModuleDF
+bwModuleDF %>% 
+  mutate(module = factor(module, levels = hclust$labels[hclust$order])) -> bwModuleDF
 
-bwModuleDF %>% group_by(module) %>% mutate(pct = n / sum(n)) -> bwModuleDF
+bwModuleDF %>% 
+  group_by(module) %>%
+  # ungroup() %>%
+  mutate(cluster_frac = n / sum(n), 
+    reads_frac = reads / sum(reads)) -> bwModuleDF
+
+# bwModuleDF %>% tally(reads_frac)
+
 
 df1 %>%
   mutate(star = ifelse(corPvalueStudent <.001, "***", 
@@ -260,39 +314,78 @@ df1 %>%
       ifelse(corPvalueStudent <.05, "*", "")))) -> df1
 
 df1 %>%
-  # mutate(name = factor(name, levels = c('Boquita', 'Carrizales', 'Green', 'Brown'))) %>%
   mutate(facet = ifelse(name %in% c('HR11076', 'HR2476'), 'Low pH', 'Control')) %>%
   mutate(moduleTraitCor = round(moduleTraitCor, 2)) %>%
-  # mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), moduleTraitCor)) %>%
-  mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), '')) %>%
+  mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), moduleTraitCor)) %>%
+  # mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), '')) %>%
   ggplot(aes(y = module, x = name, fill = moduleTraitCor)) +
-  # geom_tile(color = 'black', size = 0.5, width = 0.7) + 
-  geom_raster() +
-  geom_text(aes(label = star),  vjust = 0.5, hjust = 0.5, size= 5, family =  "GillSans") +
+  geom_tile(color = 'white', size = 0.7, width = 1) +
+  # geom_raster() +
+  geom_text(aes(label = star),  vjust = 0.5, hjust = 0.5, size= 4, family =  "GillSans") +
   ggsci::scale_fill_gsea(name = "", reverse = T, na.value = "white") +
   # scale_fill_viridis_c(name = "Membership", na.value = "white") +
   ggh4x::scale_y_dendrogram(hclust = hclust) +
   labs(x = '', y = 'Module') +
-  guides(fill = guide_colorbar(barwidth = unit(3, "in"),
+  guides(fill = guide_colorbar(barwidth = unit(3.5, "in"),
+    barheight = unit(0.1, "in"), label.position = "top",
     alignd = 0.5,
     ticks.colour = "black", ticks.linewidth = 0.5,
     frame.colour = "black", frame.linewidth = 0.5,
-    label.theme = element_text(size = 12))) +
+    label.theme = element_text(size = 10))) +
   theme_classic(base_size = 12, base_family = "GillSans") +
   theme(legend.position = "top",
-    strip.background = element_rect(fill = 'white', color = 'white'),
-    axis.line.y = element_line(color = 'white'),
-    axis.text.y = element_text(hjust = 1.2),
-    axis.ticks.length = unit(5, "pt")) +
+    strip.background = element_rect(fill = 'white', color = 'white')) +
   facet_wrap(~ facet, scales = 'free_x') -> p1 
 
 p1 <- p1 + theme(
-  # axis.ticks.x = element_blank(), 
-  # axis.text.x = element_blank(), 
-  axis.line.x = element_blank())
+  axis.line.x = element_blank(),
+  axis.line.y = element_blank(),
+  axis.text.y = element_text(hjust = 1.2),
+  axis.ticks.length = unit(5, "pt"))
 
-p1 <- p1 + theme(panel.spacing.x = unit(0, "mm"))
+p1 <- p1 + theme(panel.spacing.x = unit(-0.5, "mm"))
 
-# ggsave(p1, filename = 'ModuleTraitRelationship_1.png', 
-#   path = path, width = 5, height = 5, dpi = 1000)
+
+bwModuleDF %>% 
+  ggplot(aes(y = module, fill = biotype)) +
+  # facet_wrap(biotype ~ ., nrow = 1, scales = "free_x") +
+  scale_x_continuous("Frac. of reads", labels = scales::percent) +
+  geom_col(aes(x = reads_frac), width = 0.95, position = position_stack(reverse = TRUE)) +
+  # geom_col(aes(x = reads_frac), width = 0.95, fill = "grey")
+  scale_fill_manual(name = '', values = c("#303960", "#647687", "grey90")) +
+  theme_classic(base_size = 12, base_family = "GillSans") +
+  theme(legend.position = "top",
+    strip.background = element_rect(fill = 'white', color = 'white'),
+    axis.title.y = element_blank(), 
+    axis.text.y= element_blank(),
+    axis.ticks.y =element_blank(), 
+    axis.line.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.length = unit(5, "pt")) -> p2
+
+
+library(patchwork)
+
+# p1 + plot_spacer() + p2 + plot_layout(widths = c(5,-0.5, 10))  #& theme(plot.margin = 0)
+
+ps <- p1 + p2 + plot_layout(widths = c(6, 5)) + labs(caption = '* corPvalueStudent < 0.05 ') 
+
+# ps
+
+ggsave(ps, filename = 'WGCNA.png', 
+  path = path, width = 8, height = 4.5, device = png, dpi = 300)
+
+
+bwModuleDF %>%
+  ungroup() %>%
+  mutate(x = n / sum(n), y = reads / sum(reads)) %>%
+  ggplot(aes(x, y, color = biotype)) +
+  # facet_wrap(~module) +
+  theme_classic(base_size = 12, base_family = "GillSans") +
+  scale_color_manual(name = '', values = c("#303960", "#647687", "grey90")) +
+  geom_point()
+
+bwModuleDF %>% view()
+
+df1 %>% filter(star != "") %>% View()
 
