@@ -27,36 +27,42 @@ SRNAS <- read_rds(paste0(path, "KNOWN_CLUSTERS_MIRS_PIRS.rds"))
 str(which_pirs <- SRNAS %>% filter(grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
 str(which_mirs <- SRNAS %>% filter(!grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
 
+str(query_names <- c(which_pirs, which_mirs))
+
+# sum(!unique(RESULTS$Name) %in% query_names) # 65326
 
 PRIME5_UNKNOWN <- RESULTS %>%
-  filter(is.na(KnownRNAs)) %>% 
-  group_by(MajorRNA) %>%
+  filter(!Name %in% query_names) %>%
+  group_by(MajorRNA, DicerCall) %>%
   summarise(MajorRNAReads = sum(MajorRNAReads), n = n()) %>%
   mutate(first_nuc = sapply(strsplit(MajorRNA, ""), `[`, 1)) %>%
-  mutate(Length = nchar(MajorRNA)) %>%
+  ungroup() %>%
+  mutate(DicerCall = ifelse(DicerCall == "N", nchar(MajorRNA), DicerCall)) %>%
   mutate(biotype = "Unknown") %>%
-  group_by(first_nuc, Length, biotype) %>%
+  group_by(first_nuc, DicerCall, biotype) %>%
   summarise(MajorRNAReads = sum(MajorRNAReads), n = sum(n))
 
+# PRIME5_UNKNOWN %>% view()
+
 PRIME5_KNOWN <- RESULTS %>%
-  drop_na(KnownRNAs) %>% 
-  filter(Name %in% c(which_pirs, which_mirs)) %>%
-  # mutate(biotype = NA) %>%
+  # drop_na(KnownRNAs) %>% 
+  filter(Name %in% query_names) %>%
   mutate(biotype = ifelse(Name %in% which_pirs, "piRs", "miRs")) %>%
-  group_by(MajorRNA, biotype) %>%
+  group_by(MajorRNA, biotype, DicerCall) %>%
   summarise(MajorRNAReads = sum(MajorRNAReads), n = n()) %>%
   mutate(first_nuc = sapply(strsplit(MajorRNA, ""), `[`, 1)) %>%
-  mutate(Length = nchar(MajorRNA)) %>%
-  group_by(first_nuc, Length, biotype) %>%
+  ungroup() %>%
+  mutate(DicerCall = ifelse(DicerCall == "N", nchar(MajorRNA), DicerCall)) %>%
+  group_by(first_nuc, DicerCall, biotype) %>%
   summarise(MajorRNAReads = sum(MajorRNAReads), n = sum(n))
 
 
 ylab <- "Number of reads"
 
 rbind(PRIME5_KNOWN, PRIME5_UNKNOWN) %>%
-  group_by(Length, biotype) %>%
-  mutate(freq = sum(MajorRNAReads)) %>%
-  ggplot(aes(x = Length, y = MajorRNAReads, fill = first_nuc)) + 
+  group_by(DicerCall, biotype) %>%
+  # mutate(freq = MajorRNAReads/sum(MajorRNAReads)) %>%
+  ggplot(aes(x = DicerCall, y = MajorRNAReads, fill = first_nuc)) + 
   facet_grid(biotype ~., scales = 'free') + 
   geom_col(width = 0.85) +
   see::scale_fill_social(reverse = T) +
