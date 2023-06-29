@@ -231,7 +231,7 @@ srna_to_genome_ov <- findOverlaps(gr2, gr, minoverlap = 1)
 ## optional, if you want a genomic order of the chromosomes
 gr0 = sortSeqlevels(gr2)
 
-## split into a GRangesList
+REPEAT_MASKER_OUT## split into a GRangesList
 ## where each element has all ranges for one chromosome
 grl = split(gr0, seqnames(gr0))
 
