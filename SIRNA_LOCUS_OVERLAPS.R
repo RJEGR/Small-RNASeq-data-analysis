@@ -34,6 +34,8 @@ names(bwmodules) <- names(bwnet$colors)
 table(bwmodules)
 
 
+# bwmodules <- bwmodules %>% as_tibble(rownames = "Name") %>% rename("Module" = "value")
+
 # SRNA-SEQ TRANSCRIPTOME ====
 
 pattern <- "Results.gff3"
@@ -41,6 +43,18 @@ pattern <- "Results.gff3"
 f <- list.files(path = wd, pattern = pattern, full.names = T)
 
 assembly <- rtracklayer::import(f)
+
+
+assembly$Module <- NA
+
+x <- names(bwmodules) # head(names(bwmodules))
+
+lab <- bwmodules # head(bwmodules)
+
+assembly$Module <- NA
+
+assembly$Module <- bwmodules[match(assembly$ID, names(bwmodules))]
+
 
 mirs_true <- assembly[which(assembly$MIRNA == "Y")]
 
@@ -94,29 +108,53 @@ assembly %>% as_tibble() %>%
   filter(!ID %in% query_names) %>%
   count(type, sort = T)
 
+str(piRNA_locus <- assembly %>% as_tibble() %>%
+    # filter(!type %in% c("mature_miRNA", "miRNA-star", "MIRNA_hairpin")) %>%
+    filter(ID %in% which_pirs) %>% distinct(ID) %>% pull())
+
+
 str(siRNA_locus <- assembly %>% as_tibble() %>%
     filter(!type %in% c("mature_miRNA", "miRNA-star", "MIRNA_hairpin")) %>%
     filter(!ID %in% query_names) %>% distinct(ID) %>% pull())
 
 # SELECT CHROMOSOME-RELATED MIR-LOCI
 
+# SIRS
 length(g2 <- assembly[seqnames(assembly) %in% query.locus])
-
-# SELECT ONLY siRNA_locus
 length(g2 <- g2[which(g2$ID %in% siRNA_locus)])
-
 seqlevels(g2) <- unique(unfactor(seqnames(g2)@values))
 
-# NUMBER OF siRNA_locus (NOT MIRS NOR PIRS) RELATED TO MIR-LOCI
+
+# PIRS
+length(g3 <- assembly[seqnames(assembly) %in% query.locus])
+length(g3 <- g3[which(g3$ID %in% piRNA_locus)])
+seqlevels(g3) <- unique(unfactor(seqnames(g3)@values))
+
+# NUMBER OF siRNA_locus / piRNA_locus (NOT MIRS) RELATED TO MIR-LOCI
 
 g2 %>% as_tibble() %>% count(type, sort = T) 
+
+
+g2 %>% as_tibble() %>% group_by(type) %>% 
+  summarise(n = n(), Reads = sum(score)) %>%
+  arrange(desc(n)) %>% view()
+
+g3 %>% as_tibble() %>% group_by(type) %>% 
+  summarise(n = n(), Reads = sum(score)) %>%
+  arrange(desc(n)) %>% view()
+
+# g2 %>% as_tibble() %>% count(type, Module, sort = T)
 
 # # NUMBER OF siRNA_locus (NOT MIRS NOR PIRS) RELATED TO MIR-LOCI
 
 # IRanges::reduce(g2) # <- those are already reduced (i.e not overlapped) !
 # IRanges::ranges(g2)
 
+# TEST AS ABOVE:
+
 g2 <- GenomicRanges::resize(g2, width(g2), fix = "center")
+
+g3 <- GenomicRanges::resize(g3, width(g3), fix = "center")
 
 mirs_true <- GenomicRanges::resize(mirs_true, width(mirs_true), fix = "center")
 
@@ -128,7 +166,7 @@ mirs_true <- GenomicRanges::resize(mirs_true, width(mirs_true), fix = "center")
 
 # https://software.broadinstitute.org/software/igv/Cytoband
 
-cytobands <- g3 %>% as_tibble() %>% select(seqnames, start, end, strand, type, biotype)
+cytobands <- G %>% as_tibble() %>% select(seqnames, start, end, strand, type, biotype)
 
 cytobands <- GRanges(Rle(cytobands$seqnames), 
   ranges =  IRanges(start = cytobands$start, end = cytobands$end), 
@@ -144,22 +182,29 @@ pp <- getDefaultPlotParams(1)
 # pp$leftmargin <- 0.2
 # kp <- plotKaryotype(g, plot.type = 6, plot.params = pp)
 
-# png(filename = paste0(wd, "/INTER-DISTANCE-MIR-LOCI.png"), width = 15, height = 15)
+# png(filename = paste0(wd, "/INTER-DISTANCE-MIR-LOCI.png"), 
+#   width = 1000, height = 700, units = "px", res = 300)
 
 kp <- plotKaryotype(genome = g, plot.type=1, cex = 0.5,  
   # cytobands = cytobands, # Include cytobands relaled to genomic features
   plot.params = pp, main = "INTER-DISTANCE MIR-LOCI")
 
-kpDataBackground(kp, color = "#FFFFFFAA", r0 = -0.5, r1 = 0)
+kpDataBackground(kp, color = "#FFFFFFAE", r0 = -0.5, r1 = 0)
 
 kpAddBaseNumbers(kp, add.units = T, units = "Mb")
 
-kpPlotRegions(kp,g2, col = "#647FA4", r0 = 0,r1 = 0.5)
+# "grey90"))
 
-kpPlotRegions(kp,mirs_true, col="red", r0 = 0,r1 = 0.5)
+kpPlotRegions(kp, g2, col = "#E7DFD5", r0 = 0,r1 = 0.5)
+kpPlotRegions(kp, g3, col = "#647687", r0 = 0,r1 = 0.5)
+kpPlotRegions(kp, mirs_true, col = "red", r0 = 0,r1 = 0.5) # #303960
 
+legend("bottomright", legend=c("siRs", "piRs", "miRs"), 
+  pch= 15,
+  col=c("#E7DFD5", "#647687", "red"),
+  horiz=TRUE, bty='n', cex=0.7)
 
-dev.off()
+# dev.off()
 
 # kpPlotRegions(kp, g3, border="red", r0 = 0,r1 = 0.5)
 
@@ -178,20 +223,164 @@ text_df <- GRanges(Rle(text_df$seqnames),
 
 kpPlotMarkers(kp, data = mirs_true, labels = text_df$KnownRNAs)
 
-# LABEL BY MIRS-SOURCE: ====
 
+# OR BY CLUSTER
+
+mirs_true %>% as_tibble() %>% count(Module, sort = T)
+g2 %>% as_tibble() %>% count(Module, sort = T)
+g3 %>% as_tibble() %>% count(Module, sort = T)
+
+kpPlotMarkers(kp, data = mirs_true, labels = mirs_true$Module)
+
+
+# LABEL BY MIRS-SOURCE: ====
+# THE PURPOSE IS DEFINE IF THOSE ARE INTERGENIC OR NOT
+# doi: 10.1101/gr.2722704: These findings strongly suggest that miRNAs are transcribed in parallel with their host transcripts, and that the two different transcription classes of miRNAs (`exonic' and `intronic') identified here may require slightly different mechanisms of biogenesis.
+
+# FOR EACH CLUSTER (66226) ANNOTATE GENOMIC LOCATION (INTRONIC, EXONIC, ETC.)
+# Ex: 
+
+# (DOI: 10.1111/mec.14973) miRNA locations that were characterized as intergenic were those that did not intersect with any annotated gene in the genome, while intronic locations were those that intersected with a gene but were not annotated as either an exon or an UTR 
+
+length(TU <- genome[!genome$type == "region"])
+
+# length(genome)
+
+x <- subsetByOverlaps(x = TU, ranges = assembly[1,1], type="any")
+
+x %>% as_tibble() %>% 
+  mutate(Name = "Cluster_1") %>%
+  select(seqnames, start, end, strand, type, biotype, Name) 
+  # group_by(biotype) %>%
+  # summarise(across(type, .fns = paste_headers), .groups = "drop_last") 
+
+
+out <- list()
+
+max <- length(assembly)
+
+pb <- txtProgressBar(min = 0, max = max, style = 3, width = 50, char = "=")
+
+for(i in 1:10) { 
+  
+  j <- i
+  
+  Name_id <- assembly[j,]$ID
+  
+  ranges <- assembly[j,]
+  
+  L <- subsetByOverlaps(x = TU, ranges = ranges, type="any")
+  
+  if(length(L) == 0) {
+    
+    t <- "Intergenic"
+    
+    s <- start(ranges)
+    e <- end(ranges)
+    
+    sqnames <- unfactor(seqnames(ranges)@values)
+    
+    strand_ <- unfactor(strand(ranges)@values)
+    
+    out[[j]] <- data.frame(sqnames, start = s, end = e, strand = strand_, type = t, biotype = t, Name_id)
+  } else
+  
+  out[[j]] <- L %>% as_tibble() %>% mutate(Name = Name_id) %>%
+    select(seqnames, start, end, strand, type, biotype, Name) 
+  
+  setTxtProgressBar(pb, i)
+
+  }
+
+# df <- lapply(file, read.table) # leer todas las tablas
+
+do.call(rbind, out) %>%
+  group_by(Name, biotype) %>%
+  summarise(across(type, .fns = paste_headers), .groups = "drop_last")
+
+
+
+# ALSO INCLUDE INTERGENIC TERM:
+# https://support.bioconductor.org/p/54789/
+### Removing the strand to perform the reduce operation
+genes <- range(TU[strand(TU) != "*"])
+
+strand(genes) <- '*'
+
+### Now, let's find the gaps
+genic <- IRanges::reduce(genes)
+
+### Because of teh reduce, there should be no overlaping genic regions
+# MUST BE ZERO
+length(findOverlaps(genic))
+
+### Finding the intergenic regions
+intergenic <- gaps(genic)
+
+length(findOverlaps(intergenic))
+
+
+# OR
+
+length(findOverlaps(IRanges::setdiff(g,genic)))
+
+# 
 
 # PROCESS FEATURES:
-# 1) SET INTERGENIC REGIONS
+# 1) SET INTERGENIC REGIONS ====
 # gaps(x) produces a set of ranges covering the positions in [start(x), end(x)] 
 # that are not covered by any range in x. 
 # Given coding sequence addresses and exon intervals, this can be used to enumerate introns.
+?"intra-range-methods"
+?"inter-range-methods"
 
-g3 <- genome[!genome$type == "region"]
 
-length(g3 <- g3[seqnames(g3) %in% query.locus])
 
-seqlevels(g3) <- unique(unfactor(seqnames(g3)@values))
+# EX:
+# genome %>% as_tibble() %>% head() %>% view()
+genome %>% as_tibble() %>% 
+  filter(type != "region") %>% 
+  group_by(seqnames, start) %>% 
+  count(type, sort = T)  
+
+genome %>% 
+  as_tibble() %>% 
+  filter(seqnames == "JALGQA010000004.1" & start == 9291699) %>% view()
+
+subsetByOverlaps(x = genome, ranges = CDS[1,1])
+
+length(CDS <- genome[genome$type == "CDS"])
+
+length(CDS <- CDS[seqnames(CDS) %in% query.locus])
+
+seqlevels(CDS) <- unique(unfactor(seqnames(CDS)@values))
+
+ranges <- IRanges::ranges(CDS)
+
+# NUMBER OF CDS PER CHROMOSOME?
+
+CDS %>% as_tibble() %>% count(seqnames, sort = T) 
+
+# gaps(ranges)
+
+
+gaps(CDS)[1]
+
+# CDS
+
+subsetByOverlaps(x = genome, ranges = mirs_true) %>% 
+  as_tibble() %>% 
+  # group_by(seqnames, start, end) %>%
+  # summarise(across(type, .fns = paste_headers), .groups = "drop_last") %>%
+  count(type, sort = T) 
+
+# 46718-46755
+
+# g3 <- genome[!genome$type == "region"]
+
+# length(g3 <- g3[seqnames(g3) %in% query.locus])
+
+# seqlevels(g3) <- unique(unfactor(seqnames(g3)@values))
 
 # g3 %>% as_tibble() %>% count(type, sort = T)
 
