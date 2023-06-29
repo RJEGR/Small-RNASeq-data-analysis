@@ -60,31 +60,12 @@ SRNAS <- read_rds(paste0(wd, "/KNOWN_CLUSTERS_MIRS_PIRS.rds"))
 str(which_pirs <- SRNAS %>% filter(grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
 str(which_mirs <- SRNAS %>% filter(!grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
 
-# LOAD MODULES ?? ====
-
-bwnet <- readRDS(paste0(wd, "/2023-06-26/bwnet.rds"))
-
-bwmodules = WGCNA::labels2colors(bwnet$colors)
-
-names(bwmodules) <- names(bwnet$colors)
-
-assembly$Module <- NA
-
-x <- names(bwmodules) # head(names(bwmodules))
-
-lab <- bwmodules # head(bwmodules)
-
-assembly$Module <- NA
-
-assembly$Module <- bwmodules[match(assembly$ID, names(bwmodules))]
-
-# table(bwmodules)
 
 # PREPARE DB FOR VIZ ====
 # 1)
 # TO KEEP TRACK LOCUS TYPE PER CLUSTER
 # Note: be aware score (Reads) cols for *.mature/*.star locus are documented in assembly  (262 rows)
-
+# 
 # assembly %>% as_tibble() %>% filter(grepl(".mature|.star", ID)) %>% select()
   
 .DB1 <- assembly %>% as_tibble() %>% select(ID, type) %>% rename("Locus_type"="type", "Name"="ID")
@@ -140,7 +121,28 @@ bind_ids <- function(x) {
 
 DB <- DB %>% left_join(.DB, by = "Name")
 
+# 5) ADD COUNT-MATRIX-BASED CLUSTERING  ====
+
+# LOAD MODULES
+
+bwnet <- readRDS(paste0(wd, "/2023-06-26/bwnet.rds"))
+
+bwmodules = WGCNA::labels2colors(bwnet$colors)
+
+names(bwmodules) <- names(bwnet$colors)
+
+DB$WGCNA <- NA
+
+# Sanity check
+
+any(names(bwmodules) %in% DB$Name)
+
+DB$WGCNA  <- bwmodules[match(DB$Name, names(bwmodules))]
+
 write_tsv(DB, file = paste0(wd, "/RNA_LOCATION_DB.tsv"))
+
+# FURTHER: ADD TARGET: ====
+# ADD INNER JOIN ANTIJOIN FROM TARGET-SCAN AND RNAHYBRID:
 
 # head(read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
 
