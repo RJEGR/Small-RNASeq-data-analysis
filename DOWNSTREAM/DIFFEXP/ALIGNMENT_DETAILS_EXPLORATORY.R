@@ -190,3 +190,67 @@ alignment_details %>%
 # https://easystats.github.io/see/articles/seecolorscales.html#overview-of-palette-colors
 
 ggsave(ps, filename = 'ALIGNMENT_DETAILS.png', path = wd, width = 5, height = 2.5, device = png)
+
+
+# CHECK IF, DICERCALL PROFILE
+# IT CORRESPOND TO MAJOR READ LENGTH THAT CONTRIBUTES TO CLUSTERING SNRAS
+# If < 80% of the aligned reads are in the --dicermin and --dicermax boundaries, DicerCall is set to 'N'. Loci with a DicerCall of 'N' are unlikely to be small RNAs related to the Dicer-Like/Argonaute system of gene regulation.
+
+f <- list.files(path = wd, pattern = "Results.txt", full.names = T)
+
+m <- read_tsv(f) %>% 
+  select(DicerCall, Short,c(as.character(21:30)),  Long)  
+
+sample_cor = cor(as(m[-1], "matrix"), method='pearson', use='pairwise.complete.obs')
+
+heatmap(sample_cor)
+
+Levels_to <- c("<21",c(as.character(21:30)), ">30")
+
+recode_to <- c(`Long` = ">30", `Short`= "<21")
+
+
+m <- m %>% pivot_longer(-DicerCall) %>% 
+  filter(value > 0) %>% 
+  dplyr::mutate(name = dplyr::recode_factor(name, !!!recode_to)) %>%
+  group_by(DicerCall,name) %>%
+  summarise(value = sum(value)) 
+
+x <- m %>% 
+  pivot_wider(names_from = name, values_from = value) %>%
+  select(all_of(c("DicerCall",Levels_to)))
+
+rowNames <- x$DicerCall
+
+x <- as(x[-1], "matrix")
+
+rownames(x) <- rowNames
+
+sample_cor = cor(t(x), method='pearson', use='pairwise.complete.obs')
+sample_dist = dist(x, method='euclidean')
+hc_samples = hclust(sample_dist, method='complete')
+
+heatmap(sample_cor)
+
+sum(m$value) # 83,808,529
+
+m %>%
+  dplyr::mutate(name = factor(name, levels = Levels_to)) %>%
+  dplyr::mutate(DicerCall = factor(DicerCall, levels = c("N",c(as.character(21:30))))) %>%
+  ggplot(aes(y = name, x = DicerCall, fill = log10(value))) + 
+  geom_tile(color = 'white', linewidth = 0.2) +
+  # facet_wrap(~ mapping_type, nrow = 1) +
+  scale_fill_viridis_c(option = "B", name = "x", direction = 1) +
+  #   limits = c(0,1),
+  #   labels = scales::percent_format(scale = 100)) +
+  scale_x_discrete(position = 'top') +
+  theme_classic(base_size = 10, base_family = "GillSans") +
+  labs(y = 'Read Length') +
+  theme_bw(base_family = "GillSans", base_size = 14) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'top',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 10))
+
+
