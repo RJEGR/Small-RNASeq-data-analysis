@@ -103,7 +103,7 @@ plotRanges_gg <- function(ir) {
 }
 
 
-plotRanges(ranges(gr))
+plotRanges_gg(ranges(gr))
 
 
 # BiocManager::install("ggbio")
