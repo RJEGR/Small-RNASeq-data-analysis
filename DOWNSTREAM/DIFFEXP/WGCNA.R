@@ -352,7 +352,7 @@ bwModuleDF %>%
   scale_x_continuous("Frac. of reads", labels = scales::percent) +
   geom_col(aes(x = reads_frac), width = 0.95, position = position_stack(reverse = TRUE)) +
   # geom_col(aes(x = reads_frac), width = 0.95, fill = "grey")
-  scale_fill_manual(name = '', values = c("#303960", "#647687", "grey90")) +
+  scale_fill_manual(name = '', values = c("#303960", "#647687", "#E7DFD5")) + # grey90
   theme_classic(base_size = 12, base_family = "GillSans") +
   theme(legend.position = "top",
     strip.background = element_rect(fill = 'white', color = 'white'),
