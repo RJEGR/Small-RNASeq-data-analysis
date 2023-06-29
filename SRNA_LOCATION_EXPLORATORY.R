@@ -157,7 +157,7 @@ g
 
 out <- list()
 
-max <- 100 # length(assembly)
+max <- length(assembly)
 
 pb <- txtProgressBar(min = 0, max = max, style = 3, width = 50, char = "=")
 
@@ -211,11 +211,15 @@ head(out)
 # df <- do.call(rbind, lapply(out, function(x) { setNames(x, names(out[[6]])) }))
 # df <- df %>% as_tibble()
 
-df <- do.call(rbind, out) %>% as_tibble()
+# df <- do.call(rbind, out) %>% as_tibble()
 
+write_rds(out, file = paste0(wd, "/SRNA_LOCATION_OUT.rds"))
 
+head(read_rds(paste0(wd, "/SRNA_LOCATION_OUT.rds")))
 
 df %>% count(type)
+
+df %>% count(Name)
 
 df %>%
   # filter(type != "Intergenic")
