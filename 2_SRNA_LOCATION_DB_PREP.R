@@ -19,9 +19,9 @@ head(.out <- read_rds(paste0(wd, "/SRNA_LOCATION_OUT.rds")))
 
 .out <- do.call(rbind, .out) %>% as_tibble()
 
-.out %>% count(type)
+# .out %>% count(type)
 
-.out %>% count(Name)
+# .out %>% count(Name)
 
 
 paste_headers <- function(x) { 
@@ -32,19 +32,18 @@ paste_headers <- function(x) {
   x <- paste(x, sep = '|', collapse = '|') 
   x <- paste(n, x, sep = '|', collapse = '|') }
 
-# .out %>% filter(Name == "Cluster_11")
+# out <- .out %>%
+#   head(100) %>%
+#   group_by(Name, biotype, gene_id) %>%
+#   summarise(across(type, .fns = paste_headers), .groups = "drop_last") %>% 
+#   ungroup()
 
-out <- .out %>%
-  head(100) %>%
-  group_by(Name, biotype) %>%
-  summarise(across(type, .fns = paste_headers), .groups = "drop_last") %>% 
-  ungroup()
-
-out %>% drop_na(gene_id)
+# out %>% drop_na(gene_id)
 
 # MERGE W/ SHORTSTACKS OUTPUT =====
 
 # SRNA-SEQ TRANSCRIPTOME
+
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out"
 
 pattern <- "Results.gff3"
@@ -55,38 +54,38 @@ assembly <- rtracklayer::import(f)
 
 # SPLIT TRUE MIRS/PIRS
 
-SRNAS <- read_rds(paste0(wd, "/KNOWN_CLUSTERS_MIRS_PIRS.rds"))
+SRNAS <- read_rds(paste0(wd, "/SPLIT_SHORTSTACKS_MIRS_PIRS_SIRS.rds"))
 
-str(which_pirs <- SRNAS %>% filter(grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
-str(which_mirs <- SRNAS %>% filter(!grepl("piR", KnownRNAs)) %>% distinct(Name) %>% pull())
+SRNAS %>% count(SRNAtype)
 
+str(which_pirs <- SRNAS %>% filter(SRNAtype == "piR") %>% distinct(Name) %>% pull())
+str(which_mirs <- SRNAS %>% filter(SRNAtype == "miR") %>% distinct(Name) %>% pull())
 
 # PREPARE DB FOR VIZ ====
 # 1)
 # TO KEEP TRACK LOCUS TYPE PER CLUSTER
-# Note: be aware score (Reads) cols for *.mature/*.star locus are documented in assembly  (262 rows)
+# Note: be aware score (Reads) cols for *.mature/*.star locus are documented in assembly (262 rows) but not in res
 # 
 # assembly %>% as_tibble() %>% filter(grepl(".mature|.star", ID)) %>% select()
   
-.DB1 <- assembly %>% as_tibble() %>% select(ID, type) %>% rename("Locus_type"="type", "Name"="ID")
+.DB <- assembly %>% as_tibble() %>% select(ID, type) %>% rename("Locus_type"="type", "Name"="ID")
 
 # 2)  BIND SEVERAL OUTPUT  ====
 # TO KEEP TRACK READS COUNT PER CLUSTER
 
 f <- list.files(path = wd, pattern = "Results.txt", full.names = T)
 
-read_tsv(f) %>% arrange(desc(FracTop))
-  head() %>% View()
-
 DB <- read_tsv(f) %>% 
   select(Locus, Name, Chrom, Start, End, Strand, DicerCall, Reads, UniqueReads, FracTop, 
-    MajorRNA, MajorRNAReads, MIRNA) %>%
-  left_join(.DB1, by = "Name")
+    MajorRNA, MajorRNAReads, MIRNA, KnownRNAs) %>%
+  left_join(.DB, by = "Name")
 
 
 # 3) BIND KNOWN RNA LABEL =====
 
-.DB <- SRNAS %>% select(-MajorRNA) %>% rename("NKnownRNAs"="n")
+# SRNAS %>% mutate(RNAType = ifelse(grepl("piR", KnownRNAs)))
+
+.DB <- SRNAS %>% select(-MajorRNA, -KnownRNAs) %>% rename("NKnownRNAs"="n")
 
 DB <- DB %>% left_join(.DB, by = "Name")
 
@@ -139,9 +138,12 @@ any(names(bwmodules) %in% DB$Name)
 
 DB$WGCNA  <- bwmodules[match(DB$Name, names(bwmodules))]
 
+DB %>% head() %>% view()
+
 write_tsv(DB, file = paste0(wd, "/RNA_LOCATION_DB.tsv"))
 
 # FURTHER: ADD TARGET: ====
+
 # ADD INNER JOIN ANTIJOIN FROM TARGET-SCAN AND RNAHYBRID:
 
 # head(read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
