@@ -1,6 +1,7 @@
 # RICARDO GOMEZ-REYES
 
 # MICRORNA CONSERVATION
+# Identificación de microRNAs conocidos en la etapa trocófora (pre-competente) y competente (veliger tardía) en el abulón rojo Haliotis rufescens a través de técnicas de secuenciación masiva.
 
 
 rm(list = ls())
@@ -8,59 +9,6 @@ rm(list = ls())
 if(!is.null(dev.list())) dev.off()
 
 options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
-
-library(tidyverse)
-
-
-wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/MIRGENEDB_20230314/"
-
-dim(MIRGENEDB <- read_tsv(paste0(wd, "/MIRGENEDB_2.1.tsv")))
-
-MIRGENEDB <- MIRGENEDB %>% select_at(vars(contains(c("MirGeneDB_ID", "Family","Node_of_origin_", "Seed"))))
-
-view(MIRGENEDB)
-
-
-# 1) ====
-# COUNT THE NUMBER OF HOMOLOGY-BASED:SHORTSTACKS PREDICTED MIRS:
-
-wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out"
-
-head(DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
-
-nrow(DB <- DB %>% filter(SRNAtype == "miR"))
-
-
-DB <- DB %>% 
-  drop_na(KnownRNAs) %>%
-  mutate(KnownRNAs = strsplit(KnownRNAs, ";")) %>%
-  unnest(KnownRNAs) %>%
-  select(Name, KnownRNAs, DicerCall, Reads) %>%
-  mutate(sep = KnownRNAs) %>%
-  separate(sep, into = c("MirGeneDB_ID", "arm"), sep = "_") %>% 
-  mutate(sp = sapply(strsplit(KnownRNAs, "-"), `[`, 1)) %>%
-  filter(sp != "piR") %>% # <- ALSO EXCLUDE OVERLAPED MIRS/PIRS
-  left_join(MIRGENEDB, by = "MirGeneDB_ID")
-
-DB %>% distinct(sp, Family)
-
-DB %>% filter(`Node_of_origin_(family)` == "Mollusca") %>% view()
-
-DB %>% count(arm, `Node_of_origin_(family)`, sort = T)
-# DB %>% count(`Node_of_origin_(locus)`) %>% View()
-
-# DB %>% filter(is.na(`Node_of_origin_(family)`))
-
-DB %>%
-  # filter(`Node_of_origin_(family)` == "Mollusca") %>%
-  group_by(sp, arm, `Node_of_origin_(family)`) %>%
-  summarise(n = n()) %>% # Reads = sum(unique(Reads)), 
-  # group_by(`Node_of_origin_(family)`) %>%
-  mutate(sp = fct_reorder(sp, n)) %>%
-  ggplot(aes(x = sp, y = n, fill = arm)) +
-  # facet_grid(~ `Node_of_origin_(family)`, scales = "free", space = "free") +
-  geom_col(position = "dodge2")
-  
 
 # 2) ==== 
 # TREE-BASED FAMILY ANALYSIS OF DE NOVO/KNOWN MIRS:
@@ -80,10 +28,9 @@ DB %>%
 
 WD <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
-f <- "KNOWN_AND_NOVEL_MIRS_MajorRNA.fasta"
+# f <- "KNOWN_AND_NOVEL_MIRS_MajorRNA.fasta"
 
-# f <- "mir.fasta"
-
+f <- "KNOWN_AND_NOVEL_MIRS_MajorRNA.aln$"
 
 f <- list.files(path = WD, pattern = f, full.names = T)
 
@@ -91,41 +38,143 @@ f <- list.files(path = WD, pattern = f, full.names = T)
 
 sapply(c(.bioc_packages), require, character.only = TRUE)
 
-seqs <- Biostrings::readRNAStringSet(f)
+print(seqs <- Biostrings::readRNAStringSet(f))
 
-# seqs <- Biostrings::readDNAStringSet(f)
+names(seqs) <- sapply(strsplit(names(seqs), " "), `[`, 1)
 
-keep <- !grepl("mature|star", names(seqs))
+# seqs <- DECIPHER::RemoveGaps(seqs)
 
-seqs <- seqs[keep]
-
-# Biostrings::replaceAt(seqs, "U")
-
-seqs <- DECIPHER::RemoveGaps(seqs)
-
-hist(width(seqs))
+# hist(width(seqs))
 
 # Construct phylogenetic tree
 # https://bioconductor.org/packages/release/bioc/vignettes/DECIPHER/inst/doc/FindingNonCodingRNAs.pdf
 
-alignment <- DECIPHER::AlignSeqs(DNAStringSet(seqs))
+# use RNAStringSet or DNAStringSet to turn RNA/DNA and viseversa:
+#
+# fasta=KNOWN_AND_NOVEL_MIRS_MajorRNA.fasta
+# mafft --thread 2 $fasta > ${fasta%.*}.aln
+# mafft --globalpair --thread 2 $fasta > ${fasta%.*}.aln2
+  
+# alignment <- DECIPHER::AlignSeqs(RNAStringSet(seqs))
 
-P <- PredictDBN(alignment, type="structures")
+alignment <- seqs
 
-BrowseSeqs(alignment, patterns=P )
+# P <- PredictDBN(alignment, type="structures")
+# BrowseSeqs(alignment, patterns=P )
 
+out <- ggmsa::tidy_msa(alignment) %>% as_tibble() %>% rename("Name"="name") 
+  # separate(name, into = c("Name", "KnownRNA"), sep = " ")
 
+# see::social_colors()
+# scales::show_col(see::social_colors())
 
-ggmsa::tidy_msa(alignment) %>%
-  as_tibble() %>%
-  mutate(facet = ifelse(grepl("Mir|Highly_conserved", name), "Known", "Novel")) %>%
-  filter(facet == "Novel") %>%
-  ggplot(aes(x = position, y = name)) +
+ps <- out %>%
+  ggplot(aes(x = position, y = Name)) +
   geom_tile(aes(fill = character)) + # size = 0.1, width = 0.95, color = "black"
-  facet_grid(facet ~., scales = "free_y") +
-  geom_text(aes(label = character), vjust = 0.5, hjust = 0.5, size= 2.5, family =  "GillSans") +
-  theme_classic(base_size = 12, base_family = "GillSans") +
-  see::scale_fill_pizza() 
+  # geom_text(aes(label = character), vjust = 0.5, hjust = 0.5, size= 2.5, family =  "GillSans") +
+  theme_classic(base_size = 7, base_family = "GillSans") +
+  scale_fill_manual("", values = c("white", "#cd201f", "#FFFC00","#00b489","#31759b")) +
+  theme(
+    legend.position = "none", 
+    axis.line.x = element_blank(),
+    axis.line.y = element_blank(),
+    axis.text.y = element_text(hjust = 1),
+    axis.ticks.length = unit(5, "pt"))
+  
+
+# ggsave(ps, filename = 'ALIGMENT_TREE.png', 
+  # path = wd, width = 6, height = 12, device = png, dpi = 300)
+
+# ADD LEFT-TREE AND TOP MOTIF ANALYSIS:
+
+# EX:
+# (doi:10.1093/gbe/evy096 ) This alignment was run under a GTR+G model in PhyloBayes.
+
+# The phangorn R package is then used to construct a phylogenetic tree. 
+# follow lines construct a neighbor-joining tree, 
+# and then fit a GTR+G+I (Generalized time-reversible with Gamma rate variation) maximum likelihood tree 
+# using the neighbor-joining tree as a starting point
+
+phangAlign <- phyDat(as(alignment, "matrix"), type="DNA")
+
+dm <- phangorn::dist.ml(phangAlign)
+
+treeNJ <- phangorn::NJ(dm) # Note, tip order != sequence order
+
+# plot(treeNJ)
+
+fit <- phangorn::pml(treeNJ, data=phangAlign)
+
+fitGTR <- stats::update(fit, k = 4, inv = 0.2)
+
+fitGTR <- optim.pml(fitGTR)
+
+# fitGTR <- optim.pml(fitGTR, model="GTR", optInv=TRUE, optGamma=TRUE, 
+#   control = pml.control(trace = 0))
+
+fitGTR$tree
+class(fitGTR$tree)
+
+is.ultrametric(fitGTR$tree)
+
+as.hclust(fitGTR$tree)
+?as.hclust.phylo
+
+stats::as.dendrogram(fitGTR$tree)
+ps + ggh4x::scale_y_dendrogram(hclust = fitGTR)
+
+# 
+
+topdf <- out %>% 
+  group_by(position) %>% 
+  count(character) %>%
+  mutate(Freq = n/sum(n))
+
+top <- topdf %>%
+  ggplot(aes(y = Freq, x = position, fill = character)) +
+  geom_col() +
+  labs(x = "") +
+  theme_classic(base_size = 7, base_family = "GillSans") +
+  scale_fill_manual("", values = c("white", "#cd201f", "#FFFC00","#00b489","#31759b")) +
+  theme(
+    legend.position = "top", 
+    axis.line.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.text.y = element_text(hjust = 1))
+
+
+library(patchwork)
+
+top/ps + plot_layout(widths = c(2, 2), heights = c(2,10))
+
+detach("package:phangorn", unload=TRUE)
+
+tree <- fitGTR$tree
+
+x <- ggtree::as_data_frame(tree)
+
+# JOIN TO ...AND THEN:
+x %>% tidytree::as.treedata()
+
+# OMIT ====
+
+# CONTRAST AGAINST A PRECURSOR: PROFILE (NOT) :
+
+f <- "mir.fa"
+
+f <- list.files(path = WD, pattern = f, full.names = T)
+
+seqs2 <- Biostrings::readRNAStringSet(f)
+
+keep <- !grepl("mature|star", names(seqs2))
+
+seqs2 <- seqs2[keep]
+
+# perform the alignment
+# aligned <- AlignProfiles(seqs, seqs2)
+
 
 # 
 # dots <- matrix(0, width(alignment)[1], width(alignment)[1])
@@ -138,37 +187,7 @@ ggmsa::tidy_msa(alignment) %>%
 # 
 # heatmap(dots)
 
-# The phangorn R package is then used to construct a phylogenetic tree. 
-# follow lines construct a neighbor-joining tree, 
-# and then fit a GTR+G+I (Generalized time-reversible with Gamma rate variation) maximum likelihood tree 
-# using the neighbor-joining tree as a starting point
 
-phangAlign <- phyDat(as(alignment, "matrix"), type="DNA")
-
-dm <- dist.ml(phangAlign)
-
-treeNJ <- NJ(dm) # Note, tip order != sequence order
-
-fit = pml(treeNJ, data=phangAlign)
-
-fitGTR <- update(fit, k=4, inv=0.2)
-
-fitGTR <- optim.pml(fitGTR, model="GTR", optInv=TRUE, optGamma=TRUE, control = pml.control(trace = 0))
-
-# save(fitGTR,fit, treeNJ, dm,phangAlign, file = paste0(dir, "dna-sequences-fitGTR.RData"))
-
-plot(fitGTR$tree)
-
-detach("package:phangorn", unload=TRUE)
-
-library(tidyverse)
-
-tree <- fitGTR$tree
-
-x <- ggtree::as_data_frame(fitGTR$tree)
-
-# JOIN TO ...AND THEN:
-x %>% tidytree::as.treedata()
 
 # clade-specific mir family (mirtrace):
 
