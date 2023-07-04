@@ -77,13 +77,14 @@ table(g$type)
 
 wd_rmask <- "/Users/cigom/Documents/MIRNA_HALIOTIS/REPEAT_MASKER_OUT/"
 
-pattern <- "multi_genome.newid_repeat_masked.gff3" # "multi_genome.newid.fa.out.gff"
+pattern <- "multi_genome.newid.fa.out.gff" # "multi_genome.newid_repeat_masked.gff3" # 
 
 mask_f <- list.files(path = wd_rmask, pattern = pattern, full.names = T)
 
 maskg <- rtracklayer::import(mask_f)
 
 table(maskg$type) 
+
 
 maskdf <- maskg %>% as_tibble()
 
@@ -110,8 +111,8 @@ maskdf <- data.frame(seqnames = maskdf$seqnames,
   start = maskdf$start, end = maskdf$end, 
   strand = maskdf$strand, 
   source = maskdf$source,
-  type = maskdf$repeat_family,
-  biotype = maskdf$matching_repeat,
+  type = maskdf$matching_repeat,
+  biotype = maskdf$repeat_family,
   score = maskdf$score, 
   phase = maskdf$phase,
   # description = maskdf$type, 
@@ -140,7 +141,7 @@ fileout <- paste0(wd_rmask, "multi_genome.newid_repeat_masked.gff3")
 
 write(rtracklayer::export(.g, format = "gff3"), file = fileout)
 
-.g <- rtracklayer::import(fileout)
+# .g <- rtracklayer::import(fileout)
 
 length(g <- .g[!.g$type == "region"])
 
