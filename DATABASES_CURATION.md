@@ -348,6 +348,16 @@ mirtrace qc -s pirb -w --uncollapse-fasta --custom-db-folder $custom_db_dir $fas
 
 # revisar formatos fasta https://github.com/friedlanderlab/mirtrace/tree/master/src/lib/inputs
 
+mkdir -p ../../main/resources/databases
+
+./make_rnatype_databases.py     --mirna-ref ../../lib/inputs/miRNA_hairpin_v21.fa     --trna-ref ../../lib/inputs/tRNA_reference.fa     --rrna-ref ../../lib/inputs/rRNA_reference.fa     --artifacts-ref ../../lib/inputs/artifact_sequences.fa     --out-dir ../../main/resources/databases
+
+
+./make_clade_databases.py \
+    --mature-hairpins ../../lib/inputs/miRNA_mature_v21.fa \
+    --clade-specification-animals ../../lib/curated/clade-specific_miRNA_families_of_animal_clades.txt \
+    --clade-specification-plants ../../lib/curated/clade-specific_miRNA_families_of_plant_clades.txt \
+    --out-dir ../../main/resources/databases
 
 
 ```
