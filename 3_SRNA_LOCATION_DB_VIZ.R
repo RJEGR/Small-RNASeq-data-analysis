@@ -16,10 +16,14 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out
 
 print(DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
 
-view(DB)
+# view(DB)
 
 # 
+
 DB %>% count(biotype_best_rank, sort = T)
+DB %>% count(biotype, sort = T) 
+
+DB %>% count(type, sort = T)
 
 DB %>% count(SRNAtype, sort = T)
 
@@ -66,6 +70,20 @@ df %>%
     panel.border = element_blank(),
     panel.grid.minor = element_blank()) 
   # facet_grid(~ SRNAtype, scales = "free", space = "free")
+
+# PLOT BY TRANPOSON TYPE? ====
+# PLOT of piRNA cluster expression across developmental stages
+# SEE FIG 7 ADN 8 FROM 10.1080/15476286.2017.1349048. .
+# Praher D, Zimmermann B, Genikhovich G, Columbus-Shenkar Y, Modepalli V, Aharoni R, Moran Y, Technau U. Characterization of the piRNA pathway during development of the sea anemone Nematostella vectensis. RNA Biol. 2017 Dec 2;14(12):1727-1741. doi: 10.1080/15476286.2017.1349048. Epub 2017 Sep 13. PMID: 28783426; PMCID: PMC5731801.
+
+#
+DB %>%
+  filter(!grepl("exon|Intergenic|Intragenic|UTR", biotype)) %>%
+  mutate(width = nchar(MajorRNA)) %>%
+  # mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_nc, "Other ncRNA", biotype_best_rank)) %>%
+  group_by(SRNAtype,biotype, type) %>%
+  summarise(Reads = sum(Reads), n = n())  %>% view()
+
 
 # ANALYSIS OF CANONICAL OR ISOFORM (NEILSEN ET AL 2012) ?
 
