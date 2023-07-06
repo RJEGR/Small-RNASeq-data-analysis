@@ -4,7 +4,7 @@ if(!is.null(dev.list())) dev.off()
 
 options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
-mtd <- read_tsv('~/Documents/MIRNA_HALIOTIS/METADATA.tsv') %>% rename("sample_id" = "File")
+mtd <- read_tsv('~/Documents/MIRNA_HALIOTIS/METADATA.tsv') %>% rename("sample_id" = "LIBRARY_ID")
 
 path <- '~/Documents/MIRNA_HALIOTIS/PROFILING_BY_READ_LENGTH/'
 
@@ -68,7 +68,7 @@ out <- read_rds(paste0(path, "prof_by_read_length_summary.rds")) %>% left_join(m
 # 1) -----
 
 xlab <- "Read Length (nt)"
-ylab <- "Percentage of reads"
+ylab <- "Freq. of reads"
 
 out %>% 
   mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
@@ -116,7 +116,7 @@ top <- top + theme_bw(base_family = "GillSans", base_size = 11) +
 
 library(patchwork)
 
-ps <- top / bottom + plot_layout(heights = c(0.3, 1), design = )
+ps <- top / bottom + plot_layout(heights = c(0.3, 1))
 
 # t, b The top and bottom bounds of the area in the grid
 # 
@@ -128,7 +128,7 @@ layout <- c(
   area(t = 1, b = 1, l = 1, r = 1)
 )
 
-top / bottom + plot_layout(heights = c(0.3, 1), design = layout)
+# top / bottom + plot_layout(heights = c(0.3, 1), design = layout) # , design = layout
 
 ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ.png', path = path, width = 6, height = 5, device = png)
 
@@ -140,7 +140,7 @@ ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ.png', path = path, width = 6, h
 
 
 xlab <- "Read Length (nt)"
-ylab <- "Percentage of reads"
+ylab <- "Freq. of reads"
 
 out %>% 
   # group_by(Length, rnatype, first_nuc) %>% summarise(n = sum(n)) %>%
@@ -184,3 +184,46 @@ out %>%
     panel.grid.minor = element_blank()) -> ps
 
 ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_NUC_kmiRNAs.png', path = path, width = 4, height = 4.5, device = png)
+
+# BY:
+
+out %>% 
+  mutate(sample_id = substr(sample_id, 1,nchar(sample_id)-1)) %>%
+  mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
+  group_by(sample_id, group, Length, rnatype) %>% summarise(n = sum(n)) %>%
+  mutate(sample_id = factor(sample_id, levels = c("HR248","HR1108", "HR2476", "HR11076"))) %>%
+  ggplot(aes(x = Length, y = n, fill = rnatype)) + 
+  facet_grid(sample_id ~ ., scales = "free_y") +
+  geom_col(width = 0.85) +
+  scale_y_continuous(ylab, labels = scales::comma) +
+  scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 1)) +
+  see::scale_fill_pizza() +
+  theme_bw(base_family = "GillSans", base_size = 11) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'none',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank()) -> bottom
+
+# ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_2.png', path = path, width = 5, height = 4, device = png)
+
+top <- out %>% 
+  group_by(Length, rnatype) %>% summarise(n = sum(n)) %>%
+  group_by(Length) %>% mutate(pct = n / sum(n)) %>%
+  ggplot(aes(x = Length, y = pct, fill = rnatype)) + 
+  geom_col(width = 0.85) +
+  scale_y_continuous("Freq. of reads", labels = scales::percent) +
+  scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 1)) +
+  see::scale_fill_pizza() + 
+  theme_bw(base_family = "GillSans", base_size = 11) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'top',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid.major = element_blank())
+
+ps <- top / bottom + plot_layout(heights = c(0.3, 1))
+
+ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_2.png', path = path, width = 6, height = 5, device = png)
+
