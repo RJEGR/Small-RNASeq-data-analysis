@@ -44,7 +44,11 @@ which_cols <- c("seqnames", "gene_coords", "gene_id","description", "type", "bio
 gene_features <- gr %>% as_tibble() %>% 
   drop_na(description) %>%
   mutate(gene_coords = paste(start, end, strand, sep = ":")) %>%
-  select_at(all_of((which_cols)))
+  select(any_of((which_cols)))
+
+# Sanity check
+
+gene_features %>% distinct(gene_id) %>% nrow()
 
 # gene_features <- gene_features %>% distinct(gene_id, description)
 
@@ -81,7 +85,7 @@ f <- list.files(path = wd, pattern = pattern, full.names = T)
 # colNames <- c("target", "query", "mfe", "pval", "pos", "lenT", "lenQ")
 # colnames(df) <- colNames
 
-df <- read_tsv(f)
+# df <- read_tsv(f)
 
 # str(targetsids <- df %>% distinct(target) %>% pull(target))
 
@@ -91,12 +95,19 @@ df <- read_tsv(f)
 
 # write_tsv(df, file = paste0(gsub(".tsv", "", f), ".psig.tsv"))
 
+# AFTER CLEAN pval < 0.05, JUST LOAD .out.psig.tsv file:
+
+df <- read_tsv(f)
+
 
 # Q: how many unique binding sites? =====
 
 nrow(df %>% distinct(target)) #  37,663
-nrow(df %>% distinct(query)) # 261 from 393 clusters from mir.fasta
 
+nrow(df %>% distinct(query)) # 261 from 393 clusters from mir.fasta (I.E. ONLY MATURE AND STAR SEQS)
+
+# mir.fasta: 
+# This is a FASTA formatted file containing hairpin, mature miRNA, and miRNA* sequences derived from ShortStack's identification of MIRNA loci.
 
 # Q: how many were 5' and 3' UTR? ====
 
@@ -115,8 +126,6 @@ howtargets %>% count(UTR)
 # 8,969 three_prime_utr ids with predicted target site for miR binding 
 # 28, 694 five_prime_utr ids with predicted target site for miR binding
 
-# mir.fasta: 
-# This is a FASTA formatted file containing hairpin, mature miRNA, and miRNA* sequences derived from ShortStack's identification of MIRNA loci.
 
 howmirs <- df %>% 
   # distinct(target, query) %>%
@@ -138,13 +147,39 @@ p1 <- howmirs %>%
   mutate(UTR = ifelse(target %in% three_prime_utr, 
     "three_prime_utr", "five_prime_utr")) %>%
   ggplot(aes(y = -log10(pval), x = mfe, color = UTR)) + 
-  facet_grid(~ MIRNA) +
+  # facet_grid(~ MIRNA) +
   geom_point(shape = 1, alpha = 0.5) +
   geom_hline(yintercept = -log10(0.01), linetype = "dashed", color="grey") +
   geom_vline(xintercept = -35, linetype = "dashed", color="grey") +
-  theme_bw(base_size = 16, base_family = "GillSans") +
-  labs(x = "mfe (kcal/mol)") +
-  theme(legend.position = "top")
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'none',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank()) +
+  labs(x = "mfe (kcal/mol)")
+
+p2 <- howmirs %>% 
+  mutate(UTR = ifelse(target %in% three_prime_utr, 
+  "three_prime_utr", "five_prime_utr")) %>%
+  ggplot(aes(mfe, color = UTR)) + 
+  stat_ecdf(linewidth = 2) + #  linetype = "dashed"
+  geom_rug() +
+  scale_y_continuous("f(mfe)",labels = scales::comma) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'right',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank()) 
+ 
+library(patchwork)
+ 
+
+ps <- p1 + p2 + plot_layout(widths = c(5, 6))
+
+ggsave(ps, filename = 'RNAhybrid.png', path = wd, width = 10, height = 4, 
+  device = png, dpi = 300)
 
 
 # Q: How many mirs per target:? =====
@@ -153,9 +188,12 @@ mir_sites <- howmirs %>%
   mutate(UTR = ifelse(target %in% three_prime_utr, 
     "three_prime_utr", "five_prime_utr")) %>%
   group_by(target, UTR) %>%
-  count(MIRNA)
+  count(MIRNA, sort = T) %>%
+  group_by(target)
 
-sum(mir_sites$n)
+# Santity check
+
+identical(sum(mir_sites$n), nrow(df)) # 90918
 
 mir_sites %>% 
   # group_by(UTR, MIRNA, n) %>%
@@ -178,7 +216,7 @@ library(patchwork)
 # p1/p2
 
 # Q: how many chromosomes were binding sites for mirs? ====
-
+# 
 # chromosome_df <- df %>% 
 #   separate(col = target, into = c("seqnames", "ranges"), sep = "_") %>%
 #   count(seqnames)
@@ -191,7 +229,6 @@ chromosome_df <- howmirs %>%
   count(seqnames) %>%
   ungroup()
 
-
 length(unique(chromosome_df$seqnames)) # 243
 
 chromosome_df %>% pull(n) %>% sum() # 90918
@@ -199,6 +236,8 @@ chromosome_df %>% pull(n) %>% sum() # 90918
 chromosome_df <- .gr[.gr$type == "region"] %>% 
   as_tibble() %>% select(seqnames, width) %>%
   left_join(chromosome_df) %>% drop_na()
+
+# How many 
 
 # mith? zero <--
 
@@ -220,7 +259,7 @@ p3 <- chromosome_df %>%
 
 library(patchwork)
 
-p1/p2/p3
+# p1/p2/p3
 
 # Join features to miRNA:mRNA target prediction ====
 
@@ -271,22 +310,102 @@ grr <- GRanges(Rle(seqnames_),
   mfe = df$mfe, pval = df$pval, query = df$query)
 
 
+# Q: how many targets were binding sites for mirs? ====
+# Ex.
 
-# Find overlaping features (OMIT) ====
-# 
+howmirs %>% filter(target %in% "JALGQA010000017.1_22665876-22665941:-") 
+howmirs %>% filter(query %in% "Cluster_47717.mature::JALGQA010000024.1:8020797-8020820(+)") %>% view()
+# Contrast w/ mir_sites
+
+target_df <- howmirs %>%
+  mutate(UTR = ifelse(target %in% three_prime_utr, 
+    "three_prime_utr", "five_prime_utr")) %>%
+  group_by(MIRNA, UTR) %>%
+  count(query, sort = T) %>%
+  group_by(query)
+
+p1 <- target_df %>%
+  ggplot(aes(n, color = UTR, fill = UTR)) +
+  facet_grid(~ MIRNA) +
+  geom_histogram() +
+  theme_bw(base_size = 12, base_family = "GillSans") +
+  scale_x_continuous("Number of target", labels = scales::comma) +
+  scale_y_continuous("Number of miRs", labels = scales::comma) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'top',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank()) 
+
+p2 <- mir_sites %>% 
+  ggplot(aes(n, color = UTR, fill = UTR)) +
+  facet_grid(~ MIRNA) +
+  geom_histogram() +
+  theme_bw(base_size = 12, base_family = "GillSans") +
+  labs(x = "miRs") +
+  scale_x_continuous("Number of miRs", labels = scales::comma) +
+  scale_y_continuous("Number of targets", labels = scales::comma) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800")) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'none',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank()) 
+
+ps <- p1/p2
+
+ggsave(ps, filename = 'RNAhybrid_2.png', path = wd, width = 5, height = 5, 
+  device = png, dpi = 300)
+
+# DATAVIZ W/
+# SE PUEDE CONVERTIR A RANGOS CON IRANGE::RANGES <----
+# ALGO COMO LO REALIZADO EN 1/2_SRNA_LOCATION_DB.R
 
 
-ov <- findOverlaps(grr, gr, minoverlap = 2)
+.g <- howmirs %>%
+  mutate(UTR = ifelse(target %in% three_prime_utr, 
+    "three_prime_utr", "five_prime_utr")) %>%
+  separate(col = target, into = c("seqnames", "ranges"), sep = "_") %>%
+  separate(col = ranges, into = c("ranges", "strand"), sep = ":") %>%
+  separate(col = ranges, into = c("start", "end"), sep = "-") %>%
+  mutate_at(c("start", "end"), as.integer)
+# group_by(MIRNA, UTR, query) %>%
+# count(target) %>%
+# ungroup()
 
-to_index <- unique(subjectHits(ov)) # position vector where coordinates from subject is found
 
-from_index <- unique(queryHits(ov)) # position vector where coordinates from query is found
+.g %>% group_by(start, end)
 
-gr[sort(to_index)] %>%  as_tibble() %>% drop_na(description) %>% select(seqnames, start, end, description)
 
-grr[sort(from_index)]
+target_gr <- GRanges(Rle(.g$seqnames), 
+  ranges =  IRanges(start = .g$start, end = .g$end), 
+  strand = .g$strand, 
+  source = "RNAHybrid",
+  UTR = .g$UTR,
+  MIRNA = .g$MIRNA,
+  mfe = .g$mfe, 
+  pval = .g$pval)
 
-# Rsubread::flattenGTF(genome, GTF.featureType = "three_prime_UTR", GTF.attrType = "gene_id")
+# Remember:
+
+length(target_gr) # 90 918
+
+length(IRanges::reduce(target_gr)) # 33 663
+
+length(range(target_gr)) # 404
+
+IRanges::reduce(target_gr)
+
+
+
+IRanges::resize(target_gr, width(target_gr), fix = "center") %>% 
+  as_tibble() %>% group_by(start, end)
+
+# IF WHICH TRACK ALL type OF SOURCE:
+# length(x <- .gr[!.gr$type == "region"])
+# target_df <- subsetByOverlaps(x = x, ranges = range(target_gr), type="any")
+
 
 # TEST UTR FROM BIOMART (OMIT) ====== 
 library(biomaRt)
