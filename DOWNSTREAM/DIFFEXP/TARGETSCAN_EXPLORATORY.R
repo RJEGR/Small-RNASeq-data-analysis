@@ -12,6 +12,8 @@ f <- "mature_star_mir_vs_mir_vs_utr_rmdup_RNAhybrid.out.psig_targetscan.out"
 
 f <- list.files(path = wd, pattern = f, full.names = T)
 
+library(tidyverse)
+
 df <- read_tsv(f)
 
 df %>% distinct(a_Gene_ID) # 861
@@ -25,3 +27,5 @@ df %>%
   count(MIRNA)
 
 # OVERLAP WITH RNAHYBRID
+
+
