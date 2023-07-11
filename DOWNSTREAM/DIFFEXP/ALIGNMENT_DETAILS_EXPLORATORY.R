@@ -254,3 +254,40 @@ m %>%
     axis.text.x = element_text(size = 10))
 
 
+# CALL FOR VARIANT AND PRECISION IDENTIFICATION:
+which_vars <- c(c(as.character(21:24)))
+
+Treads <- read_tsv(f) %>% select_at(all_of(which_vars)) %>% rowSums()
+
+read_tsv(f) %>%
+  mutate(PRECISION = Treads/Reads) %>%
+  ggplot(aes(x = MIRNA, y = PRECISION)) +
+  geom_boxplot()
+
+which_vars <- c("Short", c(as.character(21:30)),  "Long")
+
+sum(read_tsv(f)$Reads == Treads)
+
+read_tsv(f) %>% select_at(all_of(c(which_vars, 'UniqueReads', 'MajorRNAReads', 'Reads', "FracTop"))) %>%
+  rstatix::cor_mat() %>%
+  rstatix::cor_reorder() %>%
+  rstatix::pull_lower_triangle() %>%
+  rstatix::cor_plot(label = TRUE)
+
+which_vars2 <- c('DicerCall','UniqueReads', 'MajorRNAReads', 'Reads')
+
+# ???
+
+read_tsv(f) %>% select_at(all_of(c(which_vars, which_vars2))) %>%
+  mutate(PRECISION = (UniqueReads+MajorRNAReads)/Reads) %>%
+  ggplot(aes(x = DicerCall, y = PRECISION)) +
+  geom_boxplot()
+  
+
+DB %>% mutate(PRECISION = (UniqueReads+MajorRNAReads)/Reads) %>%
+  ggplot(aes(fill = SRNAtype, PRECISION)) +
+  geom_histogram() + facet_wrap(~ SRNAtype, scales = "free_y")
+
+DB %>%
+  ggplot(aes(fill = SRNAtype, FracTop)) +
+  geom_histogram() + facet_wrap(~ SRNAtype, scales = "free_y")
