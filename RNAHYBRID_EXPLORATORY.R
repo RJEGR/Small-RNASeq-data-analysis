@@ -431,6 +431,5 @@ searchDatasets(mart = ensembl, pattern = "rufescens")
 
 datasets <- listDatasets(mart = ensembl)
 
-
 datasets %>% 
   filter(str_detect(description, 'gca02305543'))
