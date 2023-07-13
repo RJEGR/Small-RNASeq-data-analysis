@@ -28,7 +28,7 @@ path <- '/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_o
 
 srna_f <- list.files(path = path, pattern = "Results.gff3", full.names = T)
 
-path <- "/Users/cigom/Documents/MIRNA_HALIOTIS/RNA_SEQ_ANALYSIS/REPEAT_MASKER_OUT"
+path <- "/Users/cigom/Documents/MIRNA_HALIOTIS/REPEAT_MASKER_OUT"
 
 mask_f <- list.files(path = path, pattern = "multi_genome.newid.fa.out.gff", full.names = T)
 
@@ -78,7 +78,6 @@ any(duplicated(chr.names))
 library(karyoploteR)
 
 # https://bernatgel.github.io/karyoploter_tutorial//Tutorial/PlotTypes/PlotTypes.html
-
 
 
 # data <- gr2[which(gr2$MIRNA == "Y")]
