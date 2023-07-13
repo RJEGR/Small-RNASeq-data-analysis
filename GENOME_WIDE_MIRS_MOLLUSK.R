@@ -1,6 +1,6 @@
 
 # Ricardo Gomez-Reyes
-# Huang et al (2021) had (in silico) scan potential mollusks miRs using a genome-wide approach: 
+# Huang et al (2021) obtained (in silico) scan potential mollusks miRs using a genome-wide approach: 
 
 # 1. Predicted mature miRs were allowed to have only 0 - 4 mismatch in sequences with know mature miRNA
 # 2. The mismatched nucleotides were not permitted in know miRNA seed region (2 - 8 bp)
@@ -43,7 +43,6 @@ my_custom_name_repair <- function(nms) tolower(gsub(" ", "_", nms))
 
 names(.workbook) <- excel_sheets(xls_f)
 
-
 workbook <-
   mapply(`[<-`, .workbook, 'sp', value = names(.workbook), SIMPLIFY = FALSE)
 
@@ -62,30 +61,66 @@ llist <- function(x) {
   x <- unlist(x)
 }
 
-# DEBIDO A REDUNDANCIA EN LOS NOMBRES, HAREMOS UN NUEVO ID POR SECUENCIAS
+# DEBIDO A SECUENCIAS DUPLICADAS, AGRUPAREMOS IDS POR SECUENCIAS
 workbook %>% distinct(mature_sequence)
+
+workbook %>% arrange(mirna)
 
 # workbook <- workbook %>% 
 #   arrange(mirna) %>%
 #   distinct(mature_sequence, sp,.keep_all = T)
 
-workbook <- workbook %>% 
-  # distinct(mature_sequence, sp,.keep_all = T) %>%
-  group_by(mature_sequence) %>%
-  mutate(n_sp = length(sp), 
-    across(sp, .fns = llist)) %>% 
-  ungroup() %>%
-  distinct(mature_sequence, .keep_all = T) %>% 
-  # summarise(n_sp = length(sp), 
-    # across(sp, .fns = llist)) %>% 
-  mutate(n_sp = paste0(n_sp, "_sp")) %>%
-  unite("headers", c("mirna", "n_sp"), sep = "_") 
+# summarise(across(type, .fns = paste_headers), .groups = "drop_last"
   
+paste_sp <- function(x) { 
+  x <- x[!is.na(x)] 
+  x <- unique(x)
+  # n <- length(x)
+  
+  x <- paste(x, sep = '|', collapse = '|') 
+  # x <- paste(n, x, sep = '|', collapse = '|') 
+  }
 
-workbook <- workbook %>%
-  mutate(n = mature_sequence) %>% unite("headers", c("headers", "n"), sep = "_") 
+count_sp <- function(x) { 
+  x <- x[!is.na(x)] 
+  x <- unique(x)
+  n <- length(x)}
 
-workbook %>% arrange(headers) %>% distinct(headers) 
+# workbook %>% filter(mature_sequence == "TGGACGGAGAACTGATAAGGG") %>% view()
+
+# %>%
+
+.workbook <- workbook %>% 
+  group_by(mature_sequence) %>%
+  summarise(
+    n = count_sp(sp),
+    across(mirna, .fns = paste_sp),
+    across(sp, .fns = paste_sp), .groups = "drop_last") %>% 
+  arrange(desc(mature_sequence)) %>%
+  # mutate(header = ifelse(n > 5, paste0("Highly_conserved|", n), sp)) %>%
+  mutate(header = paste("Mollusk_miR",1:nrow(.), sep = "_")) 
+
+.workbook %>% right_join(workbook, by = "mature_sequence")
+
+# 
+# workbook <- workbook %>% 
+#   # distinct(mature_sequence, sp,.keep_all = T) %>%
+#   group_by(mature_sequence) %>%
+#   mutate(n_sp = length(sp), 
+#     across(sp, .fns = llist)) %>% 
+#   ungroup() %>%
+#   distinct(mature_sequence, .keep_all = T) %>% 
+#   # summarise(n_sp = length(sp), 
+#     # across(sp, .fns = llist)) %>% 
+#   mutate(n_sp = paste0(n_sp, "_sp")) %>%
+#   unite("headers", c("mirna", "n_sp"), sep = "_") 
+#   
+
+# workbook <- workbook %>%
+  # mutate(n = mature_sequence) %>% unite("headers", c("headers", "n"), sep = "_") 
+
+
+.workbook %>% arrange(header) %>% distinct(header) 
 
 #  workbook %>% unite("headers", c("mirna", "sp"), sep = "|")
 
@@ -94,17 +129,19 @@ workbook %>% arrange(headers) %>% distinct(headers)
 # ================
 # help in https://astrobiomike.github.io/amplicon/dada2_workflow_ex
 
-miRs_header <- workbook %>% pull(headers)
+miRs_header <- .workbook %>% pull(header)
+
 head(miRs_header <- paste(">", miRs_header, sep=""))
 
-mature_seqs <- workbook %>% pull(mature_sequence)
-hairpin_seqs <- workbook %>% pull(mirna_precursor)
+mature_seqs <- .workbook %>% pull(mature_sequence)
 
 mature_fasta <- c(rbind(miRs_header, mature_seqs))
-hairpin_fasta <- c(rbind(miRs_header, hairpin_seqs))
 
 write(mature_fasta, file = paste0(path, "/molluscs_mature.fa"))
-write(hairpin_fasta, file = paste0(path, "/molluscs_precursor.fa"))
+
+# hairpin_seqs <- .workbook %>% pull(mirna_precursor)
+# hairpin_fasta <- c(rbind(miRs_header, hairpin_seqs))
+# write(hairpin_fasta, file = paste0(path, "/molluscs_precursor.fa"))
 
 
 # exit
