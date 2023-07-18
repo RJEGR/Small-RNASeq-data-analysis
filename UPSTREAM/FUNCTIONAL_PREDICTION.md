@@ -12,6 +12,32 @@ output=${query%.*}_vs_${target%.*}
 RNAhybrid -t $target -m 20000 -q $query -n 50 -f 2,8 -s 3utr_human > ${output}_RNAhybrid.out &
 
 ```
+In order to output a flat text and tabular file derived from RNAhybrid results(*RNAhybrid.out.tsv):
+
+```bash
+
+grep -E "target:|miRNA :|mfe|p-value|length|position" mir_vs_utr_rmdup_RNAhybrid.out > mir_vs_utr_rmdup_RNAhybrid.out.Lines
+
+FILE=mir_vs_utr_rmdup_RNAhybrid.out.Lines
+
+grep -E "target:" $FILE | sed 's/target: //g' > TARGET.tmp
+grep -E "miRNA :" $FILE | sed 's/miRNA : //g' > QUERY.tmp
+grep -E "mfe" $FILE | sed 's/mfe: //g' | sed 's/kcal\/mol//g' > MFE.tmp
+grep -E "p-value" $FILE | sed 's/p-value: //g' > PVAL.tmp
+grep -E "position" $FILE | sed 's/position //g' > POS.tmp
+
+grep -A1 "target:" $FILE | grep "length:" | sed 's/length: //g' > TLEN.tmp
+
+grep -A1 "miRNA :" $FILE | grep "length:" | sed 's/length: //g' > QLEN.tmp
+ 
+paste TLEN.tmp QLEN.tmp > LEN.tmp
+
+paste TARGET.tmp QUERY.tmp MFE.tmp PVAL.tmp POS.tmp LEN.tmp | tr -s '[:blank:]' > mir_vs_utr_rmdup_RNAhybrid.out.tsv
+
+rm *.tmp
+
+```
+
 ## TargetScan
 Using perl script (`targetscan_70.pl`) to identify conserved and non conserved targets sites using a custom set of data. 
 ```bash
