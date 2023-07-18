@@ -468,7 +468,9 @@ libdir=/usr/local/RepeatMasker/Libraries/
 
 RepeatMasker -s -libdir $libdir -gff multi_genome.newid.fa &> RepeatMasker.log2 &
 
-# the above abort because 
+RepeatMasker -pa 12 -q -species "all" -libdir $libdir -gff multi_genome.newid.fa &> RepeatMasker_all.log &
+
+# IF: 
 # cat: write error: No space left on device
 # (PRELIMINAR RESULT) zcat /home/rvazquez/TRANSPOSABLE_ELEMENTS/RM_2073304.FriMar171337092023/multi_genome.newid.fa.cat.all.gz | less
 
