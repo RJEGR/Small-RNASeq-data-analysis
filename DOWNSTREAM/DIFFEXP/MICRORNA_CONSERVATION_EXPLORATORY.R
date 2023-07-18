@@ -127,8 +127,10 @@ ps + ggh4x::scale_y_dendrogram(hclust = fitGTR)
 
 topdf <- out %>% 
   group_by(position) %>% 
-  count(character) %>%
+  dplyr::count(character) %>%
   mutate(Freq = n/sum(n))
+
+topdf %>% tally(Freq)
 
 top <- topdf %>%
   ggplot(aes(y = Freq, x = position, fill = character)) +
