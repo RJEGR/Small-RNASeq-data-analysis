@@ -60,6 +60,13 @@ Porque correr el filtrado de srna-seqs? While miRs are processed from hairpin co
 
 # test
 
+export PATH=$PATH:"/home/rvazquez/anaconda3/bin/"
+
+# replace:
+# MIN_ALLOWED_SEQ_LEN from mirtrace/src/main/java/se/scilifelab/mirtrace/Config.java
+
+vi /home/rvazquez/MIRTRACE/mirtrace_git/src/main/java/se/scilifelab/mirtrace/Config.java
+
 mirtrace qc -s meta_species_all *.fq -w --uncollapse-fasta --t 20
 
 mirtrace qc -s meta_species_all -c configfile -w --uncollapse-fasta --t 20
