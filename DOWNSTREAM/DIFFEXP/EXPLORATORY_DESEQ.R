@@ -16,6 +16,7 @@ path <- '~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/'
 mtd <- read_tsv(list.files(path = path, pattern = 'METADATA', full.names = T))
 
 # fileName <- list.files(path = path, pattern = 'miRNAs_expressed_all_samples', full.names = T)
+
 fileName <- list.files(path = path, pattern = "Counts.txt", full.names = T)
 
 Countdf <- read_tsv(file = fileName)
@@ -27,41 +28,72 @@ Countdf <- read_tsv(file = fileName)
 Countdf %>% dplyr::count(MIRNA)
 
 # count %>% distinct(`#miRNA`)
+which_sam
 
-count <- Countdf %>% dplyr::filter(total > 0)
+keep <- Countdf %>% select_if(is.double) %>% rowSums()
 
-names(count)
+count <- Countdf[keep > 0,]
 
-summary <- count[,1:4]
+count <- count %>% select_if(is.double)
 
-count %>% distinct(`#miRNA`)
+count <- as(count, "matrix")
 
-summary %>% dplyr::count(`#miRNA`, sort = T)
+rownames(count) <- Countdf$Name
 
-summary %>% filter(`#miRNA`== 'dre-miR-430a-3p')
+# count <- Countdf %>% dplyr::filter(total > 0)
 
-count <- as.data.frame(count[,5:16])
+# names(count)
 
-row_id <- paste0(1:nrow(summary),"-" ,summary$`#miRNA`)
+# summary <- count[,1:4]
 
-rownames(count) <- row_id
+# count %>% distinct(`#miRNA`)
+
+# summary %>% dplyr::count(`#miRNA`, sort = T)
+
+# summary %>% filter(`#miRNA`== 'dre-miR-430a-3p')
+
+# count <- as.data.frame(count[,5:16])
+
+# row_id <- paste0(1:nrow(summary),"-" ,summary$`#miRNA`)
+
+# rownames(count) <- row_id
 
 dim(count)
 
+# dim(count0 <- count[rowSums(edgeR::cpm(count) > 1 ) >= 2, ])
+
 dim(count0 <- count[rowSums(edgeR::cpm(count) > 1 ) >= 2, ])
+
+colSums(count) %>% 
+  as_tibble(rownames = "sample_id") %>%
+  rename("Raw"="value") %>%
+  cbind(colSums(count0) %>% as_tibble()) %>% 
+  mutate(Pct = value / Raw) %>%
+  rename("Filtr"="value") %>%
+  # pivot_longer(-sample_id) %>%
+  ggplot(aes(x = sample_id, y = Pct)) +
+  geom_col() +
+  scale_y_continuous("", labels = scales::percent) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+    legend.position = 'top',
+    panel.border = element_blank(),
+    panel.grid.major = element_blank())
+
+
 
 # DESEQ2 -----
 # Select samples and run deseq2 
 
 which_sam <- function(mtd, f_col = "hpf", f = 24, ref = "Control") {
   
-  samples_id <- mtd$colName
+  samples_id <- mtd$LIBRARY_ID
   
   # mtd %>% filter_at(vars(starts_with(f_col)), any_vars((. %% f) == 0))
   
   subset_mtd <- filter(mtd, if_any(starts_with(f_col), ~ (.x == f) == 0))
   
-  x <- subset_mtd %>% pull(pH, name = colName)
+  x <- subset_mtd %>% pull(pH, name = LIBRARY_ID)
   
   y <- samples_id %in% names(x)
   
