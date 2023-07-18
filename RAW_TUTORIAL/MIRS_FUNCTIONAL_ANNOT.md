@@ -23,7 +23,7 @@ cd RNAhybrid-2.1.2
 make
 make install
 
-chmod + /home/rvazquez/RNAhybrid-2.1.2/src/RNAhybrid
+chmod +x /home/rvazquez/RNAhybrid-2.1.2/src/RNAhybrid
 export PATH=$PATH:"/home/rvazquez/RNAhybrid-2.1.2/src/"
 
 # Usage: RNAhybrid [options] [target sequence] [query sequence].
