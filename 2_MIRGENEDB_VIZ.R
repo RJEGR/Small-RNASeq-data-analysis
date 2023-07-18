@@ -19,6 +19,7 @@ dim(MIRGENEDB <- read_tsv(paste0(wd, "/MIRGENEDB_2.1.tsv")))
 
 MIRGENEDB <- MIRGENEDB %>% select_at(vars(contains(c("MirGeneDB_ID", "Family","Node_of_origin_", "Seed"))))
 
+
 # view(MIRGENEDB)
 
 
@@ -30,11 +31,11 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out
 print(.DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
 
 # 1.1) SELECT ONLY KNOWN MIRS
-.DB %>% filter(SRNAtype == "miR") %>% count(SRNAtype) # 147
+.DB %>% filter(SRNAtype == "miR") %>% dplyr::count(SRNAtype) # 147
 
 print(DB <- .DB %>% filter(SRNAtype == "miR") %>% drop_na(KnownRNAs))
 
-DB %>% count(SRNAtype) # MUST BE 69: 53TRUECONSERVED + 12HOMOLOGYBASED + 4 HOMOLOGYBASED PIR/MIR
+DB %>% dplyr::count(SRNAtype) # MUST BE 69: 53TRUECONSERVED + 12HOMOLOGYBASED + 4 HOMOLOGYBASED PIR/MIR
 
 # 1.2) SPLIT AND UNNEST MIR NAMES ====
 
@@ -53,7 +54,7 @@ DB %>% distinct(Name) %>% nrow() # MUST BE 69 - 1: TRUECONSERVED BUT PIR HOMOLOG
 
 DB %>% 
   mutate(SEED = substr(MajorRNA, 2,8) == Seed) %>%
-  count(SEED)
+  dplyr::count(SEED)
 
 FALSE_SEED_DB <- DB %>% 
   mutate(SEED = substr(MajorRNA, 2,8) == Seed) %>%
@@ -61,7 +62,7 @@ FALSE_SEED_DB <- DB %>%
   filter(SEED != TRUE) %>% 
   left_join(.DB)
 
-FALSE_SEED_DB %>% count(Seed, sort = T)
+FALSE_SEED_DB %>% dplyr::count(Seed, sort = T)
 
 # SOMETIMES, SEED WINDOW MATCH NOR BETWEEN 2-8 NUCL. POSITION
 # EX:
@@ -71,7 +72,7 @@ WHICH_SEED <- c("UAAGGCA|UUGGUCC|CACAGCC|CCCUGUA|UUGUGAC|UUGCACU|UAGCACC|AUUGCUU
 FALSE_SEED_DB <- FALSE_SEED_DB %>% 
   filter(!grepl(WHICH_SEED, Seed))
 
-FALSE_SEED_DB %>% count(Name,Seed, Family, arm, sort = T)
+FALSE_SEED_DB %>% dplyr::count(Name,Seed, Family, arm, sort = T)
 
 # view(FALSE_SEED_DB)
 
@@ -90,7 +91,7 @@ sum(grepl(paste(SEED, collapse = "|"), MAJORRNA))
 
 DB %>% distinct(Family, Seed) %>% filter(Family == "MIR-124")
 
-DB %>% distinct(Family, Seed) %>% count(Family, sort = T)
+DB %>% distinct(Family, Seed) %>% dplyr::count(Family, sort = T)
 
 
 # 1.4) HOW MANY MIR FAMILIES FOUND:? ====
@@ -99,15 +100,15 @@ DB %>% distinct(Family) %>% nrow() # 49 PRINCIPAL FAMILIES
 
 # ARE CLUSTERS-EXCLUSIVE FAMILIES FOUND 
 
-DB %>% distinct(Name, Family) %>% count(Family, sort = T)  
+DB %>% distinct(Name, Family) %>% dplyr::count(Family, sort = T)  
 
 # SINGLE LOCUS FAMILIE:
 
-str(DB %>% distinct(Name, Family) %>% count(Family, sort = T) %>% filter(n == 1) %>% pull(Family))
+str(DB %>% distinct(Name, Family) %>% dplyr::count(Family, sort = T) %>% filter(n == 1) %>% pull(Family))
 
 # MULTI-LOCUS FAMILIES:
 
-str(DB %>% distinct(Name, Family) %>% count(Family, sort = T) %>% filter(n > 1) %>% pull(Family))
+str(DB %>% distinct(Name, Family) %>% dplyr::count(Family, sort = T) %>% filter(n > 1) %>% pull(Family))
 
 
 # 2) )DATA VIZ ====
@@ -119,7 +120,7 @@ LEFT_DB <- .DB %>% select(Name, type, biotype, WGCNA)
 DB %>% distinct(Name, Family) %>% 
   # left_join(LEFT_DB) %>%
   # group_by(biotype) %>%
-  count(Family, sort = T) %>% 
+  dplyr::count(Family, sort = T) %>% 
   mutate(Family = fct_reorder(Family, n)) %>%
   ggplot(aes(y = Family, x = n)) +
   geom_col() +
@@ -128,16 +129,33 @@ DB %>% distinct(Name, Family) %>%
   theme(legend.position = "top",
     strip.background = element_rect(fill = 'grey', color = 'white')) -> ps
 
-ggsave(ps, filename = 'FAMILIEs_PER_CLUSTERS.png', 
+ggsave(ps, filename = 'FAMILIES_PER_CLUSTERS.png', 
   path = wd, width = 4, height = 8, device = png, dpi = 300)
 
+
 # B) PLOT NUMBER SPECIES PER FAMILIE
+# HOW CONSERVED (BY FAMILY)?
+
+CONSERVED_TO_HALIOTIS <- DB %>% 
+  mutate(Node = `Node_of_origin_(family)`) %>%
+  distinct(Name, Node) %>%
+  dplyr::count(Node, sort = T) %>%
+  rename("Haliotis"="n")
+
+MIRGENEDB %>% 
+  mutate(Node = `Node_of_origin_(family)`) %>%
+  dplyr::count(Node, sort = T) %>%
+  rename("DB"="n") %>% 
+  right_join(CONSERVED_TO_HALIOTIS) %>% 
+  view()
+
+
 # HOW MANY CLADES?
 
 DB %>% 
   distinct(Family, `Node_of_origin_(family)`) %>%
   mutate(Node = `Node_of_origin_(family)`) %>%
-  count(Node, sort = T)
+  dplyr::count(Node, sort = T)
 
 
 # DB %>% filter(sp == "Lgi") %>% distinct(Family) 
@@ -148,7 +166,7 @@ NodeLev <- DB %>%
   mutate(Node = `Node_of_origin_(family)`) %>%
   group_by(Node) %>%
   distinct(sp) %>%
-  count(sort = T) %>% pull(Node)
+  dplyr::count(sort = T) %>% pull(Node)
 
 
 # HOW MANY SPECIES?
