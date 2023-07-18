@@ -21,6 +21,7 @@ print(DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
 # 
 
 DB %>% count(biotype_best_rank, sort = T)
+
 DB %>% count(biotype, sort = T) 
 
 DB %>% count(type, sort = T)
@@ -41,6 +42,10 @@ df %>% summarise(sum(Reads), sum(n))
 
 df %>% summarise(sum(reads_pct), sum(n_freq))
 
+df %>% group_by(SRNAtype, biotype_best_rank) %>% 
+  summarise(values_from = sum(n)) %>% # values_from = sum(n), 
+  pivot_wider(names_from = SRNAtype, values_from = values_from) %>% 
+  view()
 
 # (doi.org/10.1186/1471-2164-11-533): Roughly half of known miRNA genes are located within previously annotated protein-coding regions ("intragenic miRNAs"). A high-confidence set of predicted mRNA targets of intragenic miRNAs also shared many of these features with the host genes. Approximately 20% of intragenic miRNAs were predicted to target their host mRNA transcript.
 
