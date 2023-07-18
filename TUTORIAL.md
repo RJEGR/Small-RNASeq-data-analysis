@@ -767,7 +767,6 @@ mafft --globalpair HR11082.clean_subset.fa > HR11082.clean_subset.afa
 > To inhouse convertion to fastq2fasta lets: `python3 -c "from Bio import SeqIO;SeqIO.convert('file.fq', 'file.fa', 'fasta')"`
 
 
-
 3. Then, run mitrace in order to screening  the sRNA composition from the libraries as well as sanity check the adapter trimming
 
 `qc` Quality control mode (full set of reports). --species must be given.
