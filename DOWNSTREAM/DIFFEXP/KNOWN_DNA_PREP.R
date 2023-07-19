@@ -2,6 +2,7 @@
 # SUBSEQ SEQUENCE BASED ON COORDINATES CLOSE TO UTR-TARGET SITES
 # PREPARE KNOW ANNOTATION SEQUENCES TO RERUN BLAST AND RETRIVE GENE ONTOLOGIES
 
+library(tidyverse)
 
 rm(list = ls())
 
@@ -63,3 +64,21 @@ Biostrings::writeXStringSet(dna[keep], file = paste0(wd, fileName))
 
 # re-run mir_vs_utr_rmdup_RNAhybrid.out.psig.gene_features_known_annot.fa w/ blast diamont
 # uniprot_sprot.ncbi.blastx.tsv
+
+# LOAD uniprot_sprot.ncbi.blastx.tsv
+# MAP TO http://current.geneontology.org/ontology/go-basic.obo
+
+# ~/Trinotate-Trinotate-v4.0.0/util/admin/util/obo_to_tab.pl go-basic.obo > obo_to_tab.tsv
+
+url <- "http://current.geneontology.org/ontology/go-basic.obo"
+
+OBO <- readLine(url)
+
+OBO <- read_tsv(url,col_names = F)
+
+OBO %>% head(100) %>% view()
+
+# OBO %>% filter(grepl("^[Term]", X1))
+
+# 
+# my ($field, $annot) = split(/\s+/, $_, 2);
