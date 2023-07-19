@@ -559,4 +559,10 @@ query=mir_vs_utr_rmdup_RNAhybrid.out.psig.gene_features_known_annot.fa
 
 scp rvazquez@200.23.162.234:/home/rvazquez/MIRS_FUNCTIONAL_ANNOT/BLAST_FROM_PREDICTED_TARGETS/uniprot_sprot.ncbi.blastx.tsv .
 
+# UNIPROT TO GENE ONTOLOGY
+# GET GENE ONTOLOGY OBO FORMAT
+http://current.geneontology.org/ontology/
+
+https://github.com/Trinotate/Trinotate/blob/master/util/admin/Build_Trinotate_Boilerplate_SQLite_db.pl
+
 # blastx -query $query -db /home/rvazquez/Trinotate-Trinotate-v4.0.0/DATABASE/uniprot_sprot.pep -num_threads 1 -max_target_seqs 1 -outfmt 6 -evalue 1e-5 -out uniprot_sprot.ncbi.blastx.outfmt6 2> blastx.log &
