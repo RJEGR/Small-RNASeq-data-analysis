@@ -1,6 +1,9 @@
 # TARGETSCAN
 # ESTE ANALISIS ES DIRIGIDO A SOLO A LOS 131 MIRS:
 
+library(tidyverse)
+
+
 rm(list = ls())
 
 if(!is.null(dev.list())) dev.off()
@@ -13,16 +16,47 @@ f <- "mature_star_mir_vs_mir_vs_utr_rmdup_RNAhybrid.out.psig_targetscan.out"
 
 f <- list.files(path = wd, pattern = f, full.names = T)
 
-utr_f <- list.files(path = wd, full.names = T, pattern = "three_prime_utr.ids")
+# Flat GTF info:
 
-str(x <- read_lines(utr_f)) # 54 432 <-- i.e the N sequences from three_prime_utr.fa
+# utr_f <- list.files(path = wd, full.names = T, pattern = "three_prime_utr.ids")
 
+# str(x <- read_lines(utr_f)) # 54 432 <-- i.e the N sequences from three_prime_utr.fa
 
-str(three_prime_utr <- sapply(strsplit(x, " "), `[`, 1)) # three_prime_utr ids 
+# str(target <- sapply(strsplit(x, " "), `[`, 1))
 
-library(tidyverse)
+# str(gene_id <- sapply(strsplit(x, " "), `[`, 2)) 
+
+# nrow(utr_source <- data.frame(target, gene_id) %>% as_tibble())
+
+# nrow(utr_source <- utr_source %>% distinct(target, gene_id)) # 31,654
+
+# Join to targetscan out
 
 df <- read_tsv(f)
+
+df <- df %>% select(a_Gene_ID, miRNA_family_ID) %>%
+  mutate(miRNA_family_ID = sapply(strsplit(miRNA_family_ID, "::"), `[`, 1) ) %>%
+  separate(a_Gene_ID, into = c("target", "gene_id"), sep = ";") %>%
+  dplyr::rename("query" = "miRNA_family_ID")
+
+nrow(gene_features <- read_rds(paste0(wd, "gene_features.rds")))
+
+df <- gene_features %>% right_join(df) 
+
+paste_ids <- function(x) {
+  x <- paste(x, sep = ';', collapse = ';')
+}
+
+df %>% 
+  group_by(target) %>%
+  summarise(across(query, .fns = paste_ids), n = n(), .groups = "drop_last") %>%
+  view()
+
+
+
+#. =====
+str(three_prime_utr <- sapply(strsplit(x, " "), `[`, 1)) # three_prime_utr ids 
+
 
 df %>% distinct(a_Gene_ID) # 861
 
