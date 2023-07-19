@@ -1,76 +1,5 @@
 
 
-rm(list = ls())
-
-if(!is.null(dev.list())) dev.off()
-
-options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
-
-
-library(tidyverse)
-
-library(GenomicRanges)
-
-wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT"
-
-# GET gene features from locus ====
-
-pattern <- "multi_genome.newid.gff3$"
-
-genome <- list.files(path = wd, pattern = pattern, full.names = T)
-
-.gr <- rtracklayer::import(genome)
-
-# .gr %>% as_tibble() %>% dplyr::count(type)
-# .gr %>% as_tibble() %>% drop_na(description) %>% dplyr::count(biotype)
-
-# ...
-# 4 protein_coding 31171 # <---
-# ...
-#
-
-gr <- .gr[which(.gr$type == "gene")]
-
-gr <- gr[which(gr$biotype == "protein_coding")]
-
-# Sanity check
-# 31 171 of protein_coding with gene/protein description:
-
-gr %>% as_tibble() %>% drop_na(description) %>% dplyr::count(biotype) 
-
-
-which_cols <- c("seqnames", "gene_coords", "gene_id","description", "type", "biotype")
-
-gene_features <- gr %>% as_tibble() %>% 
-  drop_na(description) %>%
-  mutate(gene_coords = paste(start, end, strand, sep = ":")) %>%
-  select(any_of((which_cols)))
-
-# Sanity check
-
-gene_features %>% distinct(gene_id) %>% nrow()
-
-# gene_features <- gene_features %>% distinct(gene_id, description)
-
-# from gene feature to UTR (flat information)
-
-utr_f <- list.files(path = wd, full.names = T, pattern = "three_prime_utr.ids")
-
-str(x <- read_lines(utr_f)) # 54 432 <-- i.e the N sequences from three_prime_utr.fa
-
-str(gene_id <- sapply(strsplit(x, " "), `[`, 2)) # LOC*
-
-str(target <- sapply(strsplit(x, " "), `[`, 1)) # three_prime_utr ids 
-
-nrow(utr_source <- data.frame(target, gene_id) %>% as_tibble())
-
-nrow(utr_source <- utr_source %>% distinct(target, gene_id)) # 31,654
-
-# Las columnas start:end del objeto gene_features corresponden 
-# a las coordenadas de todo el gene/protein_coding de cada gene_id
-
-nrow(utr_source <- utr_source %>% left_join(gene_features)) # 31, 654
-
 # READ RNAHYBRYD CSV ====
 
 
@@ -201,19 +130,36 @@ mir_sites %>%
   group_by(UTR, MIRNA) %>%
   rstatix::get_summary_stats(n, type = "common")
 
-p2 <- mir_sites %>% 
-  ggplot(aes(n, color = UTR, fill = UTR)) +
+p1 <- mir_sites %>% 
+  group_by(n) %>%
+  dplyr::count(UTR, MIRNA) %>%
+  ggplot(aes(y = nn, x = n, color = UTR, fill = UTR)) +
+  geom_col() +
+  coord_flip() +
   facet_grid(~ MIRNA) +
-  geom_histogram() +
-  # stat_ecdf(linewidth = 2, alpha = 0.5) +
   theme_bw(base_size = 16, base_family = "GillSans") +
   labs(x = "binding miRs per target") +
   scale_y_continuous("Target gene", labels = scales::comma) +
-  theme(legend.position = "none")
+  theme(legend.position = "top") +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800")) 
+
+p2 <- mir_sites %>% 
+  group_by(n) %>%
+  dplyr::count(UTR, MIRNA) %>% 
+  # pivot_wider(names_from = MIRNA, values_from = nn)
+  ggplot(aes(nn, color = UTR)) +
+  facet_grid(~ MIRNA) +
+  stat_ecdf(linewidth = 2, alpha = 0.5) +
+  theme_bw(base_size = 16, base_family = "GillSans") +
+  labs(x = "Target gene") +
+  scale_y_continuous("Freq.", labels = scales::comma) +
+  theme(legend.position = "none") +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) 
 
 library(patchwork)
 
-# p1/p2
+p1/p2
 
 # Q: how many chromosomes were binding sites for mirs? ====
 # 
@@ -255,7 +201,9 @@ p3 <- chromosome_df %>%
   scale_y_continuous("Binding sites (UTR targets)", labels = scales::comma) +
   scale_x_continuous("Chromosome width (Nucleotides)", 
     labels = scales::number_format(scale = 1/1000000, suffix = " Gb")) +
-  theme(legend.position = "none")
+  theme(legend.position = "top") +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800")) 
 
 library(patchwork)
 
