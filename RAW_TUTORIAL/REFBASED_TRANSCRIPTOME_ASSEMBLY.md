@@ -202,6 +202,8 @@ cd /home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY
 
 ln -s /home/rvazquez/RNA_SEQ_ANALYSIS/PROCESSED_LIBS/*P.qtrim.fq.gz
 
+# tar -czvf PROCESSED_LIBS.tar.gz PROCESSED_LIBS
+
 mkdir -p HISAT2_SAM_BAM_FILES
 
 for file in $(ls *_1.P.qtrim.fq.gz | grep gz)
