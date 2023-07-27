@@ -398,7 +398,7 @@ get_res <- function(dds, contrast, alpha_cutoff = 0.1) {
     as.data.frame(.) %>%
     cbind(baseMeanA, baseMeanB, .) %>%
     cbind(sampleA = sA, sampleB = sB, .) %>%
-    as_tibble(rownames = "ids") %>%
+    as_tibble(rownames = "Name") %>%
     mutate(padj = ifelse(is.na(padj), 1, padj)) %>%
     mutate_at(vars(!matches("ids|sample|pvalue|padj")),
       round ,digits = 2)
