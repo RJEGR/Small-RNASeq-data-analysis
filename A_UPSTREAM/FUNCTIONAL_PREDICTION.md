@@ -180,6 +180,10 @@ cat $pep |seqkit replace -p "\s.+" > pep.all.fa
 # Nucl. level
 ./diamond blastx -d DATABASE/uniprot_sprot -q cds.all.fa -o cds_all_vs_uniprot_sprot.blastx.tsv
 
+# orf level:
+
+#./diamond blastx -d DATABASE/uniprot_sprot -q pep.all.fa -o uniprot_sprot.ncbi.blastp.tsv
+
 # orf level: (needs orfs predicted by TransDecoder wah!!)
 
 TransDecoder.LongOrfs -t cds.all.fa --gene_trans_map gene_trans_map > transdecoder.log &
@@ -187,8 +191,6 @@ TransDecoder.LongOrfs -t cds.all.fa --gene_trans_map gene_trans_map > transdecod
 # nohup TransDecoder.Predict -t cds.all.fa --cpu 6 >> transdecoder.log & 
 
 # Load
-
-scp rvazquez@200.23.162.234:/home/rvazquez/GENOME_20230217/ENSEMBLE/TRINOTATE/cds_all_vs_uniprot_sprot.blastx.tsv .
 
 TR_PATH="/home/rvazquez/Trinotate-Trinotate-v4.0.0/"
 TMHMM=$TR_PATH/"tmhmm-2.0c/bin"
