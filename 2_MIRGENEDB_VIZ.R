@@ -41,7 +41,7 @@ DB %>% dplyr::count(SRNAtype) # MUST BE 69: 53TRUECONSERVED + 12HOMOLOGYBASED + 
 
 DB <- DB %>%
   mutate(KnownRNAs = strsplit(KnownRNAs, ";")) %>%
-  select(Name, KnownRNAs, MajorRNA) %>%
+  dplyr::select(Name, KnownRNAs, MajorRNA) %>%
   unnest(KnownRNAs) %>%
   filter(!grepl("^piR-",KnownRNAs)) %>% # <- ALSO EXCLUDE OVERLAPED MIRS/PIRS
   separate(KnownRNAs, into = c("MirGeneDB_ID", "arm"), sep = "_") %>% 
@@ -49,6 +49,11 @@ DB <- DB %>%
   left_join(MIRGENEDB, by = "MirGeneDB_ID")
 
 DB %>% distinct(Name) %>% nrow() # MUST BE 69 - 1: TRUECONSERVED BUT PIR HOMOLOGYBASED
+
+# WRITE OUTPUT FOR FURTHER MERGING
+
+write_tsv(DB, file = paste0(wd, "/SRNA2MIRGENEDB.tsv"))
+  
 
 # 1.3) SEED ANALYSIS: ====
 
