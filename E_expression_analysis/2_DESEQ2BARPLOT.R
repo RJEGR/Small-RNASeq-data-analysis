@@ -1,10 +1,9 @@
 
 # LOAD DATA RESULTS FROM DESEQ ANALYSIS
-# FILTER DATA BY PADJ < 0.05 (NOT USE LOG2FC)
-# GENERATE BARPLOT OF LOG2FC W/ SIGNIFICANCE FOR KNOWN AND NOVEL MIRS
-# SUBSET EXCLUSIVE DE PER CONTRAST 
-# VIZ UPSET
-
+# 1) FILTER DATA BY PADJ < 0.05 (NOT USE LOG2FC)
+# 2) GENERATE BARPLOT OF LOG2FC W/ SIGNIFICANCE FOR KNOWN AND NOVEL MIRS
+# 3) SPLIT EXCLUSIVE FROM INTERSECTED MIRS
+# 4) SAVE 
 rm(list = ls())
 
 if(!is.null(dev.list())) dev.off()
@@ -16,10 +15,6 @@ library(tidyverse)
 wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 RES <- read_tsv(paste0(wd, "DESEQ_RES.tsv"))
-
-# wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
-
-# print(SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
 
 url <- "https://raw.githubusercontent.com/RJEGR/Cancer_sete_T_assembly/main/functions.R"
 
@@ -91,7 +86,7 @@ ggsave(p, filename = 'DESEQ2BARPLOT.png', path = wd, width = 5, height = 10, dev
 
 
 
-# upset ====
+# 2 ====
 
 RES.P %>% 
   mutate(SIGN = sign(log2FoldChange)) %>%
@@ -102,15 +97,16 @@ RES.P %>%
 
 library(ggupset)
 
-
-RES %>% 
+UPSETDF <- RES %>% 
   filter(padj < 0.05) %>%
   mutate(SIGN = sign(log2FoldChange)) %>%
   dplyr::mutate(CONTRAST = dplyr::recode(CONTRAST, !!!recode_to)) %>%
   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
   # separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]") %>%
   group_by(Name, SIGN) %>%
-  summarise(across(CONTRAST, .fns = list), n = n()) %>% 
+  summarise(across(CONTRAST, .fns = list), n = n()) 
+  
+UPSETDF %>%
   ggplot(aes(x = CONTRAST, fill = SIGN)) +
   geom_bar(position = position_dodge(width = 1)) +
   geom_text(stat='count', aes(label = after_stat(count)), 
@@ -137,14 +133,20 @@ p <- p + theme(legend.position = "top",
 ggsave(p, filename = 'DESEQ2UPSET.png', path = wd, width = 5, height = 5.2, device = png, dpi = 300)
 
 
-# Generate single / exclusive transcripts per condition ----
+# 3) SPLIT EXCLUSIVE FROM INTERSECTED MIRS ----
   
-RES %>% 
-  filter(abs(log2FoldChange) > 2) %>%
-  mutate(SIGN = sign(log2FoldChange)) %>%
-  group_by(Name, SIGN) %>%
-  summarise(n_contrast = length(CONTRAST), 
-    across(CONTRAST, .fns = list)) -> distinct_trans
+UPSETDF %>% group_by(n) %>% tally()
 
-distinct_trans %>% group_by(n_contrast) %>% tally()
+EXCLUSIVE_MIRS <- UPSETDF %>% filter(n == 1) %>%
+  mutate(CONTRAST = unlist(CONTRAST)) %>%
+  left_join(RES %>% dplyr::distinct(Name, Family))
+  # dplyr::select(-n)
+  
 
+INTERSECTED_MIRS <- UPSETDF %>% filter(n != 1) %>%
+  unnest(CONTRAST) %>%
+  left_join(RES %>% dplyr::distinct(Name, Family))
+
+out <- list(EXCLUSIVE_MIRS, INTERSECTED_MIRS)
+
+write_rds(out, file = paste0(wd, "UPSETDF.rds"))
