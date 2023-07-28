@@ -93,6 +93,7 @@ sum(sort(unique(out$gene_id)) %in% sort(unique(go_features$gene_id))) # 4662 (58
 out <- go_features %>% right_join(out, by = "gene_id")
 
 
+
 # view(out)
 
 # group go by query (i.e. by srna to prep for enrichment analysis)
@@ -109,9 +110,11 @@ SRNA2GO <- out %>%
     .groups = "drop_last")
 
 
+write_tsv(out, file = paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv"))
+
 write_tsv(SRNA2GO, file = paste0(wd, "SRNA2GO.tsv"))
 
-SRNA2GO_ARM <- SRNA2GO %>% separate(query, into = c("query", "arm"), sep = "[.]")
+# GO TO DATAVIZ ====
 
 nrow(SRNA2GO)
 
@@ -122,7 +125,6 @@ SRNA2GO <- lapply(SRNA2GO, unlist)
 typeof(SRNA2GO)
 
 head(str(SRNA2GO))
-
 
 # GO.ID ROWS IN SRNA 2 GO MUST BE A VECTOR AS IN MAP
 
@@ -155,6 +157,9 @@ allRes %>% as_tibble() %>%
 
 # NOW SPLIT SRNAS BY DE AND INCLUDE TREATMENT TO TREATMENT GOENRICHMENT:
 # EX.
+
+SRNA2GO_ARM <- SRNA2GO %>% separate(query, into = c("query", "arm"), sep = "[.]")
+
 SRNA2GO_ARM %>% distinct(arm) %>% pull() -> ARM
 
 DF <- list()
