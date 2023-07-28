@@ -14,7 +14,13 @@ library(tidyverse)
 
 wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
-RES <- read_tsv(paste0(wd, "DESEQ_RES.tsv"))
+RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05)
+
+.UPSETDF <- read_rds(paste0(wd, "UPSETDF.rds"))
+
+EXCLUSIVE_MIRS <- .UPSETDF[[1]]
+
+INTERSECTED_MIRS <- .UPSETDF[[2]]
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
@@ -25,6 +31,13 @@ url <- "https://raw.githubusercontent.com/RJEGR/Cancer_sete_T_assembly/main/func
 source(url)
 
 # Mature are you functional strand used in DE
+
+paste_go <- function(x) { 
+  x <- x[!is.na(x)] 
+  x <- unique(sort(x))
+  x <- paste(x, sep = ';', collapse = ';')
+}
+
 
 SRNA2GO <- SRNA2GO %>%
   filter(predicted == "BOTH") %>%
@@ -46,6 +59,20 @@ SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$query)
 
 SRNA2GO <- lapply(SRNA2GO, unlist)
 
+# EXCLUSIVE ====
+
+
+str(CONTRAST <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% distinct(CONTRAST) %>% pull())
+
+# SANITY CHECK IF SINGLE MIR NOT GO ENRICHMENT IS POSSIBLE  
+
+EXCLUSIVE_MIRS %>%
+  group_by(CONTRAST, SIGN) %>%
+  summarise(across(Name, .fns = list), n = n())
+  
+
+# UP
+
 DF <- list()
 
 for(j in 1:length(CONTRAST)) {
@@ -54,13 +81,17 @@ for(j in 1:length(CONTRAST)) {
   
   cat("\nRunning ",CONTRAST[i], "\n")
   
-  DF2GO <- RES %>% filter(CONTRAST %in% CONTRAST[i])
+  # DF2GO <- RES %>% filter(CONTRAST %in% CONTRAST[i])
   
-  DF2GO <- DF2GO %>% filter(log2FoldChange > 0 & padj < 0.05) # filter(log2FoldChange < 0 )
+  # DF2GO <- DF2GO %>% filter(padj < 0.05) # filter(log2FoldChange < 0 )
   
-  query.p <- DF2GO %>% pull(padj)
+  # query.p <- DF2GO %>% pull(padj)
   
-  query.names <- DF2GO %>% pull(Name)
+  # query.names <- DF2GO %>% pull(Name)
+  
+  query.names <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% filter(CONTRAST %in% CONTRAST[i]) %>% pull(Name)
+  
+  query.p <- c(rep(0.05, length(query.names)))
   
   allRes <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 20)
   
@@ -70,35 +101,66 @@ for(j in 1:length(CONTRAST)) {
   
 }
 
-do.call(rbind, DF) -> allRes
+EXCLUSIVE_UP_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = "Up")
 
-allRes %>% as_tibble() %>%
+# DOWN
+
+str(CONTRAST <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Down") %>% distinct(CONTRAST) %>% pull())
+
+DF <- list()
+
+for(j in 1:length(CONTRAST)) {
+  
+  i <- j
+  
+  cat("\nRunning ",CONTRAST[i], "\n")
+
+  query.names <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Down") %>% filter(CONTRAST %in% CONTRAST[i]) %>% pull(Name)
+  
+  query.p <- c(rep(0.05, length(query.names)))
+  
+  allRes <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 20)
+  
+  allRes <- allRes %>% mutate(CONTRAST = CONTRAST[i]) %>% as_tibble()
+  
+  DF[[i]] <- allRes
+  
+}
+
+EXCLUSIVE_DOWN_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = "Down")
+
+
+
+p <- rbind(EXCLUSIVE_DOWN_MIRS, EXCLUSIVE_UP_MIRS) %>%
   arrange(Annotated) %>%
-  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
   mutate(Term = factor(Term, levels= unique(Term))) %>%
-  ggplot(aes(x = Term, y = Annotated, fill = -log10(p.adj.ks))) + # , fill = p.adj.ks
-  coord_flip() +
+  separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]") %>%
+  ggplot(aes(y = Term, x = Annotated, fill = -log10(p.adj.ks))) + # , fill = p.adj.ks
   geom_col() +
   theme_bw(base_family = "GillSans", base_size = 12) +
-  facet_grid( CONTRAST ~ ., scales = "free") +
-  theme_bw(base_family = "GillSans", base_size = 11) +
-  theme(strip.background = element_rect(fill = 'grey86', color = 'white'),
-    legend.position = 'top',
-    panel.border = element_blank(),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank()) +
-  ggsci::scale_fill_material()
+  ggh4x::facet_nested(SIGN ~ CONTRAST+WRAP ~ ., nest_line = F, scales = "free", space = "free") +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  ggsci::scale_fill_material() 
 
+p + theme(legend.position = "top",
+  strip.background = element_rect(fill = 'grey89', color = 'white'),
+  panel.border = element_blank(),
+  plot.title = element_text(hjust = 0),
+  plot.caption = element_text(hjust = 0),
+  panel.grid.minor.y = element_blank(),
+  panel.grid.major.y = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.x = element_blank(),
+  # strip.background.y = element_blank(),
+  axis.text.y = element_text(angle = 0, size = 5),
+  axis.text.x = element_text(angle = 0))
+
+# INTERSECTED
+# UP
+# DOWN
 
 # Format to bind the DB
 
-allRes %>% filter(is.na(log2FoldChange))
-
-allRes %>% 
-  
-  res.p <- prep_DE_data(allRes, alpha = 0.05, lfcThreshold = 2)
-
-allRes %>% pivot_wider()
 
 DB %>% left_join(allRes %>% select(log2FoldChange, padj, CONTRAST))
 
