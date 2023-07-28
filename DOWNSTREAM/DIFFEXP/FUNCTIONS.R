@@ -23,9 +23,9 @@ get_res <- function(dds, contrast, alpha_cutoff = 0.1) {
     as.data.frame(.) %>%
     cbind(baseMeanA, baseMeanB, .) %>%
     cbind(sampleA = sA, sampleB = sB, .) %>%
-    as_tibble(rownames = "ids") %>%
+    as_tibble(rownames = "Name") %>%
     mutate(padj = ifelse(is.na(padj), 1, padj)) %>%
-    mutate_at(vars(!matches("ids|sample|pvalue|padj")),
+    mutate_at(vars(!matches("Name|sample|pvalue|padj")),
       round ,digits = 2)
 }
 
@@ -68,12 +68,8 @@ prep_DE_data <- function(res, alpha, lfcThreshold) {
   
   res %>%
     # drop_na() %>%
-    select_at(vars(ids, contains(sam), contains(samv), contains(FC_cols), 
-      contains(pv_cols),
-      contains(pvad_cols))) %>%
-    rename_at(vars(contains(FC_cols),
-      contains(pv_cols),
-      contains(pvad_cols)), ~ rename_to) %>%
+    # select_at(vars(Name, contains(sam), contains(samv), contains(FC_cols), contains(pv_cols), contains(pvad_cols))) %>%
+    rename_at(vars(contains(FC_cols),contains(pv_cols),contains(pvad_cols)), ~ rename_to) %>%
     arrange(pvalue) -> res
   
   
@@ -94,4 +90,10 @@ prep_DE_data <- function(res, alpha, lfcThreshold) {
     mutate(cc = factor(cc, levels = c(sigfc, pv, fc, "NS"))) %>%
     mutate(lfcT = factor(lfcT, levels = c(up, down, 'Basal')))
   
+}
+
+paste_go <- function(x) { 
+  x <- x[!is.na(x)] 
+  x <- unique(sort(x))
+  x <- paste(x, sep = ';', collapse = ';')
 }
