@@ -49,7 +49,6 @@ SRNA2GO <- SRNA2GO %>%
     across(GO.ID, .fns = paste_go), 
     .groups = "drop_last")
 
-
 SRNA2GO <- SRNA2GO %>% 
   separate(query, into = c("query", "arm"), sep = "[.]") %>%
   filter(arm == "mature")
@@ -60,7 +59,6 @@ SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$query)
 SRNA2GO <- lapply(SRNA2GO, unlist)
 
 # EXCLUSIVE ====
-
 
 str(CONTRAST <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% distinct(CONTRAST) %>% pull())
 
@@ -130,19 +128,56 @@ for(j in 1:length(CONTRAST)) {
 EXCLUSIVE_DOWN_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = "Down")
 
 
+# Similarity grouping ====
 
-p <- rbind(EXCLUSIVE_DOWN_MIRS, EXCLUSIVE_UP_MIRS) %>%
-  arrange(Annotated) %>%
+library(GOSemSim)
+
+# hsGO <- godata('org.Hs.eg.db', ont="BP")
+
+
+GO.ID <- rbind(EXCLUSIVE_DOWN_MIRS, EXCLUSIVE_UP_MIRS) %>% distinct(GO.ID) %>% pull()
+
+hsGO <- read_rds(paste0(wd, '/hsGO_BP.rds'))
+
+termSim <- GOSemSim::termSim(GO.ID, GO.ID,  semData = hsGO, method = "Wang")
+
+cmds <- termSim %>% 
+  # use distance metric
+  dist(method = "euclidean") %>%
+  # compute cMDS
+  cmdscale() %>%
+  data.frame() %>%
+  rownames_to_column(var= 'GO.ID')
+
+cutree <- termSim %>% 
+  # use distance metric
+  dist(method = "euclidean") %>%
+  # compute cMDS
+  hclust() %>%
+  cutree(., 5)
+
+head(cmds <- cbind(cmds, cutree) %>% mutate(cutree = as.factor(cutree)))
+
+rbind(EXCLUSIVE_DOWN_MIRS, EXCLUSIVE_UP_MIRS) %>%
+  left_join(cmds) -> TOPGO_EXCLUSIVE
+
+
+p <- TOPGO_EXCLUSIVE %>%
+  arrange(desc(Term)) %>%
   mutate(Term = factor(Term, levels= unique(Term))) %>%
   separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]") %>%
-  ggplot(aes(y = Term, x = Annotated, fill = -log10(p.adj.ks))) + # , fill = p.adj.ks
-  geom_col() +
+  ggplot(aes(y = Term, x = WRAP)) + # , fill = p.adj.ks fill = -log10(p.adj.ks))
+  # geom_col() +
+  # geom_point(aes(size = Annotated)) +
+  geom_tile(aes(fill = Annotated), color = 'white', size = 0.7, width = 1) +
+  geom_text(aes(label = Annotated), color = 'black', family = "GillSans", size = 1.5) +
   theme_bw(base_family = "GillSans", base_size = 12) +
-  ggh4x::facet_nested(SIGN ~ CONTRAST+WRAP ~ ., nest_line = F, scales = "free", space = "free") +
+  ggh4x::facet_nested( ~ CONTRAST+SIGN, nest_line = F, scales = "free", space = "free") +
   theme_bw(base_family = "GillSans", base_size = 12) +
-  ggsci::scale_fill_material() 
+  ggsci::scale_fill_material() +
+  labs(x = "", y = "")
 
-p + theme(legend.position = "top",
+p <- p + theme(legend.position = "top",
   strip.background = element_rect(fill = 'grey89', color = 'white'),
   panel.border = element_blank(),
   plot.title = element_text(hjust = 0),
@@ -153,16 +188,136 @@ p + theme(legend.position = "top",
   panel.grid.major.x = element_blank(),
   # strip.background.y = element_blank(),
   axis.text.y = element_text(angle = 0, size = 5),
-  axis.text.x = element_text(angle = 0))
+  axis.text.x = element_text(angle = 90, vjust = 0.5, size = 10))
 
-# INTERSECTED
-# UP
-# DOWN
-
-# Format to bind the DB
+ggsave(p, filename = 'DESEQ2TOPGO.png', path = wd, width = 4, height = 10, device = png, dpi = 300)
 
 
-DB %>% left_join(allRes %>% select(log2FoldChange, padj, CONTRAST))
+# INTERSECTED ====
+
+# DOWN INTERSECTED:
+
+str(CONTRAST <- INTERSECTED_MIRS %>% ungroup() %>% filter(SIGN == "Down") %>% distinct(CONTRAST) %>% pull())
+
+DF <- list()
+
+for(j in 1:length(CONTRAST)) {
+  
+  i <- j
+  
+  cat("\nRunning ",CONTRAST[i], "\n")
+  
+  query.names <- INTERSECTED_MIRS %>% ungroup() %>% filter(SIGN == "Down") %>% filter(CONTRAST %in% CONTRAST[i]) %>% pull(Name)
+  
+  query.p <- c(rep(0.05, length(query.names)))
+  
+  allRes <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 20)
+  
+  allRes <- allRes %>% mutate(CONTRAST = CONTRAST[i]) %>% as_tibble()
+  
+  DF[[i]] <- allRes
+  
+}
+
+INTERSECTED_DOWN_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = "Down")
+
+
+# UP INTERSECTED:
+
+str(CONTRAST <- INTERSECTED_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% distinct(CONTRAST) %>% pull())
+
+DF <- list()
+
+for(j in 1:length(CONTRAST)) {
+  
+  i <- j
+  
+  cat("\nRunning ",CONTRAST[i], "\n")
+  
+  query.names <- INTERSECTED_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% filter(CONTRAST %in% CONTRAST[i]) %>% pull(Name)
+  
+  query.p <- c(rep(0.05, length(query.names)))
+  
+  allRes <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 20)
+  
+  allRes <- allRes %>% mutate(CONTRAST = CONTRAST[i]) %>% as_tibble()
+  
+  DF[[i]] <- allRes
+  
+}
+
+INTERSECTED_UP_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = "Up")
+
+rbind(INTERSECTED_DOWN_MIRS, INTERSECTED_UP_MIRS) %>%
+  left_join(cmds) -> TOPGO_INTERSECTED
+
+
+p <- TOPGO_INTERSECTED %>%
+  arrange(desc(Term)) %>%
+  mutate(Term = factor(Term, levels= unique(Term))) %>%
+  separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]") %>%
+  ggplot(aes(y = Term, x = WRAP)) + # , fill = p.adj.ks fill = -log10(p.adj.ks))
+  # geom_col() +
+  # geom_point(aes(size = Annotated)) +
+  geom_tile(aes(fill = Annotated), color = 'white', size = 0.7, width = 1) +
+  geom_text(aes(label = Annotated), color = 'black', family = "GillSans", size = 1.5) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  ggh4x::facet_nested( ~ CONTRAST+SIGN, nest_line = F, scales = "free", space = "free") +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  ggsci::scale_fill_material() +
+  labs(x = "", y = "")
+
+p <- p + theme(legend.position = "top",
+  strip.background = element_rect(fill = 'grey89', color = 'white'),
+  panel.border = element_blank(),
+  plot.title = element_text(hjust = 0),
+  plot.caption = element_text(hjust = 0),
+  panel.grid.minor.y = element_blank(),
+  panel.grid.major.y = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.x = element_blank(),
+  # strip.background.y = element_blank(),
+  axis.text.y = element_text(angle = 0, size = 5),
+  axis.text.x = element_text(angle = 90, vjust = 0.5, size = 10))
+
+ggsave(p, filename = 'DESEQ2TOPGO_EXCLUSIVE.png', path = wd, width = 4, height = 10, device = png, dpi = 300)
+
+
+# AS DIMENSIONAL SCATTERPLOT
+
+
+str(GO.ID <- rbind(INTERSECTED_DOWN_MIRS, INTERSECTED_UP_MIRS) %>% distinct(GO.ID) %>% pull())
+
+hsGO <- read_rds(paste0(wd, '/hsGO_BP.rds'))
+
+termSim <- GOSemSim::termSim(GO.ID, GO.ID,  semData = hsGO, method = "Wang")
+
+cmds <- termSim %>% 
+  # use distance metric
+  dist(method = "euclidean") %>%
+  # compute cMDS
+  cmdscale() %>%
+  data.frame() %>%
+  rownames_to_column(var= 'GO.ID')
+
+cutree <- termSim %>% 
+  # use distance metric
+  dist(method = "euclidean") %>%
+  # compute cMDS
+  hclust() %>%
+  cutree(., 5)
+
+head(cmds <- cbind(cmds, cutree) %>% mutate(cutree = as.factor(cutree)))
+
+TOPGO_INTERSECTED %>%
+  ggplot(aes(X1,X2, color = cutree)) +
+  geom_point(aes(alpha = p.adj.ks), size = 4) +
+  ggrepel::geom_text_repel(aes(label = Term),
+    max.overlaps = 20, color = 'black',
+    family = "GillSans") +
+  theme_classic(base_size = 16, base_family = "GillSans") +
+  labs(x = 'Dimension 1', y = 'Dimension 2') 
+
 
 # ENRICHMENT ANALYSIS: =====
 
