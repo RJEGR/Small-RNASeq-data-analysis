@@ -557,6 +557,8 @@ query=mir_vs_utr_rmdup_RNAhybrid.out.psig.gene_features_known_annot.fa
 
 ./diamond blastx -d DATABASE/uniprot_sprot -q $query -o uniprot_sprot.ncbi.blastx.tsv
 
+
+
 scp rvazquez@200.23.162.234:/home/rvazquez/MIRS_FUNCTIONAL_ANNOT/BLAST_FROM_PREDICTED_TARGETS/uniprot_sprot.ncbi.blastx.tsv .
 
 # UNIPROT TO GENE ONTOLOGY
