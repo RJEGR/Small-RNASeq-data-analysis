@@ -4,6 +4,12 @@
 # 2) GENERATE BARPLOT OF LOG2FC W/ SIGNIFICANCE FOR KNOWN AND NOVEL MIRS
 # 3) SPLIT EXCLUSIVE FROM INTERSECTED MIRS
 # 4) SAVE 
+
+# NOTE:
+
+# POSITIVE LFC == UP EXPRESSED IN CONTROL
+# NEGATIVE LFC == UP EXPRESSED IN EXPERIMENTAL
+
 rm(list = ls())
 
 if(!is.null(dev.list())) dev.off()
@@ -30,6 +36,7 @@ recode_fc <- structure(c("Up","Down"), names = c(1,-1))
 
 RES.P <- RES %>% filter( padj < 0.05) # abs(log2FoldChange) > 2 &
 
+RES.P <- RES.P %>% mutate(log2FoldChange = log2FoldChange * -1)
 
 # 1) =====
 
@@ -43,6 +50,7 @@ RES.P <- RES.P %>%
   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
   separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]")
 
+write_tsv(RES.P, paste0(wd, "DESEQ_RES_P.tsv"))
 
 RES.P %>% 
   # drop_na(padj)
@@ -87,18 +95,19 @@ ggsave(p, filename = 'DESEQ2BARPLOT.png', path = wd, width = 5, height = 10, dev
 
 
 # 2 ====
-
+# not only unique
 RES.P %>% 
   mutate(SIGN = sign(log2FoldChange)) %>%
-  dplyr::count(CONTRAST, WRAP, SIGN, sampleB, sampleA) 
-  # dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
-  # dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
+  dplyr::count(CONTRAST, WRAP, SIGN, sampleB, sampleA) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc))
   # separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]")
 
 library(ggupset)
 
 UPSETDF <- RES %>% 
   filter(padj < 0.05) %>%
+  mutate(log2FoldChange = log2FoldChange * -1) %>%
   mutate(SIGN = sign(log2FoldChange)) %>%
   dplyr::mutate(CONTRAST = dplyr::recode(CONTRAST, !!!recode_to)) %>%
   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
@@ -132,10 +141,10 @@ p <- p + theme(legend.position = "top",
 
 ggsave(p, filename = 'DESEQ2UPSET.png', path = wd, width = 5, height = 5.2, device = png, dpi = 300)
 
-
 # 3) SPLIT EXCLUSIVE FROM INTERSECTED MIRS ----
-  
 UPSETDF %>% group_by(n) %>% tally()
+
+UPSETDF %>% group_by(n, SIGN) %>% tally()
 
 EXCLUSIVE_MIRS <- UPSETDF %>% filter(n == 1) %>%
   mutate(CONTRAST = unlist(CONTRAST)) %>%
@@ -150,3 +159,4 @@ INTERSECTED_MIRS <- UPSETDF %>% filter(n != 1) %>%
 out <- list(EXCLUSIVE_MIRS, INTERSECTED_MIRS)
 
 write_rds(out, file = paste0(wd, "UPSETDF.rds"))
+
