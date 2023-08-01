@@ -41,7 +41,7 @@ probs_df %>%
   geom_errorbar(width = 0.3, position = position_dodge(0.6)) +
   geom_boxplot(aes(fill = pH), width = 0.5, stat = 'identity', 
     position = position_dodge(0.6)) +
-  labs(y = expression('Abundancia'~ '(' *log[2]* ')'), x = '') +
+  labs(y = expression('Expresión'~ '(' *log[2]* ')'), x = '') +
   theme_classic(base_family = "GillSans") +
   scale_color_manual("", values = rev(pHpalette)) +
   scale_fill_manual("", values = rev(pHpalette)) +
@@ -90,7 +90,7 @@ n_genes %>%
   # mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = unique(LIBRARY_ID))) %>%
   ggplot() + 
   geom_col(aes(x = LIBRARY_ID, y = Raw, fill = pH)) + 
-  labs(x = 'Muestra', y = 'RNAs pequeños') +
+  labs(x = 'Muestra', y = 'ARNs pequeños') +
   scale_y_continuous(labels = scales::comma) +
   scale_color_manual("", values = rev(pHpalette)) +
   scale_fill_manual("", values = rev(pHpalette)) +
