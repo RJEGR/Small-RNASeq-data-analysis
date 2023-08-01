@@ -50,6 +50,8 @@ rownames(COUNTS) <- rowNames
 
 .COUNTS <- COUNTS
 
+write_rds(.COUNTS, paste0(path, "COUNT.rds"))
+
 # rowSums(COUNTS) %>% as_tibble(rownames = "Name")
 
 # DB %>% select(Name, Locus_type, MajorRNA, SRNAtype, Reads) %>% filter(SRNAtype == "miR")
