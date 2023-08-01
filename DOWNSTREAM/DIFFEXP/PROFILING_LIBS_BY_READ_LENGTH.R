@@ -6,8 +6,15 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 library(tidyverse)
 
-mtd <- read_tsv('~/Documents/MIRNA_HALIOTIS/METADATA.tsv') %>% 
-  rename("sample_id" = "LIBRARY_ID")
+MTD <- read_tsv('~/Documents/MIRNA_HALIOTIS/METADATA.tsv')
+
+recode_to <- structure(c("Ctrl pH", "Low pH"), names = c("Control", "Low"))
+
+MTD <- MTD %>%
+  dplyr::rename("sample_id" = "LIBRARY_ID") %>%
+  dplyr::mutate(hpf = paste0(hpf, " HPF")) %>%
+  dplyr::mutate(hpf = factor(hpf, levels = c("24 HPF", "110 HPF"))) %>%
+  dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to))
 
 path <- '~/Documents/MIRNA_HALIOTIS/PROFILING_BY_READ_LENGTH/'
 
@@ -66,11 +73,11 @@ read_df_and_summarise <- function(x) {
 
 # write_rds(out, file = paste0(path, "prof_by_read_length_summary.rds"))
 
-recode_to <- c(`miRNAs` = "miRs", `Unknown`= "Desc.",`rRNA` = "ARNr", `tRNA` = "ARNt", `Artifacts` = "Artefactos")
 
+recode_to <- c(`miRNAs` = "A) miRs", `Unknown`= "B) Desc",`rRNA` = "C) ARNr", `tRNA` = "D) ARNt", `Artifacts` = "E) Artefactos")
 
 out <- read_rds(paste0(path, "prof_by_read_length_summary.rds")) %>% 
-  left_join(mtd) %>%
+  left_join(MTD) %>%
   mutate(first_nuc = recode(first_nuc, `T` = "U")) %>%
   dplyr::mutate(rnatype = dplyr::recode_factor(rnatype, !!!recode_to))
 
@@ -86,23 +93,24 @@ xlab <-  "Longitud (Nucleótidos)" # "Read Length (nt)"
 ylab <- "Frecuencia"
 
 out %>% 
-  mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
-  group_by(group, Length, rnatype) %>% summarise(n = sum(n)) %>%
-  group_by(group, Length) %>% mutate(pct = n / sum(n)) %>%
+  # mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
+  group_by(hpf,pH, Length, rnatype) %>% 
+  summarise(n = sum(n)) %>%
+  group_by(hpf,pH, Length) %>% mutate(pct = n / sum(n)) %>%
   ggplot(aes(x = Length, y = pct, fill = rnatype)) + 
-  facet_grid(group ~ ., scales = "free_y") + geom_col(width = 0.85) +
+  # facet_grid(group ~ ., scales = "free_y") + 
+  geom_col(width = 0.85) +
+  ggh4x::facet_nested( hpf+pH ~ ., nest_line = F, scales = "free", space = "free") +
   scale_y_continuous(ylab, labels = scales::percent) +
   # scale_y_continuous(ylab, labels = scales::comma) + # if y = n
   scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 1)) +
   see::scale_fill_pizza(reverse = T) -> bottom
 
 bottom <- bottom + theme_bw(base_family = "GillSans", base_size = 11) +
-  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+  theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
     legend.position = 'none',
     panel.border = element_blank(),
     panel.grid.minor = element_blank())
-
-# ggsave(bottom, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH.png', path = path, width = 6, height = 5, device = png)
 
 # 1.1) top plot ---- 
 
@@ -110,9 +118,10 @@ xlab <- ""
 ylab <- "Número de lecturas"
 
 out %>% 
-  mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
-  group_by(group, Length, rnatype) %>% summarise(n = sum(n)) %>%
-  group_by(group, Length) %>% mutate(pct = n / sum(n)) %>%
+  # mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
+  # group_by(group, Length, rnatype) %>% 
+  # summarise(n = sum(n)) %>%
+  # group_by(group, Length) %>% mutate(pct = n / sum(n)) %>%
   ggplot(aes(x = Length, y = n, fill = rnatype)) + 
   # facet_grid(group ~ ., scales = "free_y") + 
   geom_col(width = 0.85) +
@@ -121,7 +130,7 @@ out %>%
   see::scale_fill_pizza(reverse = T) -> top
 
 top <- top + theme_bw(base_family = "GillSans", base_size = 11) +
-  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+  theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
     legend.position = 'top',
     panel.border = element_blank(),
     panel.grid.minor = element_blank(),
@@ -131,21 +140,10 @@ top <- top + theme_bw(base_family = "GillSans", base_size = 11) +
 
 library(patchwork)
 
-ps <- top / bottom + plot_layout(heights = c(0.3, 1))
 
-# t, b The top and bottom bounds of the area in the grid
-# 
-# l, r The left and right bounds of the area int the grid
-# 
+ps <- top / plot_spacer() / bottom + plot_layout(heights = c(0.3, -0.1, 1))
 
-layout <- c(
-  area(t = 0.5, b = 1,l = 1, r = 1),
-  area(t = 1, b = 1, l = 1, r = 1)
-)
-
-# top / bottom + plot_layout(heights = c(0.3, 1), design = layout) # , design = layout
-
-ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ.png', path = path, width = 6, height = 5, device = png)
+ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ.png', path = path, width = 6, height = 5.5, device = png)
 
 # out %>% ggplot(aes(x = Length, y = n, fill = rnatype)) + geom_col()
 
@@ -157,8 +155,8 @@ ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ.png', path = path, width = 6, h
 xlab <- "Longitud (Nucleótidos)"
 ylab <- "Frecuencia"
 
-recode_to <- c(`miRs` = "A) miRs", `Desc.`= "B) Desc",`ARNr` = "C) ARNr", 
-  `ARNt` = "D) ARNt", `Artefactos` = "E) Artefactos")
+# recode_to <- c(`miRs` = "A) miRs", `Desc.`= "B) Desc",`ARNr` = "C) ARNr", 
+#   `ARNt` = "D) ARNt", `Artefactos` = "E) Artefactos")
 
 table(out$rnatype)
 
@@ -167,8 +165,8 @@ table(out$rnatype)
 out %>% 
   group_by(Length, rnatype, first_nuc) %>% summarise(n = sum(n)) %>%
   mutate(Freq = n / sum(n)) %>%
-  dplyr::mutate(rnatype = dplyr::recode_factor(rnatype, !!!recode_to)) %>%
-  mutate(rnatype = factor(rnatype, levels = recode_to)) %>%
+  # dplyr::mutate(rnatype = dplyr::recode_factor(rnatype, !!!recode_to)) %>%
+  # mutate(rnatype = factor(rnatype, levels = recode_to)) %>%
   ggplot(aes(x = Length, y = Freq, fill = first_nuc)) + 
   facet_grid( rnatype ~., scales = 'free_y') + geom_col(width = 0.85) +
   # scale_y_continuous(ylab, labels = scales::percent) +
@@ -194,7 +192,7 @@ ylab <- "Número de lecturas"
 breaks_seq <- seq(18, 25, by = 1)
 
 out %>% 
-  filter(rnatype %in% 'miRs') %>%
+  filter(grepl("miRs", rnatype)) %>%
   mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
   group_by(Length, group, first_nuc) %>% summarise(n = sum(n)) %>%
   group_by(Length, group) %>% mutate(pct = n / sum(n)) %>%
@@ -205,7 +203,7 @@ out %>%
   scale_x_continuous(xlab, breaks = breaks_seq, limits = c(17, 26)) +
   see::scale_fill_bluebrown(reverse = T) +
   theme_bw(base_family = "GillSans", base_size = 11) +
-  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+  theme(strip.background = element_rect(fill = 'grey86', color = 'white'),
     legend.position = 'top',
     panel.border = element_blank(),
     panel.grid.minor = element_blank()) -> ps
@@ -215,30 +213,33 @@ ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_NUC_kmiRNAs.png', path =
 # BY:
 recode_to <- c(`HR248` = "B)", `HR1108`= "C)",`HR2476` = "D)", `HR11076` = "E)")
 
+
 out %>% 
-  mutate(sample_id = substr(sample_id, 1,nchar(sample_id)-1)) %>%
-  mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
-  group_by(sample_id, group, Length, rnatype) %>% summarise(n = sum(n)) %>%
-  dplyr::mutate(sample_id = dplyr::recode_factor(sample_id, !!!recode_to)) %>%
-  mutate(sample_id = factor(sample_id, levels = recode_to)) %>%
-  ggplot(aes(x = Length, y = n, fill = rnatype)) + 
-  facet_grid(sample_id ~ ., scales = "free_y") +
-  geom_col(width = 0.85) +
+  group_by(hpf,pH, Length, rnatype) %>% 
+  summarise(n = sum(n)) %>%
+  ggplot(aes(x = Length, y = n, fill = rnatype)) +
+  ggh4x::facet_nested( hpf+pH ~ ., nest_line = F, scales = "free") +
+  # mutate(sample_id = substr(sample_id, 1,nchar(sample_id)-1)) %>%
+  # mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
+  # group_by(sample_id, group, Length, rnatype) %>% summarise(n = sum(n)) %>%
+  # dplyr::mutate(sample_id = dplyr::recode_factor(sample_id, !!!recode_to)) %>%
+  # mutate(sample_id = factor(sample_id, levels = recode_to)) %>%
+  # ggplot(aes(x = Length, y = n, fill = rnatype)) + 
+  # facet_grid(sample_id ~ ., scales = "free_y") +
+  geom_col(width = 0.85)  +
   scale_y_continuous("Número de lecturas", labels = scales::comma) +
   scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 2)) +
   see::scale_fill_pizza(reverse = T) +
   theme_bw(base_family = "GillSans", base_size = 10) +
-  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+  theme(strip.background = element_rect(fill = 'grey86', color = 'white'),
     legend.position = 'none',
     panel.border = element_blank(),
     panel.grid.minor = element_blank()) -> bottom
 
-# ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_2.png', path = path, width = 5, height = 4, device = png)
-
 top <- out %>% 
   group_by(Length, rnatype) %>% summarise(n = sum(n)) %>%
   group_by(Length) %>% mutate(pct = n / sum(n)) %>%
-  mutate(sample_id = "A)") %>%
+  mutate(sample_id = "Global") %>%
   ggplot(aes(x = Length, y = pct, fill = rnatype)) + 
   geom_col(width = 0.85) +
   facet_grid(sample_id ~ ., scales = "free_y") +
@@ -247,7 +248,7 @@ top <- out %>%
   see::scale_fill_pizza(reverse = T) + 
   guides(fill = guide_legend(title = "")) +
   theme_bw(base_family = "GillSans", base_size = 10) +
-  theme(strip.background = element_rect(fill = 'white', color = 'white'),
+  theme(strip.background = element_rect(fill = 'grey86', color = 'white'),
     legend.position = 'top',
     panel.border = element_blank(),
     panel.grid.minor = element_blank(),
@@ -256,6 +257,8 @@ top <- out %>%
     panel.grid.major = element_blank())
 
 ps <- top / bottom + plot_layout(heights = c(0.3, 1))
+
+ps <- top / plot_spacer() / bottom + plot_layout(heights = c(0.3, -0.1, 1))
 
 ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_2.png', path = path, width = 4.5, height = 4.5, device = png, dpi = 300)
 
