@@ -268,7 +268,9 @@ which_vars <- c("Short", c(as.character(21:30)),  "Long")
 
 sum(read_tsv(f)$Reads == Treads)
 
-read_tsv(f) %>% select_at(all_of(c(which_vars, 'UniqueReads', 'MajorRNAReads', 'Reads', "FracTop"))) %>%
+read_tsv(f) %>% 
+  mutate(PRECISION = Treads/Reads) %>%
+  select_at(all_of(c(which_vars, 'UniqueReads', 'MajorRNAReads', 'Reads', "FracTop", "PRECISION"))) %>%
   rstatix::cor_mat() %>%
   rstatix::cor_reorder() %>%
   rstatix::pull_lower_triangle() %>%
@@ -290,4 +292,12 @@ DB %>% mutate(PRECISION = (UniqueReads+MajorRNAReads)/Reads) %>%
 
 DB %>%
   ggplot(aes(fill = SRNAtype, FracTop)) +
-  geom_histogram() + facet_wrap(~ SRNAtype, scales = "free_y")
+  geom_histogram() + 
+  facet_wrap(Strand ~ SRNAtype, scales = "free_y", nrow = 3, ncol = 3)
+
+read_tsv(f) %>% 
+  mutate(PRECISION = Treads/Reads) %>%
+  ggplot(aes(PRECISION, FracTop)) + geom_point()
+
+# FracTop: Fraction of Reads aligned to the top genomic strand.
+# Strand: Inferred strandednes of the locus, inferred from FracTop and the --strand_cutoff setting
