@@ -57,7 +57,7 @@ READS_AND_FREQ <- GCOUNTS %>%
   filter(Reads > 0) %>%
   group_by(Name, REP) %>%
   summarise(Reads = sum(Reads), Freq = n()) %>%
-  rename("MajorRNA" = "Name")
+  dplyr::rename("MajorRNA" = "Name")
 
 # READS_AND_FREQ %>% group_by(REP) %>% rstatix::cor_test(Reads, Freq)
 
@@ -67,11 +67,20 @@ READS_AND_FREQ <- GCOUNTS %>%
 
 # ADD SAMPLES FREQ. ====
 
-DB <- READS_AND_FREQ %>% summarise(Freq = sum(Freq)) %>% # Reads = sum(Reads), 
-  left_join(.DB) %>% rename("SampleFreq" = "Freq") %>%
+DB <- READS_AND_FREQ %>% 
+  summarise(Freq = sum(Freq)) %>% # Reads = sum(Reads), 
+  left_join(.DB) %>% 
+  dplyr::rename("SampleFreq" = "Freq") %>%
   arrange(match(MajorRNA, rownames(GCOUNTS)))
   # arrange(match(Name, rownames(SORTED_MAT)))
 
+# UPGRADE DB
+
+which_cols <- names(DB)[!names(DB) %in% names(.DB)]
+
+DB <- DB %>% dplyr::select(any_of(c(names(.DB), which_cols)))
+
+write_tsv(DB, paste0(path, "/RNA_LOCATION_DB.tsv"))
 
 DB  %>% 
   filter(SampleFreq == 1) %>%
