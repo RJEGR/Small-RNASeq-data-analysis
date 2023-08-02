@@ -1,7 +1,8 @@
 
 # RICARDO GOMEZ-REYES  
 # AFTER RUN 2_SRNA_LOCATION_DB_PREP.R
-
+# EVALUATE THE SOURCE OF SRNAS
+# TRY CIRCOS
 rm(list = ls())
 
 if(!is.null(dev.list())) dev.off()
@@ -44,14 +45,14 @@ df %>% summarise(sum(reads_pct), sum(n_freq))
 
 df %>% group_by(SRNAtype, biotype_best_rank) %>% 
   summarise(values_from = sum(n)) %>% # values_from = sum(n), 
-  pivot_wider(names_from = SRNAtype, values_from = values_from) %>% 
-  view()
+  pivot_wider(names_from = SRNAtype, values_from = values_from) # %>% 
+  # view()
 
 # (doi.org/10.1186/1471-2164-11-533): Roughly half of known miRNA genes are located within previously annotated protein-coding regions ("intragenic miRNAs"). A high-confidence set of predicted mRNA targets of intragenic miRNAs also shared many of these features with the host genes. Approximately 20% of intragenic miRNAs were predicted to target their host mRNA transcript.
 
 df %>% filter(SRNAtype == "miR") %>% group_by(biotype_best_rank) %>% summarise(sum(n_freq))
 
-df %>%
+p <- df %>%
   ggplot(aes(x = SRNAtype, y = reads_pct, fill = biotype_best_rank)) +
   geom_col() +
   see::scale_fill_material() +
@@ -62,6 +63,8 @@ df %>%
     panel.border = element_blank(),
     panel.grid.minor = element_blank()) 
   # facet_grid( SRNAtype ~ .)
+
+# ggplot2::ggsave(p, filename = "SRNA_LOCATION.png", path = wd, width = 5, height = 5, device = png, dpi = 300)
 
 df %>%
   ggplot(aes(x = width, y = Reads, fill = biotype_best_rank)) +
@@ -75,6 +78,96 @@ df %>%
     panel.border = element_blank(),
     panel.grid.minor = element_blank()) 
   # facet_grid(~ SRNAtype, scales = "free", space = "free")
+
+# CIRCOS ====
+
+view(head(DB))
+
+library(gggenes)
+
+other_intra <- c("exon", "UTR")
+
+DB <- DB %>% mutate(Chrom = gsub("^JALGQA010000", "", Chrom)) %>% 
+  mutate(Chrom = gsub(".1$", "", Chrom)) %>% 
+  mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_nc, "Other ncRNA", biotype_best_rank)) %>%
+  mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_intra, "Intragenic", biotype_best_rank))
+
+
+query.chr <- DB %>% filter(SRNAtype == "miR") %>% distinct(Chrom) %>% pull()
+
+
+# DB %>%
+#   # filter(Chrom %in% query.chr ) %>%
+#   filter(SRNAtype != "siR") %>%
+#   ggplot(aes(xmin = Start, xmax = End, y = Chrom)) +
+#   geom_gene_arrow(aes(fill = SRNAtype, color = SRNAtype)) +
+#   geom_feature_label(aes(x = Start+(End-Start)/2, y = Chrom, label = biotype_best_rank, forward = Strand)) +
+#   theme_genes() 
+
+#  
+# DB %>%
+#   filter(SRNAtype != "siR") %>%
+#   mutate(SRNAtype = ifelse(SRNAtype == "miR", "a", "b")) %>%
+#   ggplot(aes(xmin = Start, xmax = End, y = Chrom)) +
+#   geom_gene_arrow(aes(fill = biotype_best_rank, color = biotype_best_rank)) +
+#   geom_feature_label(aes(x = Start+(End-Start)/2, y = Chrom, label = SRNAtype, forward = Strand), family = "GillSans") + 
+#   facet_grid(~ biotype_best_rank) +
+#   theme_genes() +
+#   scale_x_continuous("Chromosome width (Nucleotides)", 
+#     labels = scales::number_format(scale = 1/1000000, suffix = " Gb")) +
+#   see::scale_fill_material() +
+#   see::scale_color_material() +
+#   theme_minimal()
+
+col_recode <- structure(c("#E7DFD5", "#647687", "red"), names = c("siR", "piR", "miR"))
+
+DB_SIRS <- DB %>% 
+  filter(SRNAtype == "siR" & SampleFreq > 3 & UniqueReads > 100) %>%
+  filter(between(x = as.numeric(DicerCall), 24, 30))
+
+DB_SIRS %>% count(DicerCall)
+
+p <- DB %>% 
+  filter(SRNAtype != "siR") %>%
+  rbind(DB_SIRS) %>%
+  filter(Chrom %in% query.chr ) %>%
+  mutate(SRNAtype = factor(SRNAtype, levels = rev(names(col_recode)))) %>%
+  ggplot(aes(xmin = Start, xmax = End, y = Chrom)) +
+  geom_gene_arrow(aes(fill = SRNAtype, color = SRNAtype)) +
+  facet_grid(~ biotype_best_rank) +
+  theme_genes() +
+  scale_x_continuous("Tamaño (Nucleótidos)", 
+    labels = scales::number_format(scale = 1/1000000, suffix = " Gb")) +
+  labs(y = "Andamios del genoma") +
+  scale_color_manual("",values = col_recode) +
+  scale_fill_manual("",values = col_recode) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(
+    legend.position = "top",
+    # axis.text.x = element_blank(),
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.text.y = element_text(size = 7),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major = element_line(linewidth = 0.5, color = "grey89", linetype = "dashed"),
+    panel.grid.major.x = element_blank())
+
+
+ggplot2::ggsave(p, filename = "SRNA_LOCATION.png", path = wd, width = 7, height = 7, device = png, dpi = 300)
+
+
+library(ggbio)
+
+# DB <- # genomic range
+
+ggplot() +
+  ggbio::layout_circle(DB, aes(fill = SRNAtype, y = Reads), geom = "rect") +
+  theme(legend.position = "top")
+
 
 # PLOT BY TRANPOSON TYPE? ====
 # PLOT of piRNA cluster expression across developmental stages
