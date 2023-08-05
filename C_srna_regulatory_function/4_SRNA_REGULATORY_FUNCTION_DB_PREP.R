@@ -23,7 +23,10 @@ print(RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")))
 
 # nrow(out <- read_rds(paste0(wd, "SRNA_FUNCTION_PREDICTED.rds")))
 
-str(query.ids <- RES.P %>% distinct(gene_id) %>% pull()) # 8465
+str(query.ids <- RES.P %>% 
+    mutate(gene_id = strsplit(gene_id, ";")) %>%
+    unnest(gene_id) %>%
+    distinct(gene_id) %>% pull()) # 8465
 
 # str(query.ids <- paste(query.ids, collapse = "|"))
 
@@ -47,12 +50,9 @@ f <- list.files(path = wd, pattern = GTF, full.names = T)
 
 GTF <- rtracklayer::import(f)
 
-GTF2DF <- GTF %>% as_tibble() %>% distinct(gene_id, transcript_id, ref_gene_id)
-
-GTF2DF <- GTF2DF %>% filter(!is.na(ref_gene_id))
+print(GTF2DF <- GTF %>% as_tibble() %>% distinct(gene_id, transcript_id, ref_gene_id) %>% filter(!is.na(ref_gene_id))) # A tibble: 70,001 × 3
 
 nrow(GTF2DF <- GTF2DF %>% filter(ref_gene_id %in% query.ids)) # 17532
-
 
 GTF2DF %>% count(ref_gene_id, sort = T)
 
@@ -67,7 +67,7 @@ str(query2.ids <- GTF2DF %>% distinct(ref_gene_id) %>% pull() %>% sort()) # 8465
 
 any(sort(query.ids) ==  query2.ids) # TRUE
 
-# 3) ====
+# 3) USING TRANSCRITPOME DATA ====
 # WHICH ID RETRIVE BACK BETTER DETAILS?
 
 # grep -c "XM_" transcript_count_matrix.csv 55 596 from 193 407
@@ -186,8 +186,8 @@ pleft <- DB %>% dplyr::select(gene_id, n_srnas) %>%
   labs(x = 'Number of miRs', y = '') +
   theme(
     legend.position = "top",
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
+    # axis.text.x = element_blank(),
+    # axis.ticks.x = element_blank(),
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
     strip.background = element_rect(fill = 'grey89', color = 'white'),
@@ -206,7 +206,7 @@ p <- pright + plot_spacer() + pleft + plot_layout(widths = c(7, -1.5 , 3.5))
 ggsave(p, filename = "DESEQ2HEATMAP_TRANSCRIPTOME.png", path = wd, width = 5, height = 10, device = png, dpi = 300)
 
 
-# COMO COLAPSAR INFORMACION DE NAME PARA IDENTIFICAR EL TARGET EN UN HEATMAP U OTRO DATAVIZ???
+# COMO COLAPSAR INFORMACION DE NAME (I.E MIRS) PARA IDENTIFICAR EL TARGET EN UN HEATMAP U OTRO DATAVIZ???
 
 DB %>% unnest(Name) %>% 
   # dplyr::select(all_of(c("Name",which_cols))) %>% 
