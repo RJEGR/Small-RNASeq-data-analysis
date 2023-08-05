@@ -7,8 +7,9 @@
 
 # NOTE:
 
-# POSITIVE LFC == UP EXPRESSED IN CONTROL
-# NEGATIVE LFC == UP EXPRESSED IN EXPERIMENTAL
+# POSITIVE LFC == UP EXPRESSED IN EXPERIMENTAL (OR sampleB)
+# NEGATIVE LFC == UP EXPRESSED IN CONTROL (OR sampleB)
+# view baseMeanA and baseMeanB to contrast the expression values
 
 rm(list = ls())
 
@@ -20,7 +21,7 @@ library(tidyverse)
 
 wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
-RES <- read_tsv(paste0(wd, "DESEQ_RES.tsv"))
+RES <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% mutate(log2FoldChange = log2FoldChange * -1)
 
 url <- "https://raw.githubusercontent.com/RJEGR/Cancer_sete_T_assembly/main/functions.R"
 
@@ -36,10 +37,8 @@ recode_fc <- structure(c("Up","Down"), names = c(1,-1))
 
 RES.P <- RES %>% filter( padj < 0.05) # abs(log2FoldChange) > 2 &
 
-RES.P <- RES.P %>% mutate(log2FoldChange = log2FoldChange * -1)
 
 # 1) =====
-
 
 RES.P <- RES.P %>%
   mutate(star = ifelse(padj <.001, "***", 
@@ -96,6 +95,7 @@ ggsave(p, filename = 'DESEQ2BARPLOT.png', path = wd, width = 5, height = 10, dev
 
 # 2 ====
 # not only unique
+
 RES.P %>% 
   mutate(SIGN = sign(log2FoldChange)) %>%
   dplyr::count(CONTRAST, WRAP, SIGN, sampleB, sampleA) %>%
@@ -105,22 +105,28 @@ RES.P %>%
 
 library(ggupset)
 
-UPSETDF <- RES %>% 
-  filter(padj < 0.05) %>%
-  mutate(log2FoldChange = log2FoldChange * -1) %>%
-  mutate(SIGN = sign(log2FoldChange)) %>%
-  dplyr::mutate(CONTRAST = dplyr::recode(CONTRAST, !!!recode_to)) %>%
-  dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
-  # separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]") %>%
+# UPSETDF <- RES %>% 
+#   filter(padj < 0.05) %>%
+#   mutate(SIGN = sign(log2FoldChange)) %>%
+#   dplyr::mutate(CONTRAST = dplyr::recode(CONTRAST, !!!recode_to)) %>%
+#   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
+#   # separate(CONTRAST, into = c("CONTRAST","WRAP"), sep = "[|]") %>%
+#   group_by(Name, SIGN) %>%
+#   summarise(across(CONTRAST, .fns = list), n = n()) 
+
+UPSETDF <- RES.P %>%
+  unite("CONTRAST", CONTRAST:WRAP, sep = " | ") %>%
   group_by(Name, SIGN) %>%
-  summarise(across(CONTRAST, .fns = list), n = n()) 
+  summarise(across(CONTRAST, .fns = list), n = n())
+
+
   
 UPSETDF %>%
   ggplot(aes(x = CONTRAST, fill = SIGN)) +
   geom_bar(position = position_dodge(width = 1)) +
   geom_text(stat='count', aes(label = after_stat(count)), 
     position = position_dodge(width = 1), vjust = -0.5, family = "GillSans", size = 2.5) +
-  scale_x_upset(order_by = "freq", reverse = F) +
+  scale_x_upset(order_by = "degree", reverse = T) +
   theme_bw(base_family = "GillSans") +
   theme_combmatrix(combmatrix.panel.point.color.fill = "black",
     combmatrix.panel.line.size = 0, base_family = "GillSans") +
@@ -139,12 +145,32 @@ p <- p + theme(legend.position = "top",
   panel.grid.minor.x = element_blank(),
   strip.background.y = element_blank())
 
-ggsave(p, filename = 'DESEQ2UPSET.png', path = wd, width = 5, height = 5.2, device = png, dpi = 300)
+# needs manual eddition if facetwrawp
+# p <- p + facet_grid(cols = vars(WRAP), scales = "free")
+
+ggsave(p, filename = 'DESEQ2UPSET.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
 
 # 3) SPLIT EXCLUSIVE FROM INTERSECTED MIRS ----
+
 UPSETDF %>% group_by(n) %>% tally()
 
 UPSETDF %>% group_by(n, SIGN) %>% tally()
+
+# Sanity check
+
+str(query.ids <- UPSETDF %>% filter(n == 1) %>% pull(Name))
+
+RES.P %>% count(sampleA, sampleB)
+
+RES.P %>%
+  unite("CONTRAST", CONTRAST:WRAP, sep = " | ") %>%
+  filter(Name %in% head(query.ids)) %>% view()
+  # dplyr::select(Name, baseMeanA, baseMeanB, CONTRAST, WRAP, SIGN) %>%
+  pivot_longer(cols = c("baseMeanA", "baseMeanB")) %>%
+  ggplot(aes(x = value, y = Name, fill = name)) +
+  facet_grid(SIGN ~ CONTRAST) +
+  geom_col(position = position_dodge2())
+
 
 EXCLUSIVE_MIRS <- UPSETDF %>% filter(n == 1) %>%
   mutate(CONTRAST = unlist(CONTRAST)) %>%
@@ -160,3 +186,5 @@ out <- list(EXCLUSIVE_MIRS, INTERSECTED_MIRS)
 
 write_rds(out, file = paste0(wd, "UPSETDF.rds"))
 
+
+query.ids <- EXCLUSIVE_MIRS %>% count(Name, sort = T) %>% filter(n == 2) %>% pull(Name)
