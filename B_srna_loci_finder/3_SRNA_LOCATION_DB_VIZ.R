@@ -3,6 +3,7 @@
 # AFTER RUN 2_SRNA_LOCATION_DB_PREP.R
 # EVALUATE THE SOURCE OF SRNAS
 # TRY CIRCOS
+
 rm(list = ls())
 
 if(!is.null(dev.list())) dev.off()
