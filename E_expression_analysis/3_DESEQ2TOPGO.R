@@ -5,6 +5,14 @@
 # 2) RUN INDEPENDENTLY THE TOP GO ANALYSIS
 # 3) PLOT SOME STUFFS
 
+
+# NOTE:
+
+# POSITIVE LFC == UP EXPRESSED IN EXPERIMENTAL (OR sampleB)
+# NEGATIVE LFC == UP EXPRESSED IN CONTROL (OR sampleB)
+# view baseMeanA and baseMeanB to contrast the expression values
+
+
 rm(list = ls())
 
 if(!is.null(dev.list())) dev.off()
@@ -23,8 +31,7 @@ EXCLUSIVE_MIRS <- .UPSETDF[[1]] %>% ungroup()
 
 INTERSECTED_MIRS <- .UPSETDF[[2]]  %>% ungroup()
 
-
-EXCLUSIVE_MIRS %>% distinct(Family)
+EXCLUSIVE_MIRS %>% count(Name, sort = T) # ???
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
@@ -79,6 +86,9 @@ RES.P <- .SRNA2GO %>%
   
 write_tsv(RES.P, paste0(wd, "DESEQ_RES_P.tsv"))
 
+RES.P %>% 
+
+
 SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$query)
 
 SRNA2GO <- lapply(SRNA2GO, unlist)
@@ -93,7 +103,6 @@ EXCLUSIVE_MIRS %>%
   group_by(CONTRAST, SIGN) %>%
   summarise(across(Name, .fns = list), n = n())
   
-
 # UP
 
 DF <- list()
@@ -112,9 +121,18 @@ for(j in 1:length(CONTRAST)) {
   
   # query.names <- DF2GO %>% pull(Name)
   
-  query.names <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% filter(CONTRAST %in% CONTRAST[i]) %>% pull(Name)
+  query.names <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% 
+    filter(CONTRAST %in% CONTRAST[i]) %>% distinct() %>% pull(Name)
+  
+  RES.P %>% filter(Name %in% query.names) %>% filter(CONTRAST %in% CONTRAST[i]) %>% view()
+    
+  
   
   query.p <- c(rep(0.05, length(query.names)))
+  
+  cat("\nUsing ",length(query.names), " Names...\n")
+  
+  cat("\nAnd ",sum(names(SRNA2GO) %in% query.names), " GO terms\n")
   
   allRes <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 20)
   
@@ -185,6 +203,37 @@ p <- p + theme(legend.position = "none",
 
 ggsave(p, filename = 'DESEQ2TOPGO_EXCLUSIVE.png', path = wd, width = 3.5, height = 10, device = png, dpi = 300)
 
+# or plot by bars:
+# split enrichment annotated by: if 
+
+TOPGO_EXCLUSIVE %>% distinct(Term)
+
+p <- TOPGO_EXCLUSIVE %>%
+  separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]") %>%
+  mutate(Annotated = ifelse(SIGN == "Down", -Annotated, Annotated)) %>%
+  mutate(SIGN = factor(SIGN, levels = c("Up","Down"))) %>%
+  mutate(ordering = -as.numeric(SIGN) + Annotated, Term = fct_reorder(Term, ordering, .desc = T)) %>%
+  ggplot(aes(y = Term, x = Annotated, fill = SIGN, color = SIGN)) + 
+  # geom_col() +
+  geom_segment(aes(x = Annotated, xend = 0, yend = Term)) +
+  ggh4x::facet_nested(CONTRAST+WRAP+SIGN ~ ., nest_line = F, scales = "free") +
+  ggsci::scale_fill_aaas() +
+  ggsci::scale_color_aaas() +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  labs(x = "", y = "") +
+  theme(legend.position = "none",
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_line(linetype = "dashed", linewidth = 0.5),
+    axis.text.y = element_text(angle = 0, size = 5),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, size = 10))
+
+ggsave(p, filename = 'DESEQ2TOPGO_EXCLUSIVE_2.png', path = wd, width = 3.5, height = 10, device = png, dpi = 300)
 
 # INTERSECTED ====
 
