@@ -28,9 +28,9 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 WD <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
-# f <- "KNOWN_AND_NOVEL_MIRS_MajorRNA.fasta"
+f <- "KNOWN_AND_NOVEL_MIRS_MajorRNA.fasta"
 
-f <- "KNOWN_AND_NOVEL_MIRS_MajorRNA.aln$"
+# f <- "KNOWN_AND_NOVEL_MIRS_MajorRNA.aln$"
 
 f <- list.files(path = WD, pattern = f, full.names = T)
 
@@ -151,6 +151,12 @@ library(patchwork)
 
 top/ps + plot_layout(widths = c(2, 2), heights = c(2,10))
 
+
+ggsave(p, filename = "XXX", 
+  path = wd, width = 3.5, height = 10, device = png, dpi = 300)
+
+
+# OMIT =====
 detach("package:phangorn", unload=TRUE)
 
 tree <- fitGTR$tree
