@@ -23,9 +23,10 @@ dim(COUNTS <- out[[1]])
 
 dim(MTD <- out[[2]])
 
-
 head(.DB <- read_tsv(paste0(path, "/RNA_LOCATION_DB.tsv")))
 
+MIRGENEDB <- read_tsv(paste0(path, "SRNA2MIRGENEDB.tsv")) %>%
+  tidyr::unite("Family", c("Family", "arm"), sep = "-")
 
 # head(sort_m <- sort(rowSums(COUNTS), decreasing = T))
 
@@ -92,6 +93,7 @@ DB  %>%
 # Sanity check:
 
 sum(.DB$Reads)
+
 sum(DB$Reads) # 83 808 529 <- consistente
 
 DB  %>% 
@@ -157,13 +159,15 @@ heatmap(edgeR::cpm(M))
 # 2) AS Sempere, Wheeler and collaborators (35,36). 
 # USING Clustal /MAFFT 6.85 /MUSCLE. AND manually refined the alignments with RALEE/Gblocks/ and reconstructed evolutionary trees with standard phylogenetic methods: neighbor-joining (40) and maximum likelihood (41) using DECIPHER. (EX. 10.1093/nar/gkt534)
 
+.DB %>% dplyr::count(SRNAtype)
 
+DB <- .DB %>% filter(SRNAtype == "miR")
 
-head(seqs <- DB %>% arrange(MajorRNA) %>% distinct(MajorRNA) %>% pull()) # %>% head(100)
+str(seqs <- DB %>% arrange(MajorRNA) %>% pull(MajorRNA)) # %>% head(100)
 
-head(seqs <- sort(seqs))
+str(seqs.name <- DB %>% arrange(MajorRNA) %>% select(Name) %>% pull(Name))
 
-bioseq::rna(seqs)
+seqs <- bioseq::rna(seqs)
 
 # bioseq::seq_consensus(bioseq::rna(seqs))
 
@@ -172,21 +176,103 @@ library(bioseq)
 
 # method=c("ClustalW", "ClustalOmega", "Muscle")
 
-align <- msa::msa(RNAStringSet(seqs), method = "ClustalW")
+align <- msa::msa(RNAStringSet(seqs), method = "Muscle")
 
-align <- msaConvert(align)$seq
+.align <- msaConvert(align)$seq
 
-print(bioseq::rna(align))
+print(bioseq::rna(.align))
 
 # PREP SRNA-SEQUENCE POS-CLUSTERING: 
 
-SEQ_CLUSTERS <- bioseq::seq_cluster(bioseq::rna(align), threshold = )
+table(SEQ_CLUSTERS <- bioseq::seq_cluster(bioseq::rna(.align), threshold = 0.01, method = "single"))
 
-# x_bin <- ape::as.DNAbin(align)
-# x_bin <- as.matrix(x_bin)
-# ape::dist.dna(x_bin, model = "raw")
 
-bioseq::rna(align)[SEQ_CLUSTERS]
+print(bioseq::rna(.align)[SEQ_CLUSTERS])
+
+msa <- RNAStringSet(.align)
+
+names(msa) <- seqs.name
+
+out <- ggmsa::tidy_msa(msa) %>% as_tibble() %>% dplyr::rename("Name"="name") %>%
+  left_join(MIRGENEDB %>% distinct(Name, Family)) %>% 
+  mutate(Family = ifelse(is.na(Family), Name, Family))
+
+
+x_bin <- ape::as.DNAbin(as(DNAStringSet(msa), "matrix"))
+x_bin <- as.matrix(x_bin)
+x_dist <- ape::dist.dna(x_bin, model = "raw")
+
+hc_seqs <- stats::hclust(x_dist, method = "complete")
+
+seqs_order <- hc_seqs$labels[hc_seqs$order]
+
+recode_to <- out %>% distinct(Name, Family)
+
+recode_to <- structure(recode_to$Family, names = recode_to$Name)
+
+identical(sort(names(recode_to)),sort(seqs_order))
+
+seqs_order <- recode_to[match(seqs_order, names(recode_to))]
+
+identical(names(seqs_order),  hc_seqs$labels[hc_seqs$order])
+
+
+ps <- out %>%
+  # filter(grepl("^MIR-10", Family)) %>%
+  mutate(character = ifelse(character == "-", NA, character)) %>%
+  drop_na(character) %>%
+  ggplot(aes(x = position, y = Name)) +
+  geom_tile(aes(fill = character), color = 'white', linewidth = 0.2) +
+  # geom_text(aes(label = character), vjust = 0.5, hjust = 0.5, size= 2.5, family =  "GillSans") +
+  theme_classic(base_size = 7, base_family = "GillSans") +
+  scale_x_continuous(breaks = seq(1, 41, by = 2)) +
+  ggh4x::scale_y_dendrogram(hclust = hc_seqs, position = "left", labels = NULL) +
+  guides(y.sec = guide_axis_manual(labels = seqs_order, label_size = 3.5)) +
+  scale_fill_manual("Nuc.", values = c("#cd201f", "#FFFC00","#00b489","#31759b"), 
+    na.value = "white") +
+  theme(
+    legend.position = "none", 
+    axis.line.x = element_blank(),
+    axis.line.y = element_blank(),
+    axis.text.y = element_text(hjust = 1),
+    axis.ticks.length = unit(5, "pt"))
+
+topdf <- out %>% 
+  mutate(character = ifelse(character == "-", NA, character)) %>%
+  drop_na(character) %>%
+  group_by(position) %>% 
+  dplyr::count(character) %>%
+  mutate(Freq = n/sum(n))
+
+topdf %>% tally(Freq)
+
+top <- topdf %>%
+  ggplot(aes(y = Freq, x = position, fill = character)) +
+  geom_col() +
+  labs(x = "") +
+  theme_classic(base_size = 7, base_family = "GillSans") +
+  scale_fill_manual("Nuc.", values = c("#cd201f", "#FFFC00","#00b489","#31759b"), 
+    na.value = "white") +
+  theme(
+    legend.position = "top", 
+    axis.ticks.x = element_blank(),
+    axis.line.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.text.y = element_text(hjust = 1))
+
+
+library(patchwork)
+
+p <- top / plot_spacer() / ps + plot_layout(heights = c(1, -0.5, 7), widths = c(2, 2, 2))
+
+# p <- top/ps + plot_layout(widths = c(2, 2), heights = c(2,10))
+
+ggsave(p, filename = "ALIGMENT_TREE.png", 
+  path = path, width = 3.5, height = 8, device = png, dpi = 300)
+
+
 # EX.
 
 library(Biostrings)
