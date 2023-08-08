@@ -98,10 +98,11 @@ ggsave(p, filename = 'DESEQ2BARPLOT.png', path = wd, width = 5, height = 10, dev
 
 RES.P %>% 
   mutate(SIGN = sign(log2FoldChange)) %>%
-  dplyr::count(CONTRAST, WRAP, SIGN, sampleB, sampleA) %>%
+  dplyr::count(CONTRAST, WRAP, SIGN, sampleB) %>%
   dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc))
   # separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]")
+
 
 library(ggupset)
 
@@ -156,15 +157,17 @@ UPSETDF %>% group_by(n) %>% tally()
 
 UPSETDF %>% group_by(n, SIGN) %>% tally()
 
-# Sanity check
+# Sanity check if unique:
 
 str(query.ids <- UPSETDF %>% filter(n == 1) %>% pull(Name))
+
+str(query.ids <- EXCLUSIVE_MIRS %>% count(Name, sort = T) %>% filter(n == 2) %>% pull(Name))
 
 RES.P %>% count(sampleA, sampleB)
 
 RES.P %>%
   unite("CONTRAST", CONTRAST:WRAP, sep = " | ") %>%
-  filter(Name %in% head(query.ids)) %>% view()
+  filter(Name %in% query.ids) %>% # view()
   # dplyr::select(Name, baseMeanA, baseMeanB, CONTRAST, WRAP, SIGN) %>%
   pivot_longer(cols = c("baseMeanA", "baseMeanB")) %>%
   ggplot(aes(x = value, y = Name, fill = name)) +
@@ -186,5 +189,3 @@ out <- list(EXCLUSIVE_MIRS, INTERSECTED_MIRS)
 
 write_rds(out, file = paste0(wd, "UPSETDF.rds"))
 
-
-query.ids <- EXCLUSIVE_MIRS %>% count(Name, sort = T) %>% filter(n == 2) %>% pull(Name)
