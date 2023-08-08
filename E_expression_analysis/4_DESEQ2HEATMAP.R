@@ -111,6 +111,7 @@ p1 <- COUNT_LONG %>%
   ggplot(aes(x = LIBRARY_ID, y = Name, fill = log2(value))) + 
   geom_tile(color = 'white', linewidth = 0.2) +
   scale_fill_viridis_c(option = "B", name = "Log2", direction = -1, na.value = "white") +
+  # ggsci::scale_fill_gsea(name = "", reverse = T, na.value = "white") +
   ggh4x::facet_nested( ~ hpf+pH, nest_line = F, scales = "free", space = "free") +
   # scale_x_discrete(position = 'top') +
   # ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
@@ -121,6 +122,7 @@ p1 <- COUNT_LONG %>%
   theme(
     legend.position = "top",
     axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
     # axis.text.x = element_text(angle = 90, hjust = -0.15, vjust = 1),
     strip.background = element_rect(fill = 'grey89', color = 'white'),
     panel.border = element_blank(),
@@ -186,6 +188,11 @@ COUNT %>%
 
 library(ggh4x)
 
+# scale_fill_gradient2(low = "red", mid = "white", high = "blue", 
+#   midpoint = 0, na.value = "white",
+#   breaks = seq(-5, 0, 5), 
+#   limits = c(-5, 5)) +
+  
 p2 <- COUNT_LONG %>%
   ggplot(aes(x = LIBRARY_ID, y = Name, fill = log2(value))) + 
   geom_tile(color = 'white', linewidth = 0.2) +
@@ -225,6 +232,91 @@ ggsave(p, filename = "DESEQ2HEATMAP.png",
   path = wd, width = 3.5, height = 10, device = png, dpi = 300)
 
 
+# SINGLE HEATMAP
+
+str(query.ids <- RES.P %>%
+  # filter(!grepl("Cluster", Family)) %>%
+  distinct(Name) %>% pull()) # 65
+
+sum(KEEP <- rownames(.COUNT) %in% query.ids)
+
+nrow(COUNT <- .COUNT[KEEP,])
+
+COUNT <- DESeq2::varianceStabilizingTransformation(COUNT)
+
+# COUNT <- edgeR::cpm(COUNT)
+
+colSums(COUNT)
+
+# COUNT <- COUNT %>% 
+#   as_tibble(rownames = "Name") %>%
+#   left_join(RES.P %>% distinct(Name, Family)) 
+
+
+sample_dist = dist(t(COUNT), method='euclidean')
+
+hc_samples = hclust(sample_dist, method='complete')
+
+hc_order <- hc_samples$labels[hc_samples$order]
+
+srna_dist = dist(COUNT, method='euclidean')
+
+hc_srna = hclust(srna_dist, method='complete')
+
+srna_order <- hc_srna$labels[hc_srna$order]
+
+recode_to <- RES.P %>% filter(Name %in% srna_order) %>% distinct(Name, Family)
+
+recode_to <- structure(recode_to$Family, names = recode_to$Name)
+
+identical(sort(names(recode_to)),sort(srna_order))
+
+srna_order <- recode_to[match(srna_order, names(recode_to))]
+
+identical(names(srna_order),  hc_srna$labels[hc_srna$order])
+
+sum(tag <- srna_order %in% EXCLUSIVE_IDS)
+
+srna_order[tag] <- paste0(srna_order[tag], "*") 
+
+# heatmap(COUNT, col = cm.colors(12))
+
+COUNT %>% 
+  as_tibble(rownames = 'Name') %>%
+  pivot_longer(-Name, names_to = "LIBRARY_ID") %>%
+  left_join(.colData) %>%
+  mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = hc_order)) -> COUNT_LONG
+
+library(ggh4x)
+
+p3 <- COUNT_LONG %>%
+  ggplot(aes(x = LIBRARY_ID, y = Name, fill = log2(value))) + 
+  geom_tile(color = 'white', linewidth = 0.2) +
+  scale_fill_viridis_c(option = "B", name = "", direction = -1, na.value = "white") +
+  # ggh4x::facet_nested( ~ hpf+pH, nest_line = F, scales = "free", space = "free") +
+  # scale_x_discrete(position = 'top') +
+  ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top', labels = NULL) +
+  ggh4x::scale_y_dendrogram(hclust = hc_srna, position = "left", labels = NULL) +
+  guides(y.sec = guide_axis_manual(labels = srna_order, label_size = 3.5),
+    x.sec = guide_axis_manual(labels = hc_order, label_size = 10)) +
+  theme_bw(base_size = 10, base_family = "GillSans") +
+  labs(x = '', y = '') +
+  theme(
+    legend.position = "top",
+    # axis.text.y = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1.1),
+    # strip.background = element_rect(fill = 'grey89', color = 'white'),
+    strip.background = element_blank(), 
+    strip.text = element_blank(),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_blank()) 
+
+p3
 
 # 2) LEFT OR RIGHT LABEL INCLUDE SEMANTIC SIMILARITY GROUPING
 
