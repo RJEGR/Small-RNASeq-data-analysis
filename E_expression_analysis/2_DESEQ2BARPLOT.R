@@ -120,7 +120,7 @@ UPSETDF <- RES.P %>%
   group_by(Name, SIGN) %>%
   summarise(across(CONTRAST, .fns = list), n = n())
 
-
+Levels <- RES.P %>% unite("CONTRAST", CONTRAST:WRAP, sep = " | ") %>% distinct(CONTRAST) %>% pull()
   
 UPSETDF %>%
   ggplot(aes(x = CONTRAST, fill = SIGN)) +
@@ -131,6 +131,7 @@ UPSETDF %>%
   theme_bw(base_family = "GillSans") +
   theme_combmatrix(combmatrix.panel.point.color.fill = "black",
     combmatrix.panel.line.size = 0, base_family = "GillSans") +
+  axis_combmatrix(levels = Levels) +
   labs(x = '', y = 'Number of Intersected miRs') +
   ggsci::scale_fill_aaas() +
   ggsci::scale_color_aaas() +
