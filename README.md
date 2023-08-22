@@ -1,4 +1,4 @@
-<img width="600" alt="image" src="https://github.com/RJEGR/Small-RNASeq-data-analysis/assets/24900266/cf34d044-e108-43a3-81e2-78cf26501a2a">
+<img width="1200" alt="image" src="https://github.com/RJEGR/Small-RNASeq-data-analysis/assets/24900266/cf34d044-e108-43a3-81e2-78cf26501a2a">
 
 # Markdown for microRNA analysis
 This repository contains notes for the installation and execution of bioinformatics tools as well as a code-lab scripts associated with a project for small RNA analysis of a non-model specie. It is not a final version of reproducible workflow, so use with discretion.
