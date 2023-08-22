@@ -18,6 +18,19 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out
 
 print(DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
 
+
+pattern <- "multi_genome.newid.gff3$" # <- to get sequence-region per chromosome
+
+wd_genome <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/"
+
+f <- list.files(path = wd_genome, pattern = pattern, full.names = T)
+
+G <- rtracklayer::import(f)
+
+length(G <- G[G$type == "region"])
+
+G <- G %>% as_tibble() %>% select(seqnames, start,  end)
+
 # view(DB)
 
 # 
@@ -32,57 +45,9 @@ DB %>% count(SRNAtype, sort = T)
 
 other_nc <- c("snRNA", "rRNA", "tRNA", "lncRNA", "srpRNA")
 
-df <- DB %>% 
-  mutate(width = nchar(MajorRNA)) %>%
-  mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_nc, "Other ncRNA", biotype_best_rank)) %>%
-  group_by(SRNAtype, biotype_best_rank, width) %>% 
-  summarise(Reads = sum(Reads), n = n()) %>%
-  group_by(SRNAtype) %>%
-  mutate(reads_pct = Reads/sum(Reads), n_freq = n/sum(n))
-
-df %>% summarise(sum(Reads), sum(n))
-
-df %>% summarise(sum(reads_pct), sum(n_freq))
-
-df %>% group_by(SRNAtype, biotype_best_rank) %>% 
-  summarise(values_from = sum(n)) %>% # values_from = sum(n), 
-  pivot_wider(names_from = SRNAtype, values_from = values_from) # %>% 
-  # view()
-
-# (doi.org/10.1186/1471-2164-11-533): Roughly half of known miRNA genes are located within previously annotated protein-coding regions ("intragenic miRNAs"). A high-confidence set of predicted mRNA targets of intragenic miRNAs also shared many of these features with the host genes. Approximately 20% of intragenic miRNAs were predicted to target their host mRNA transcript.
-
-df %>% filter(SRNAtype == "miR") %>% group_by(biotype_best_rank) %>% summarise(sum(n_freq))
-
-p <- df %>%
-  ggplot(aes(x = SRNAtype, y = reads_pct, fill = biotype_best_rank)) +
-  geom_col() +
-  see::scale_fill_material() +
-  scale_y_continuous("Freq. of reads",labels = scales::percent) +
-  theme_bw(base_family = "GillSans", base_size = 11) +
-  theme(strip.background = element_rect(fill = 'white', color = 'white'),
-    legend.position = 'top',
-    panel.border = element_blank(),
-    panel.grid.minor = element_blank()) 
-  # facet_grid( SRNAtype ~ .)
-
-# ggplot2::ggsave(p, filename = "SRNA_LOCATION.png", path = wd, width = 5, height = 5, device = png, dpi = 300)
-
-df %>%
-  ggplot(aes(x = width, y = Reads, fill = biotype_best_rank)) +
-  geom_col() +
-  labs(x = "Read length (nt)") +
-  see::scale_fill_material() +
-  scale_y_continuous("Number of reads",labels = scales::comma) +
-  theme_bw(base_family = "GillSans", base_size = 11) +
-  theme(strip.background = element_rect(fill = 'white', color = 'white'),
-    legend.position = 'top',
-    panel.border = element_blank(),
-    panel.grid.minor = element_blank()) 
-  # facet_grid(~ SRNAtype, scales = "free", space = "free")
-
 # CIRCOS ====
 
-view(head(DB))
+# view(head(DB))
 
 library(gggenes)
 
@@ -120,7 +85,13 @@ query.chr <- DB %>% filter(SRNAtype == "miR") %>% distinct(Chrom) %>% pull()
 #   see::scale_color_material() +
 #   theme_minimal()
 
-col_recode <- structure(c("#E7DFD5", "#647687", "red"), names = c("siR", "piR", "miR"))
+# see::material_colors()
+
+# scales::show_col(see::material_colors())
+
+"#f44336"
+
+col_recode <- structure(c("#E7DFD5", "#FFC107", "#2196F3"), names = c("siR", "piR", "miR"))
 
 DB_SIRS <- DB %>% 
   filter(SRNAtype == "siR" & SampleFreq > 3 & UniqueReads > 100) %>%
@@ -128,13 +99,21 @@ DB_SIRS <- DB %>%
 
 DB_SIRS %>% count(DicerCall)
 
-p <- DB %>% 
-  filter(SRNAtype != "siR") %>%
-  rbind(DB_SIRS) %>%
+G <- G %>% mutate(Chrom = gsub("^JALGQA010000", "", as.character(seqnames))) %>% 
+  mutate(Chrom = gsub(".1$", "", Chrom)) %>%
   filter(Chrom %in% query.chr ) %>%
-  mutate(SRNAtype = factor(SRNAtype, levels = rev(names(col_recode)))) %>%
-  ggplot(aes(xmin = Start, xmax = End, y = Chrom)) +
-  geom_gene_arrow(aes(fill = SRNAtype, color = SRNAtype)) +
+  dplyr::rename("Start" = "start", "End" = "end")
+
+
+DB <- DB %>% 
+  filter(SRNAtype != "siR") %>%
+  rbind(DB_SIRS) %>% # Using only siRNA from filtered criteria
+  filter(Chrom %in% query.chr ) %>%
+  mutate(SRNAtype = factor(SRNAtype, levels = rev(names(col_recode))))
+
+p <- ggplot() +
+  geom_segment(data = G, aes(x = Start, xend = End, yend = Chrom, y = Chrom), linewidth = 0.5, color="#E7DFD5", linetype="dashed") +
+  geom_gene_arrow(data = DB, aes(xmin = Start, xmax = End, y = Chrom, fill = SRNAtype, color = SRNAtype)) +
   facet_grid(~ biotype_best_rank) +
   theme_genes() +
   scale_x_continuous("Tamaño (Nucleótidos)", 
@@ -154,12 +133,65 @@ p <- DB %>%
     plot.title = element_text(hjust = 0),
     plot.caption = element_text(hjust = 0),
     panel.grid.minor.x = element_blank(),
-    panel.grid.major = element_line(linewidth = 0.5, color = "grey89", linetype = "dashed"),
+    panel.grid.major = element_blank(),
+    # panel.grid.major = element_line(linewidth = 0.5, color = "grey89", linetype = "dashed"),
     panel.grid.major.x = element_blank())
 
 
-ggplot2::ggsave(p, filename = "SRNA_LOCATION.png", path = wd, width = 7, height = 7, device = png, dpi = 300)
+ggplot2::ggsave(p, filename = "SRNA_LOCATION2.png", path = wd, width = 7, height = 7, device = png, dpi = 300)
 
+
+
+df <- DB %>% 
+  mutate(width = nchar(MajorRNA)) %>%
+  mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_nc, "Other ncRNA", biotype_best_rank)) %>%
+  group_by(SRNAtype, biotype_best_rank, width) %>% 
+  summarise(Reads = sum(Reads), n = n()) %>%
+  group_by(SRNAtype) %>%
+  mutate(reads_pct = Reads/sum(Reads), n_freq = n/sum(n))
+
+df %>% summarise(sum(Reads), sum(n))
+
+df %>% summarise(sum(reads_pct), sum(n_freq))
+
+df %>% group_by(SRNAtype, biotype_best_rank) %>% 
+  summarise(values_from = sum(n)) %>% # values_from = sum(n), 
+  pivot_wider(names_from = SRNAtype, values_from = values_from) # %>% 
+# view()
+
+# (doi.org/10.1186/1471-2164-11-533): Roughly half of known miRNA genes are located within previously annotated protein-coding regions ("intragenic miRNAs"). A high-confidence set of predicted mRNA targets of intragenic miRNAs also shared many of these features with the host genes. Approximately 20% of intragenic miRNAs were predicted to target their host mRNA transcript.
+
+df %>% filter(SRNAtype == "miR") %>% group_by(biotype_best_rank) %>% summarise(sum(n_freq))
+
+p <- df %>%
+  ggplot(aes(x = biotype_best_rank, y = Reads, fill = SRNAtype)) +
+  geom_col(position = position_dodge()) +
+  scale_color_manual("",values = col_recode) +
+  scale_fill_manual("",values = col_recode) +
+  scale_y_continuous("Freq. of reads",labels = scales::comma) +
+  theme_bw(base_family = "GillSans", base_size = 11) +
+  theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
+    legend.position = 'top',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank())
+
+# ggplot2::ggsave(p, filename = "SRNA_LOCATION.png", path = wd, width = 5, height = 5, device = png, dpi = 300)
+
+df %>%
+  ggplot(aes(x = width, y = Reads, fill = SRNAtype)) +
+  geom_col() +
+  labs(x = "Read length (nt)") +
+  see::scale_fill_material() +
+  scale_y_continuous("Number of reads",labels = scales::comma) +
+  theme_bw(base_family = "GillSans", base_size = 11) +
+  theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
+    legend.position = 'top',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank()) +
+  facet_grid(~ biotype_best_rank)
+# facet_grid(~ SRNAtype, scales = "free", space = "free")
+
+  
 
 library(ggbio)
 
