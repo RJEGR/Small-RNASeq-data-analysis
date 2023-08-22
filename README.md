@@ -1,3 +1,5 @@
+![ALIGMENT_TREE](https://github.com/RJEGR/Small-RNASeq-data-analysis/assets/24900266/58c2f2b1-171d-405e-873e-8a6556576041)
+
 # Markdown for microRNA analysis
 This repository contains notes for the installation and execution of bioinformatics tools as well as a code-lab scripts associated with a project for small RNA analysis of a non-model specie. It is not a final version of reproducible workflow, so use with discretion.
 
