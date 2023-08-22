@@ -6,7 +6,9 @@ Ricardo Gomez-Reyes
 # Usage: RNAhybrid [options] [target sequence] [query sequence].
 
 target=three_prime_utr.fa
+
 query=mature_star_mir.fa
+
 output=${query%.*}_vs_${target%.*}
 
 RNAhybrid -t $target -m 20000 -q $query -n 50 -f 2,8 -s 3utr_human > ${output}_RNAhybrid.out &
@@ -41,10 +43,10 @@ rm *.tmp
 ## TargetScan
 Using perl script (`targetscan_70.pl`) to identify conserved and non conserved targets sites using a custom set of data. 
 ```bash
-
 # ./targetscan_70.pl miRNA_file UTR_file PredictedTargetsOutputFile
 
 target=utr_rmdup_ts.txt
+
 query=mature_star_mir.txt
 
 prefix=${target%.*}
@@ -52,9 +54,6 @@ prefix=${target%.*}
 output=${query%.*}_vs_$prefix
 
 ./targetscan_70.pl $query $target ${output}_targetscan.out &> targetscan.log &
-
-
-
 ```
 
 # Install tools:
@@ -155,8 +154,24 @@ END  {printf("\n");}
 
 ## Subseq UTR
 ```bash
+gtf=multi_genome.newid.gtf
+
+genome=multi_genome.newid.fa
+
+cat $gtf | grep "utr" > utr.gtf
+
+seqkit subseq --gtf utr.gtf $genome --gtf-tag "gene_id" -o utr.fa
+
+# REMOVING DUPLICATED sequences (-s) in --only-positive-strand (-P)
+
+cat utr.fa | seqkit rmdup -s -P -D duplicated_detail.txt -d duplicates.fasta -o utr_rmdup.fa
 
 ```
+## Subset miRs
+```bash
+seqkit grep -r -p "mature|star" mir.fasta > mature_star_mir.fa
+```
+
 ## Get gene ontology using Trinotate (OMIT)
 requiere sus formatos propios para funcionar, y solo requiero ontologias de los orfs.
 ```bash
