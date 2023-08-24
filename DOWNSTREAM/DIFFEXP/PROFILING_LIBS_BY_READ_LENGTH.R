@@ -74,7 +74,9 @@ read_df_and_summarise <- function(x) {
 # write_rds(out, file = paste0(path, "prof_by_read_length_summary.rds"))
 
 
-recode_to <- c(`miRNAs` = "A) miRs", `Unknown`= "B) Desc",`rRNA` = "C) ARNr", `tRNA` = "D) ARNt", `Artifacts` = "E) Artefactos")
+# recode_to <- c(`miRNAs` = "A) miRs", `Unknown`= "B) Desc",`rRNA` = "C) ARNr", `tRNA` = "D) ARNt", `Artifacts` = "E) Artefactos")
+
+recode_to <- c(`miRNAs` = "miRs", `Unknown`= "Desc",`rRNA` = "ARNr", `tRNA` = "ARNt", `Artifacts` = "Artefactos")
 
 out <- read_rds(paste0(path, "prof_by_read_length_summary.rds")) %>% 
   left_join(MTD) %>%
@@ -213,12 +215,17 @@ ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_NUC_kmiRNAs.png', path =
 # BY:
 recode_to <- c(`HR248` = "B)", `HR1108`= "C)",`HR2476` = "D)", `HR11076` = "E)")
 
+# New facet label names for dose variable
+y.labs <- c("B) pH 8.0", "C) pH 7.6", "D) pH 8.0", "E) pH 7.6")
+
+names(y.labs) <- c("24 HPF:Ctrl pH", "24 HPF:Low pH", "110 HPF:Ctrl pH", "110 HPF:Low pH")
 
 out %>% 
   group_by(hpf,pH, Length, rnatype) %>% 
   summarise(n = sum(n)) %>%
+  mutate(pH = paste0(hpf, ":", pH)) %>%
   ggplot(aes(x = Length, y = n, fill = rnatype)) +
-  ggh4x::facet_nested( hpf+pH ~ ., nest_line = F, scales = "free") +
+  ggh4x::facet_nested( hpf+pH ~ ., nest_line = F, scales = "free", labeller = labeller(pH = y.labs, .multi_line = T)) +
   # mutate(sample_id = substr(sample_id, 1,nchar(sample_id)-1)) %>%
   # mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
   # group_by(sample_id, group, Length, rnatype) %>% summarise(n = sum(n)) %>%
@@ -227,7 +234,8 @@ out %>%
   # ggplot(aes(x = Length, y = n, fill = rnatype)) + 
   # facet_grid(sample_id ~ ., scales = "free_y") +
   geom_col(width = 0.85)  +
-  scale_y_continuous("Número de lecturas", labels = scales::comma) +
+  # scale_y_continuous("Número de lecturas", labels = scales::comma) +
+  scale_y_continuous("Número de lecturas", labels = scales::number_format(scale = 1/1000000, suffix = " M")) +
   scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 2)) +
   see::scale_fill_pizza(reverse = T) +
   theme_bw(base_family = "GillSans", base_size = 10) +
@@ -239,7 +247,7 @@ out %>%
 top <- out %>% 
   group_by(Length, rnatype) %>% summarise(n = sum(n)) %>%
   group_by(Length) %>% mutate(pct = n / sum(n)) %>%
-  mutate(sample_id = "Global") %>%
+  mutate(sample_id = "A) Global") %>%
   ggplot(aes(x = Length, y = pct, fill = rnatype)) + 
   geom_col(width = 0.85) +
   facet_grid(sample_id ~ ., scales = "free_y") +
@@ -260,7 +268,7 @@ ps <- top / bottom + plot_layout(heights = c(0.3, 1))
 
 ps <- top / plot_spacer() / bottom + plot_layout(heights = c(0.3, -0.1, 1))
 
-ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_2.png', path = path, width = 4.5, height = 4.5, device = png, dpi = 300)
+ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_2.png', path = path, width = 4, height = 4.5, device = png, dpi = 300)
 
 # PLOT CLADE SPECIFIC MIRS? ====
 
