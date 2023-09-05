@@ -97,3 +97,42 @@ paste_go <- function(x) {
   x <- unique(sort(x))
   x <- paste(x, sep = ';', collapse = ';')
 }
+
+
+get_eggnog <- function (x, ids, by = "transcript_id")  {
+  # trinotateR::plot_NOGs()
+  
+  if (by == "transcript_id") {
+    
+    x1 <- x %>% filter(transcript_id %in% ids)
+    
+    # y <- unique(x1[!is.na(eggnog), .(transcript_id, eggnog)])
+    eggnog <- x1 %>% drop_na(eggnog) %>% distinct(eggnog) %>% pull(eggnog)
+    
+  }
+  else {
+    x1 <- x %>% filter(gene_id %in% ids)
+    
+    y <- unique(x1[!is.na(eggnog), .(gene_id, eggnog)])
+    
+  }
+ 
+  nogs <- gsub("(.*)\\^.*", "\\1", eggnog)
+  
+  # nogs <- eggnog
+  
+  
+  # y %>% separate(col = eggnog, sep = "(.*)\\^.*", into = c('nogs', 'eggnog'))
+  
+  n <- match(nogs, egg$nog)
+  
+  y <- table(unlist(strsplit(egg$class[n], "")))
+  
+  y <- data.frame(y)
+  
+  names(y) <- c('code', 'Freq')
+  
+  
+  
+  return(y)
+}
