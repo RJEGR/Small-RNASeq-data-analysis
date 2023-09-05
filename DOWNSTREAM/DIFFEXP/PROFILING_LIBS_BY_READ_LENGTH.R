@@ -8,7 +8,12 @@ library(tidyverse)
 
 MTD <- read_tsv('~/Documents/MIRNA_HALIOTIS/METADATA.tsv')
 
-recode_to <- structure(c("Ctrl pH", "Low pH"), names = c("Control", "Low"))
+scale_col <- c("#cd201f", "#FFFC00","#00b489","#31759b")
+
+recode_to <- c(`Control` = "pH 8.0", `Low` = "pH 7.6")
+
+
+# recode_to <- structure(c("Ctrl pH", "Low pH"), names = c("Control", "Low"))
 
 MTD <- MTD %>%
   dplyr::rename("sample_id" = "LIBRARY_ID") %>%
@@ -157,8 +162,8 @@ ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ.png', path = path, width = 6, h
 xlab <- "Longitud (Nucleótidos)"
 ylab <- "Frecuencia"
 
-# recode_to <- c(`miRs` = "A) miRs", `Desc.`= "B) Desc",`ARNr` = "C) ARNr", 
-#   `ARNt` = "D) ARNt", `Artefactos` = "E) Artefactos")
+recode_to <- c(`miRs` = "A) miRs", `Desc`= "B) Desc.",`ARNr` = "C) ARNr",
+  `ARNt` = "D) ARNt", `Artefactos` = "E) Artefactos")
 
 table(out$rnatype)
 
@@ -167,14 +172,15 @@ table(out$rnatype)
 out %>% 
   group_by(Length, rnatype, first_nuc) %>% summarise(n = sum(n)) %>%
   mutate(Freq = n / sum(n)) %>%
-  # dplyr::mutate(rnatype = dplyr::recode_factor(rnatype, !!!recode_to)) %>%
+  dplyr::mutate(rnatype = dplyr::recode_factor(rnatype, !!!recode_to)) %>%
   # mutate(rnatype = factor(rnatype, levels = recode_to)) %>%
   ggplot(aes(x = Length, y = Freq, fill = first_nuc)) + 
   facet_grid( rnatype ~., scales = 'free_y') + geom_col(width = 0.85) +
   # scale_y_continuous(ylab, labels = scales::percent) +
   scale_y_continuous(ylab, labels = scales::comma) +
   scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 2)) +
-  see::scale_fill_bluebrown(reverse = T) -> ps
+  scale_fill_manual(values = scale_col) -> ps
+  # see::scale_fill_bluebrown(reverse = T) -> ps
 
 ps <- ps + 
   guides(fill = guide_legend(title = "")) +
@@ -184,33 +190,36 @@ ps <- ps +
     panel.border = element_blank(),
     panel.grid.minor = element_blank())
 
-ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_NUC.png', path = path, width = 4.5, height = 5, device = png)
+ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_NUC.png', path = path, width = 4.5, height = 5, device = png, dpi = 300)
 
 
 # 3) miRNA 1st position ----
 
-ylab <- "Número de lecturas"
+ylab <- "Número de lecturas (Millones)"
 
-breaks_seq <- seq(18, 25, by = 1)
+breaks_seq <- seq(18, 26, by = 1)
 
 out %>% 
   filter(grepl("miRs", rnatype)) %>%
-  mutate(group = paste0(hpf, "+", pH)) %>% # group = sample_id
-  group_by(Length, group, first_nuc) %>% summarise(n = sum(n)) %>%
-  group_by(Length, group) %>% mutate(pct = n / sum(n)) %>%
+  group_by(Length, hpf, pH, first_nuc) %>% summarise(n = sum(n)) %>%
+  group_by(Length,  hpf, pH) %>% mutate(pct = n / sum(n)) %>%
   ggplot(aes(x = Length, y = n, fill = first_nuc)) + 
-  facet_grid( group ~., scales = 'free_y') + geom_col(width = 0.85) +
+  # facet_grid( group ~., scales = 'free_y') + 
+  ggh4x::facet_nested( hpf+pH ~ ., nest_line = F, scales = "free") +
+  geom_col(width = 0.85) +
   # scale_y_continuous(ylab, labels = scales::percent) +
-  scale_y_continuous(ylab, labels = scales::comma) +
-  scale_x_continuous(xlab, breaks = breaks_seq, limits = c(17, 26)) +
-  see::scale_fill_bluebrown(reverse = T) +
+  # scale_y_continuous(ylab, labels = scales::comma) +
+  scale_y_continuous(ylab, labels = scales::number_format(scale = 1/1000000, suffix = " M")) +
+  scale_x_continuous(xlab, breaks = breaks_seq, limits = c(18, 26)) +
+  # see::scale_fill_bluebrown(reverse = T) +
+  scale_fill_manual("",values = scale_col) +
   theme_bw(base_family = "GillSans", base_size = 11) +
   theme(strip.background = element_rect(fill = 'grey86', color = 'white'),
     legend.position = 'top',
     panel.border = element_blank(),
     panel.grid.minor = element_blank()) -> ps
 
-ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_NUC_kmiRNAs.png', path = path, width = 4, height = 4.5, device = png)
+ggsave(ps, filename = 'PROFILING_SAMPLES_BY_READ_LENGTH_NUC_kmiRNAs.png', path = path, width = 2.5, height = 3.5, device = png)
 
 # BY:
 recode_to <- c(`HR248` = "B)", `HR1108`= "C)",`HR2476` = "D)", `HR11076` = "E)")
