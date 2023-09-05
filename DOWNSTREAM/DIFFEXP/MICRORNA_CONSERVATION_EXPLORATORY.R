@@ -232,3 +232,7 @@ ggmsa(miRNA_sequences,  seq_name = TRUE, color = "Clustal", font = "DroidSansMon
 
 # tidy_msa(msa, start = start, end = end)
 
+
+# (10.1093/bioinformatics/btab708) approach to capture the essential sequence motifs and hairpin loops representing a non-coding RNA famil
+# align the sequences
+
