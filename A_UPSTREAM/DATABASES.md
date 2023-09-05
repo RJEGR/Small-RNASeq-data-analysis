@@ -57,3 +57,46 @@ curl -o ALL-mat.fa -OJX GET "${url}/fasta/ALL?mat=1"
 curl -o ALL.fa -OJX GET "${url}/fasta/ALL?all=1"
 
 ```
+
+# piRs de referencia
+```bash
+
+```
+
+# Anotaciones de elementos repetidos en el genoma del abulón rojo
+
+```bash
+genome=multi_genome.newid.fa
+
+libdir=/usr/local/RepeatMasker/Libraries/
+
+RepeatMasker -s -libdir $libdir -gff -species "all" $genome &> RepeatMasker.log &
+```
+
+```bash
+# INCLUDE ALL SPECIES 
+cp RepeatMasker RepeatMasker.bkp
+
+# Fix the issue by changing RepeatMasker line 7718 from this -->
+if ( $lineage eq "") {
+
+# To this -->
+if ( $lineage eq "" && $species ne 'root' && $species ne 'all') {
+
+# Because REGEX fails to account for negative numbers also replace line 8141 with:
+
+if ( /^STATS\s+LOCAL\s+FORWARD\s+([\-\d\.]+)\s+([\d\.]+)/ ) {
+
+
+# Then:
+version=Dfam_3.7 
+
+wget https://www.dfam.org/releases/${version}/families/Dfam_curatedonly.h5.gz -O Dfam37_curatedonly.h5.gz
+
+gunzip Dfam37_curatedonly.h5.gz
+
+mv Dfam37_curatedonly.h5 /usr/local/RepeatMasker/Libraries
+
+# Execute then
+```
+
