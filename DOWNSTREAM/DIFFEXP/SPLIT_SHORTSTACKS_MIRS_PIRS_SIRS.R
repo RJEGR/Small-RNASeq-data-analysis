@@ -127,6 +127,50 @@ fasta <- c(rbind(headers, seqs))
 
 write(fasta, file= paste0(path, "KNOWN_AND_NOVEL_MIRS_MajorRNA.fasta"))
 
+# ONLY NEW
+
+fasta_prep <- NOVEL_MIRS %>% 
+  mutate(Name = paste0(Name, " Novel_miR")) %>%
+  arrange(desc(MajorRNA))
+
+seqs <- fasta_prep %>% pull(MajorRNA)
+
+headers <- fasta_prep %>% pull(Name) 
+
+fasta <- c(rbind(headers, seqs))
+
+
+write(fasta, file= paste0(path, "NOVEL_MIRS_MajorRNA.fasta"))
+
+
+# PREPARE STRUCVIS INPUT
+
+query.ids <- SPLIT %>% filter(biotype == "Mir" & MIRNA == "N") %>% distinct(Name) %>% pull()
+
+RESULTS %>% filter(Name %in% query.ids) %>% select(Name, MIRNA, KnownRNAs, Reads) %>% view()
+
+RUN <- RESULTS %>% filter(Name %in% query.ids) %>% 
+  mutate(Start = Start-40, End=End+40) %>%
+  mutate(param = paste0(Chrom, ":", Start,"-",End), Strand = ifelse(Strand == "+", "plus", "minus")) %>%
+  select(Name, param, Strand) 
+
+RUN <- as(RUN, "matrix")
+
+setwd("~/Documents/MIRNA_HALIOTIS/strucVis/")
+
+for (i in 1:nrow(RUN)) {
+  
+  p <- paste0("./strucVis -b merged_alignments.bam -g multi_genome.newid.fa -c ", RUN[i,"param"], " -s '", RUN[i,"Strand"], "' -p ", 
+    RUN[i,"Name"], ".ps ", "-n ", RUN[i,"Name"], " &> ", RUN[i,"Name"], ".txt")
+  
+  system(p)
+  
+}
+
+#paste0("./strucVis -b merged_alignments.bam -g multi_genome.newid.fa -c ", RUN[16,"param"], " -s '", RUN[16,"Strand"], "' -p ", RUN[16,"Name"], ".ps ", "-n ", RUN[16,"Name"], " &> ", RUN[16,"Name"], ".txt")
+
+# system("./strucVis -b merged_aligments.bam -g multi_genome.newid.fa -c ", )
+
 # PIRNAS TO FURTHER ANALYSIS W/ PIRSCAN ======
 
 SPLIT %>% 
