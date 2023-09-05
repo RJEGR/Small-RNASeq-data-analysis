@@ -8,7 +8,7 @@
 # NOTE:
 
 # POSITIVE LFC == UP EXPRESSED IN EXPERIMENTAL (OR sampleB)
-# NEGATIVE LFC == UP EXPRESSED IN CONTROL (OR sampleB)
+# NEGATIVE LFC == UP EXPRESSED IN CONTROL (OR sampleA)
 # view baseMeanA and baseMeanB to contrast the expression values
 
 rm(list = ls())
@@ -35,21 +35,22 @@ recode_to <- structure(recode_to, names = CONTRAST)
 
 recode_fc <- structure(c("Up","Down"), names = c(1,-1))
 
-RES.P <- RES %>% filter( padj < 0.05) # abs(log2FoldChange) > 2 &
-
-
-# 1) =====
+RES.P <- RES %>% filter( padj < 0.05 & abs(log2FoldChange) > 1) # abs(log2FoldChange) > 2 &
 
 RES.P <- RES.P %>%
   mutate(star = ifelse(padj <.001, "***", 
-  ifelse(padj <.01, "**",
-    ifelse(padj <.05, "*", "")))) %>%
+    ifelse(padj <.01, "**",
+      ifelse(padj <.05, "*", "")))) %>%
   mutate(SIGN = sign(log2FoldChange)) %>%
+  mutate(CONTRAST_DE = CONTRAST) %>%
   dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
   separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]")
 
 write_tsv(RES.P, paste0(wd, "DESEQ_RES_P.tsv"))
+
+# 1) =====
+
 
 RES.P %>% 
   # drop_na(padj)
@@ -100,7 +101,7 @@ RES.P %>%
   mutate(SIGN = sign(log2FoldChange)) %>%
   dplyr::count(CONTRAST, WRAP, SIGN, sampleB) %>%
   dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
-  dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc))
+  dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) 
   # separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]")
 
 
@@ -115,29 +116,52 @@ library(ggupset)
 #   group_by(Name, SIGN) %>%
 #   summarise(across(CONTRAST, .fns = list), n = n()) 
 
-UPSETDF <- RES.P %>%
-  unite("CONTRAST", CONTRAST:WRAP, sep = " | ") %>%
-  group_by(Name, SIGN) %>%
-  summarise(across(CONTRAST, .fns = list), n = n())
+# 1)
 
-Levels <- RES.P %>% unite("CONTRAST", CONTRAST:WRAP, sep = " | ") %>% distinct(CONTRAST) %>% pull()
-  
+recode_fc <- structure(c("pH 7.6","pH 8.0"), names = c(1,-1))
+
+recode_to <-  structure(c("24 HPF", "110 HPF"), names = c("CONTRAST_A", "CONTRAST_B"))
+
+UPSETDF <- RES.P %>% 
+  mutate(SIGN = sign(log2FoldChange)) %>%
+  dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
+  filter(CONTRAST_DE %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+  dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_to)) %>%
+  group_by(Name, SIGN) %>%
+  summarise(across(CONTRAST_DE, .fns = list), n = n()) %>%
+  mutate(SIGN = factor(SIGN, levels = rev(recode_fc)))
+
+
+UPSETDF <- UPSETDF %>%
+  ungroup() %>%
+  left_join(distinct(RES.P, Name, Family)) %>%
+  distinct(Family, .keep_all = T)
+
+# UPSETDF <- RES.P %>%
+#   # unite("CONTRAST", CONTRAST:WRAP, sep = " | ") %>%
+#   group_by(Name, SIGN) %>%
+#   summarise(across(CONTRAST_DE, .fns = list), n = n())
+
+# Levels <- RES.P %>% unite("CONTRAST", CONTRAST:WRAP, sep = " | ") %>% distinct(CONTRAST) %>% pull()
+
+col <- c("#3B4992FF","#EE0000FF")  
+
 UPSETDF %>%
-  ggplot(aes(x = CONTRAST, fill = SIGN)) +
+  ggplot(aes(x = CONTRAST_DE, fill = SIGN)) +
   geom_bar(position = position_dodge(width = 1)) +
   geom_text(stat='count', aes(label = after_stat(count)), 
-    position = position_dodge(width = 1), vjust = -0.5, family = "GillSans", size = 2.5) +
-  scale_x_upset(order_by = "degree", reverse = T) +
+    position = position_dodge(width = 1), vjust = -0.5, family = "GillSans", size = 3.5) +
+  scale_x_upset(order_by = "degree", reverse = F) +
   theme_bw(base_family = "GillSans") +
   theme_combmatrix(combmatrix.panel.point.color.fill = "black",
     combmatrix.panel.line.size = 0, base_family = "GillSans") +
-  axis_combmatrix(levels = Levels) +
-  labs(x = '', y = 'Number of Intersected miRs') +
-  ggsci::scale_fill_aaas() +
-  ggsci::scale_color_aaas() +
-  guides(fill = guide_legend(title = "", nrow = 1)) -> p
+  axis_combmatrix(levels = c("24 HPF", "110 HPF")) +
+  labs(x = '', y = 'Number of miRs') +
+  scale_color_manual("", values = col) +
+  scale_fill_manual("", values =  col) +
+  guides(fill = guide_legend(title = "", nrow = 1)) -> p1
 
-p <- p + theme(legend.position = "top",
+p1 <- p1 + theme(legend.position = "top",
   panel.border = element_blank(),
   plot.title = element_text(hjust = 0),
   plot.caption = element_text(hjust = 0),
@@ -148,9 +172,66 @@ p <- p + theme(legend.position = "top",
   strip.background.y = element_blank())
 
 # needs manual eddition if facetwrawp
-# p <- p + facet_grid(cols = vars(WRAP), scales = "free")
+# p1 + facet_grid(cols = vars(SIGN), scales = "free") + theme(strip.background = element_rect(fill = 'grey89', color = 'white'))
 
-ggsave(p, filename = 'DESEQ2UPSET.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
+ggsave(p1, filename = 'DESEQ2UPSET_CONTRAST_A_B.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
+
+
+# 2)
+
+
+WHICH_CONTRAST <- c("CONTRAST_C", "CONTRAST_D")
+
+recode_fc <- structure(c("A) 24 HPF","B) 110 HPF"), names = c(1,-1))
+
+recode_to <-  structure(c("pH 7.6","pH 8.0"), names = WHICH_CONTRAST)
+
+# RES.P %>% filter(CONTRAST_DE %in% WHICH_CONTRAST) %>% distinct(Name)
+
+UPSETDF <- RES.P %>% 
+  mutate(SIGN = sign(log2FoldChange)) %>%
+  dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
+  filter(CONTRAST_DE %in% WHICH_CONTRAST) %>%
+  dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_to)) %>%
+  group_by(Name, SIGN) %>%
+  summarise(across(CONTRAST_DE, .fns = list), n = n())
+
+UPSETDF <- UPSETDF %>%
+  ungroup() %>%
+  left_join(distinct(RES.P, Name, Family)) %>%
+  distinct(Family, .keep_all = T)
+
+
+UPSETDF %>%
+  ggplot(aes(x = CONTRAST_DE, fill = SIGN)) +
+  geom_bar(position = position_dodge(width = 1)) +
+  geom_text(stat='count', aes(label = after_stat(count)), 
+    position = position_dodge(width = 1), vjust = -0.5, family = "GillSans", size = 3.5) +
+  scale_x_upset(order_by = "degree", reverse = F) +
+  theme_bw(base_family = "GillSans") +
+  theme_combmatrix(combmatrix.panel.point.color.fill = "black",
+    combmatrix.panel.line.size = 0, base_family = "GillSans") +
+  axis_combmatrix(levels = c("pH 8.0", "pH 7.6"), clip = "off") +
+  labs(x = '', y = 'Number of miRs') +
+  scale_color_manual("", values = c("grey30", "grey70")) +
+  scale_fill_manual("", values =  c("grey30", "grey70")) +
+  guides(fill = guide_legend(title = "", nrow = 1)) -> p2
+
+p2 <- p2 + theme(legend.position = "none",
+  panel.border = element_blank(),
+  plot.title = element_text(hjust = 0),
+  plot.caption = element_text(hjust = 0),
+  panel.grid.minor.y = element_blank(),
+  panel.grid.major.y = element_blank(),
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  strip.background.y = element_blank())
+
+p2 <- p2 + facet_grid(cols = vars(SIGN), scales = "free") +
+  theme(strip.background = element_rect(fill = 'grey89', color = 'white'))
+
+
+ggsave(p2, filename = 'DESEQ2UPSET_CONTRAST_C_D.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
 
 # 3) SPLIT EXCLUSIVE FROM INTERSECTED MIRS ----
 
@@ -162,7 +243,7 @@ UPSETDF %>% group_by(n, SIGN) %>% tally()
 
 str(query.ids <- UPSETDF %>% filter(n == 1) %>% pull(Name))
 
-str(query.ids <- EXCLUSIVE_MIRS %>% count(Name, sort = T) %>% filter(n == 2) %>% pull(Name))
+# str(query.ids <- EXCLUSIVE_MIRS %>% count(Name, sort = T) %>% filter(n == 2) %>% pull(Name))
 
 RES.P %>% count(sampleA, sampleB)
 
@@ -177,13 +258,14 @@ RES.P %>%
 
 
 EXCLUSIVE_MIRS <- UPSETDF %>% filter(n == 1) %>%
-  mutate(CONTRAST = unlist(CONTRAST)) %>%
+  mutate(CONTRAST = unlist(CONTRAST_DE)) %>%
   left_join(RES %>% dplyr::distinct(Name, Family))
   # dplyr::select(-n)
   
 
 INTERSECTED_MIRS <- UPSETDF %>% filter(n != 1) %>%
-  unnest(CONTRAST) %>%
+  unnest(CONTRAST_DE) %>%
+  dplyr::rename("CONTRAST" = "CONTRAST_DE") %>%
   left_join(RES %>% dplyr::distinct(Name, Family))
 
 out <- list(EXCLUSIVE_MIRS, INTERSECTED_MIRS)
