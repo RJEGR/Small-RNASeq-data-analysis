@@ -9,7 +9,7 @@
 # NOTE:
 
 # POSITIVE LFC == UP EXPRESSED IN EXPERIMENTAL (OR sampleB)
-# NEGATIVE LFC == UP EXPRESSED IN CONTROL (OR sampleB)
+# NEGATIVE LFC == UP EXPRESSED IN CONTROL (OR sampleA)
 # view baseMeanA and baseMeanB to contrast the expression values
 
 
@@ -31,7 +31,9 @@ EXCLUSIVE_MIRS <- .UPSETDF[[1]] %>% ungroup()
 
 INTERSECTED_MIRS <- .UPSETDF[[2]]  %>% ungroup()
 
-EXCLUSIVE_MIRS %>% count(Name, sort = T) # ???
+EXCLUSIVE_MIRS %>% count(CONTRAST, SIGN, sort = T) # ???
+
+INTERSECTED_MIRS %>% count(CONTRAST, SIGN, sort = T)
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
@@ -86,8 +88,7 @@ RES.P <- .SRNA2GO %>%
   
 write_tsv(RES.P, paste0(wd, "DESEQ_RES_P.tsv"))
 
-RES.P %>% 
-
+# RES.P %>% 
 
 SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$query)
 
@@ -95,14 +96,45 @@ SRNA2GO <- lapply(SRNA2GO, unlist)
 
 # EXCLUSIVE ====
 
-str(CONTRAST <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% distinct(CONTRAST) %>% pull())
+# CONTRAST SIGN           n
+# 1 pH 7.6   B) 110 HPF    18
+# 2 pH 8.0   A) 24 HPF      9
+# 3 pH 8.0   B) 110 HPF     1
+
+WHICH_SIGN <- "A) 24 HPF"
+
+str(CONTRAST <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == WHICH_SIGN) %>% distinct(CONTRAST) %>% pull())
+
+EXCLUSIVE_MIRS %>% unnest(CONTRAST_DE) %>% filter(SIGN == WHICH_SIGN) %>% count(SIGN, CONTRAST)
+
+str(query.names <- EXCLUSIVE_MIRS %>% distinct(Name) %>% pull(Name))
+
+
+# RES.P %>%
+#   filter(Name %in% query.names) %>%
+#   left_join(distinct(.SRNA2GO, gene_id, query)) %>%
+#   view()
+
+.SRNA2GO %>% 
+  mutate(query = strsplit(query, ";")) %>%
+  unnest(query) %>%
+  separate(query, into = c("query", "arm"), sep = "[.]") %>% 
+  filter(arm == "mature") %>%
+  filter(query %in% query.names & predicted == "BOTH") %>% 
+  group_by(query)
+
+# str(CONTRAST <- EXCLUSIVE_MIRS %>% ungroup() %>% distinct(CONTRAST) %>% pull())
 
 # SANITY CHECK: IF SINGLE MIR NOT GO ENRICHMENT IS POSSIBLE  
 
-EXCLUSIVE_MIRS %>%
+drop.names <- EXCLUSIVE_MIRS %>%
   group_by(CONTRAST, SIGN) %>%
-  summarise(across(Name, .fns = list), n = n())
+  summarise(across(Name, .fns = list), n = n()) %>%
+  filter(n == 1) %>%
+  unnest(Name) %>% 
+  pull(Name)
   
+
 # UP
 
 DF <- list()
@@ -121,11 +153,11 @@ for(j in 1:length(CONTRAST)) {
   
   # query.names <- DF2GO %>% pull(Name)
   
-  query.names <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Up") %>% 
+  query.names <- EXCLUSIVE_MIRS %>% ungroup() %>% 
+    filter(SIGN == WHICH_SIGN) %>% 
     filter(CONTRAST %in% CONTRAST[i]) %>% distinct() %>% pull(Name)
   
-  RES.P %>% filter(Name %in% query.names) %>% filter(CONTRAST %in% CONTRAST[i]) %>% view()
-    
+  # RES.P %>% filter(Name %in% query.names) %>% filter(CONTRAST %in% CONTRAST[i]) %>% view()
   
   
   query.p <- c(rep(0.05, length(query.names)))
@@ -134,7 +166,7 @@ for(j in 1:length(CONTRAST)) {
   
   cat("\nAnd ",sum(names(SRNA2GO) %in% query.names), " GO terms\n")
   
-  allRes <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 20)
+  allRes <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 5)
   
   allRes <- allRes %>% mutate(CONTRAST = CONTRAST[i]) %>% as_tibble()
   
@@ -142,11 +174,13 @@ for(j in 1:length(CONTRAST)) {
   
 }
 
-print(EXCLUSIVE_UP_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = "Up"))
+print(EXCLUSIVE_UP_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = WHICH_SIGN))
 
 # DOWN
 
-str(CONTRAST <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Down") %>% distinct(CONTRAST) %>% pull())
+WHICH_SIGN <- "B) 110 HPF"
+
+str(CONTRAST <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == WHICH_SIGN) %>% distinct(CONTRAST) %>% pull())
 
 DF <- list()
 
@@ -156,7 +190,7 @@ for(j in 1:length(CONTRAST)) {
   
   cat("\nRunning ",CONTRAST[i], "\n")
 
-  query.names <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == "Down") %>% filter(CONTRAST %in% CONTRAST[i]) %>% pull(Name)
+  query.names <- EXCLUSIVE_MIRS %>% ungroup() %>% filter(SIGN == WHICH_SIGN) %>% filter(CONTRAST %in% CONTRAST[i]) %>% pull(Name)
   
   query.p <- c(rep(0.05, length(query.names)))
   
@@ -168,7 +202,7 @@ for(j in 1:length(CONTRAST)) {
   
 }
 
-EXCLUSIVE_DOWN_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = "Down")
+EXCLUSIVE_DOWN_MIRS <- do.call(rbind, DF) %>% mutate(SIGN = WHICH_SIGN)
 
 rbind(EXCLUSIVE_DOWN_MIRS, EXCLUSIVE_UP_MIRS) -> TOPGO_EXCLUSIVE
 
@@ -209,7 +243,7 @@ ggsave(p, filename = 'DESEQ2TOPGO_EXCLUSIVE.png', path = wd, width = 3.5, height
 TOPGO_EXCLUSIVE %>% distinct(Term)
 
 p <- TOPGO_EXCLUSIVE %>%
-  separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]") %>%
+  # separate(CONTRAST, into = c("WRAP","CONTRAST"), sep = "[|]") %>%
   mutate(Annotated = ifelse(SIGN == "Down", -Annotated, Annotated)) %>%
   mutate(SIGN = factor(SIGN, levels = c("Up","Down"))) %>%
   mutate(ordering = -as.numeric(SIGN) + Annotated, Term = fct_reorder(Term, ordering, .desc = T)) %>%
@@ -234,6 +268,31 @@ p <- TOPGO_EXCLUSIVE %>%
     axis.text.x = element_text(angle = 90, vjust = 0.5, size = 10))
 
 ggsave(p, filename = 'DESEQ2TOPGO_EXCLUSIVE_2.png', path = wd, width = 3.5, height = 10, device = png, dpi = 300)
+
+TOPGO_EXCLUSIVE %>%
+  mutate(Annotated = ifelse(SIGN == "A) 24 HPF B)", -Annotated, Annotated)) %>%
+  mutate(SIGN = factor(SIGN, levels = c("A) 24 HPF","B) 110 HPF"))) %>%
+  mutate(ordering = -as.numeric(SIGN) + Annotated, Term = fct_reorder(Term, ordering, .desc = T)) %>%
+  ggplot(aes(y = Term, x = Annotated, fill = SIGN, color = SIGN)) + 
+  # geom_col() +
+  geom_segment(aes(x = Annotated, xend = 0, yend = Term)) +
+  ggh4x::facet_nested(CONTRAST+SIGN ~ ., nest_line = F, scales = "free") +
+  ggsci::scale_fill_aaas() +
+  ggsci::scale_color_aaas() +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  labs(x = "", y = "") +
+  theme(legend.position = "none",
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_line(linetype = "dashed", linewidth = 0.5),
+    axis.text.y = element_text(angle = 0, size = 5),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, size = 10))
+
 
 # INTERSECTED ====
 
