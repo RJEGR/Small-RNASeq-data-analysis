@@ -149,6 +149,16 @@ RES <- RES %>% mutate(Family = ifelse(is.na(Family), Name, Family))
 
 write_tsv(RES, file = paste0(path, "DESEQ_RES.tsv"))
 
+# CREATE A DDS OBJ.
+
+ddsFullCountTable <- DESeqDataSetFromMatrix(
+  countData = .COUNTS,
+  colData = .colData,
+  design = ~ 1 )
+
+dds <- estimateSizeFactors(ddsFullCountTable) 
+
+write_rds(dds,file = paste0(path, "/DDS_DESEQ2.rds"))
 
 RES %>% 
   filter(abs(log2FoldChange) > 0 & padj < 0.05) %>%
