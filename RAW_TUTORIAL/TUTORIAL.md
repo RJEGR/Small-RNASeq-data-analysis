@@ -370,6 +370,7 @@ Output in format: Requested package -> Available versionsThe following specifica
 ### (OMIT) Isomirna detection w miraaligner (from seqbuster > isomiRs fromLorena pantano) - error by using miraligner.jar (invalid or corrupt jarfile)
 
 > https://seqcluster.readthedocs.io/mirna_annotation.html
+https://seqcluster.readthedocs.io/mirna_annotation.html#mirna-isomir-annotation-with-java
 
 ```bash
 # dependencies
@@ -394,15 +395,59 @@ curl -OJX GET "https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedt
 
 curl -OJX GET "https://github.com/lpantano/seqbuster/raw/miraligner/modules/miraligner/miraligner.jar"
 
+"https://github.com/lpantano/seqbuster/raw/miraligner/modules/miraligner/miraligner.jar"
+
 # desde mac darle acceso a permisos de ejecucion
 #example:java -jar miraligner.jar -sub 1 -trim 3 -add 3 -s hsa -i test/test.fa -db DB -o test/out
 #example: see output at miraligner/test/output.mirna & miraligner/test/output.mirna.opt
 
 
 java -jar miraligner.jar -sub 1 -trim 3 -add 3 -s hsa -i ../HR110761.clean.fa -db ../MIRBASE_20230217  -o miraligner_out
+
+# 
+
+cd /Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/MIR_VARIANT_ANALYSIS
+
+# java -jar miraligner.jar -sub 1 -trim 3 -add 3 -s all -i HR110761.clean.newid.subset.fasta -db DB -o HR110761.out
+
+
+
+for i in $(ls *newid.subset.fasta); do java -jar miraligner.jar -sub 1 -trim 3 -add 3 -s hsa -i $i -db DB -o ${i%..clean.newid.subset.fasta}.out;done
+
+# To configure own DB needs .str precursor structure file
 ```
 
+## Isomir are common in development
+https://www.rna-seqblog.com/an-evaluation-of-high-throughput-isomir-identification-tools/
 
+```bash
+https://github.com/lfelipedeoliveira/isomiRID
+
+# lib: /home/user/refs/libraries/GEK08.fastq Sample1 fa
+# lib: /home/user/refs/libraries/RTT0512.fq Sample2 fa
+
+# 1)
+for i in $(ls *clean.newid.subset.fasta)
+do
+withpath="${i}"
+fname=${withpath##*/}
+bs="${fname%*.*clean.newid.subset.fasta}"
+echo "lib: `printf "$PWD/$fname ${bs} fa"`"
+done
+
+# 2)
+
+grep -E -v "mature|star" mir.fasta > hairpin.fa
+
+# 3)
+
+chmod +x isomiRID.py
+
+python2.7 isomiRID.py
+
+# Problems w/ genome index
+
+```
 
 ### ilearnPlus (machine learning web method)
 
