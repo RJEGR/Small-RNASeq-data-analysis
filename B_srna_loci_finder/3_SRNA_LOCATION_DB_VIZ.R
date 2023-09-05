@@ -141,6 +141,7 @@ p <- ggplot() +
 ggplot2::ggsave(p, filename = "SRNA_LOCATION2.png", path = wd, width = 7, height = 7, device = png, dpi = 300)
 
 
+# p
 
 df <- DB %>% 
   mutate(width = nchar(MajorRNA)) %>%
@@ -155,9 +156,12 @@ df %>% summarise(sum(Reads), sum(n))
 df %>% summarise(sum(reads_pct), sum(n_freq))
 
 df %>% group_by(SRNAtype, biotype_best_rank) %>% 
-  summarise(values_from = sum(n)) %>% # values_from = sum(n), 
-  pivot_wider(names_from = SRNAtype, values_from = values_from) # %>% 
-# view()
+  summarise(values_from = sum(n)) %>% 
+  pivot_wider(names_from = SRNAtype, values_from = values_from) %>% view()
+
+df %>% group_by(SRNAtype, biotype_best_rank) %>% 
+  summarise(values_from = sum(Reads)) %>%  
+  pivot_wider(names_from = SRNAtype, values_from = values_from) %>% view()
 
 # (doi.org/10.1186/1471-2164-11-533): Roughly half of known miRNA genes are located within previously annotated protein-coding regions ("intragenic miRNAs"). A high-confidence set of predicted mRNA targets of intragenic miRNAs also shared many of these features with the host genes. Approximately 20% of intragenic miRNAs were predicted to target their host mRNA transcript.
 
@@ -188,10 +192,25 @@ df %>%
     legend.position = 'top',
     panel.border = element_blank(),
     panel.grid.minor = element_blank()) +
-  facet_grid(~ biotype_best_rank)
+  facet_wrap(~ biotype_best_rank, scales = "free_y", nrow = 1)
 # facet_grid(~ SRNAtype, scales = "free", space = "free")
 
-  
+
+DB %>% filter(SRNAtype == "miR") %>% dplyr::count(MIRNA)  
+
+DB %>% filter(SRNAtype == "miR" & MIRNA == "N") %>% group_by(biotype_best_rank) %>% dplyr::count(MIRNA)
+
+DB %>% drop_na(KnownRNAs) %>% filter(SRNAtype == "miR" & MIRNA == "Y") %>% group_by(biotype_best_rank) %>% dplyr::count(MIRNA)
+
+DB %>% filter(is.na(KnownRNAs)) %>% filter(SRNAtype == "miR" & MIRNA == "Y") %>% group_by(biotype_best_rank) %>% dplyr::count(MIRNA)
+
+
+DB %>% 
+  filter(is.na(KnownRNAs)) %>% filter(SRNAtype == "miR" & MIRNA == "Y") %>%
+  group_by(SRNAtype, biotype_best_rank) %>% 
+  summarise(values_from = sum(Reads)) %>%  
+  pivot_wider(names_from = SRNAtype, values_from = values_from) 
+
 
 library(ggbio)
 
