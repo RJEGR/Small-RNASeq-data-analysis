@@ -52,7 +52,7 @@ print(DB1 <- .SRNA2GO %>%
   left_join(distinct(.SRNA2GO, gene_id, description)))
 
 
-DB1 %>% view()
+# DB1 %>% view()
 
 N_TARGETS <- .SRNA2GO %>% 
   mutate(query = strsplit(query, ";")) %>%
@@ -79,7 +79,6 @@ SRNA2GO <- .SRNA2GO %>%
 SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$query)
 
 SRNA2GO <- lapply(SRNA2GO, unlist)
-
 
 str(query.names <- RES.P %>% ungroup() %>% distinct(Name) %>% pull(Name))
 
