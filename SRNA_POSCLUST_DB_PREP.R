@@ -275,24 +275,3 @@ ggsave(p, filename = "ALIGMENT_TREE.png",
 
 # EX.
 
-library(Biostrings)
-
-s1 <- DNAString("AGTATAGATGATAGAT")
-s2 <- DNAString("AGTAGATAGATGGATGATAGATA")
-
-palign1 <- pairwiseAlignment(s1, s2)
-palign1
-pid(palign1)
-
-# palign2 <-
-#   pairwiseAlignment(s1, s2,
-#     substitutionMatrix =
-#       nucleotideSubstitutionMatrix(match = 2, mismatch = 10, baseOnly = TRUE))
-# palign2
-# pid(palign2, type = "PID4")
-
-
-# W/ DECIPHER NOT WELL ALIGMENT:
-# print(seqs <- Biostrings::RNAStringSet(seqs))
-# Biostrings::pairwiseAlignment(seqs, seqs)
-# alignedDNA <- DECIPHER::AlignSeqs(RNAStringSet(seqs))
