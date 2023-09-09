@@ -122,6 +122,8 @@ count_sp <- function(x) {
 
 .workbook %>% arrange(header) %>% distinct(header) 
 
+write_rds(.workbook, file = paste0(path, "/molluscs_mature.rds"))
+
 #  workbook %>% unite("headers", c("mirna", "sp"), sep = "|")
 
 # =================
