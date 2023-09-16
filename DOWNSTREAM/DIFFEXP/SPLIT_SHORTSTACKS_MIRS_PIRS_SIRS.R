@@ -142,6 +142,25 @@ fasta <- c(rbind(headers, seqs))
 
 write(fasta, file= paste0(path, "NOVEL_MIRS_MajorRNA.fasta"))
 
+# UPDATE TARGETSCAN&RNAHYBRID SET ====
+
+UPDATE_MIRS <- SPLIT %>% filter(MIRNA == "N" & biotype == "Mir") %>% 
+  distinct(Name) %>%
+  left_join(.MIRS) %>%
+  mutate(Name = paste0(">", Name)) 
+
+fasta_prep <- UPDATE_MIRS %>% 
+  # mutate(Name = paste0(Name, " Novel_miR")) %>%
+  arrange(desc(MajorRNA))
+
+seqs <- fasta_prep %>% pull(MajorRNA)
+
+headers <- fasta_prep %>% pull(Name) 
+
+fasta <- c(rbind(headers, seqs))
+
+
+write(fasta, file= paste0(path, "UPGRADE_MIRS_TARGETS.fasta"))
 
 # PREPARE STRUCVIS INPUT
 
