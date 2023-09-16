@@ -45,9 +45,10 @@ Using perl script (`targetscan_70.pl`) to identify conserved and non conserved t
 ```bash
 # ./targetscan_70.pl miRNA_file UTR_file PredictedTargetsOutputFile
 
-target=utr_rmdup_ts.txt
+target=three_prime_utr_rmdup_ts.txt
+# target=mir_vs_utr_rmdup_RNAhybrid.out.psig_ts.txt
 
-query=mature_star_mir.txt
+query=mir_ts.txt
 
 prefix=${target%.*}
 
@@ -92,8 +93,6 @@ seqkit replace -p "\s.+" utr_rmdup.fa | seqkit grep -f $file > ${file%.ids}.fa
 
 target=mir_vs_utr_rmdup_RNAhybrid.out.psig.fa 
 
-query=mature_star_mir.fa
-
 prefix=${target%.*}
 
 # 1) Generate aligned UTR or gene (with gaps from alignment)
@@ -129,6 +128,8 @@ paste id.tmp seq.tmp | awk -v OFS="\t" '{print $1, "0000", $2}' > ${align%.*}_ts
 
 ## Subseq window sequences between 2 to 7 (i.e. seed sequence)
 
+query=mature_star_mir.fa
+
 grep -v ">" $query > mature_sequence
 ## Extract seed sequence (7bp after 1st)
 awk '{print substr($1, 2, 7)}' mature_sequence > seed_sequence
@@ -137,7 +138,7 @@ grep ">" $query | awk -F ' ' '{print $NF}' | sed 's/>//g' > miR_ID
 ## Combine
 paste miR_ID seed_sequence > targetscan_tmp.txt
 ## Correct delimiter, add dummy species
-awk -v OFS="\t" '{print $1, $2, "0000"}' targetscan_tmp.txt > mature_star_mir.txt
+awk -v OFS="\t" '{print $1, $2, "0000"}' targetscan_tmp.txt > mir_ts.txt
 
 ```
 
