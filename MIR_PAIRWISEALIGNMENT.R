@@ -154,7 +154,13 @@ write_rds(DF, file = paste0(path, "/MIRS_pairwiseAlignment.rds"))
 
 DF <- read_rds(paste0(path, "/MIRS_pairwiseAlignment.rds"))
 
+# HOW TO CHOOSE THE BEST HIT?
+
 DF <- DF %>% filter(normalized_score == 1) 
+
+DF <- DF %>% group_by(subject_name) %>% filter(score == max(score))
+
+DF %>% group_by(subject_name) %>% slice_head(n =1) # ?
 
 str(mature_id <- sapply(strsplit(DF$pattern_name, " "), '[', 1))
 
@@ -197,4 +203,6 @@ DF %>%
 
 data.frame(pattern_seq = as.character(dnaref)) %>% 
   as_tibble(rownames = "pattern_name") %>%
-  right_join(DF) %>% view()
+  right_join(DF) %>% 
+  filter(subject_name %in% SINGLE_NAMES) %>% 
+  view()
