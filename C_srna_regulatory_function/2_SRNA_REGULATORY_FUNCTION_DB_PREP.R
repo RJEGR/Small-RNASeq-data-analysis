@@ -42,6 +42,20 @@ f <- list.files(path = wd, pattern = f, full.names = T)
 
 TARGETSCAN <- read_tsv(f)
 
+# BIND TO TARGETSCAN, UPGRADE VERSION OF RESIDUAL 17 MIRS
+
+f <- "mir_ts_vs_three_prime_utr_rmdup_ts_targetscan.out"
+
+f <- list.files(path = wd, pattern = f, full.names = T)
+
+TARGETSCAN <- read_tsv(f) %>%
+  mutate(miRNA_family_ID = paste0(miRNA_family_ID, ".mature")) %>%
+  rbind(TARGETSCAN, .)
+
+
+nrow(TARGETSCAN %>% distinct(miRNA_family_ID) %>% filter(grepl("mature", miRNA_family_ID))) # MUST BE 147
+
+
 # 2) ====
 # 2.1) PREPARE UTR INFO ====
 
