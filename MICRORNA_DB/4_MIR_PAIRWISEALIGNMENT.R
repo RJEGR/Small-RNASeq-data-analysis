@@ -128,14 +128,14 @@ MpairwiseAlignment <- function(f,q, type = c("match", "align")) {
 # MpairwiseAlignment(f,q)
 
 # pattern may be multiple sequences"
-
-DF <- MpairwiseAlignment(f = dnaref, q = query[1], "match") %>% as_tibble()
-
-DF %>% view()
-
-DF %>% left_join(dnarefdb) %>% view()
-
-hist(DF$normalized_score)
+# 
+# DF <- MpairwiseAlignment(f = dnaref, q = query[1], "match") %>% as_tibble()
+# 
+# DF %>% view()
+# 
+# DF %>% left_join(dnarefdb) %>% view()
+# 
+# hist(DF$normalized_score)
 
 DF <- list()
 
@@ -149,9 +149,9 @@ for (i in 1:length(query)) {
 
 do.call(rbind, DF) -> DF
 
-write_rds(DF, file = paste0(path, "/MIRS_pairwiseAlignment.rds"))
+# write_rds(DF, file = paste0(path, "/MIRS_pairwiseAlignment.rds"))
 
-# write_rds(DF, file = paste0(path, "/MOLLUSK_MIRS_pairwiseAlignment.rds"))
+write_rds(DF, file = paste0(path, "/MOLLUSK_MIRS_pairwiseAlignment.rds"))
 
 
 # STEP 2 =====
@@ -161,14 +161,16 @@ write_rds(DF, file = paste0(path, "/MIRS_pairwiseAlignment.rds"))
 .DF %>%
   group_by(subject_name) %>% 
   sample_n(1) %>%
-  ggplot(aes(score, normalized_score)) + geom_point()
+  ggplot(aes(score, normalized_score, color = Identity)) + geom_point()
 
 hist(.DF$score)
 
 # HOW TO CHOOSE THE BEST HIT?
 # USING score >= 8 nuc. to accept alignment
 
-DF <- .DF %>% filter(score >= 9)  %>% group_by(subject_name) %>% filter(score == max(score))
+DF <- .DF %>% filter(score >= 18)  # %>% group_by(subject_name) %>% filter(score == max(score))
+
+view(DF)
 
 # DF <- DF %>% filter(normalized_score == 1) 
 
@@ -203,21 +205,22 @@ view(DF1)
 
 # RESOLVE MULTIPLE MATCHING
 
+str(MULTIPLE_NAMES <- DF %>% count(subject_name) %>% filter(n != 1) %>% pull(subject_name))
+
 
 DF %>% filter(subject_name %in% MULTIPLE_NAMES) %>% group_by(subject_name) %>% slice_head(n =1) # ?
 
-str(MULTIPLE_NAMES <- DF %>% count(subject_name) %>% filter(n != 1) %>% pull(subject_name))
 
 DF %>% 
   filter(subject_name %in% MULTIPLE_NAMES) %>%
   group_by(subject_name) %>%
-  summarise(n = n(), across(Family, .fns = paste_go), .groups = "drop_last") %>%
+  summarise(n = n(), across(sp, .fns = paste_go), .groups = "drop_last") %>%
   view()
 
 data.frame(pattern_seq = as.character(dnaref)) %>% 
   as_tibble(rownames = "pattern_name") %>%
   right_join(DF) %>% 
-  filter(subject_name %in% SINGLE_NAMES) %>% 
+  # filter(subject_name %in% SINGLE_NAMES) %>% 
   view()
 
 # 2.1 ====
@@ -227,12 +230,18 @@ dnarefdb <- read_rds(paste0(path, "/molluscs_mature.rds")) %>% dplyr::rename("pa
 
 DF <- read_rds(paste0(path, "/MOLLUSK_MIRS_pairwiseAlignment.rds"))
 
-# DF %>% ggplot(aes(score, normalized_score)) + geom_point()
+# DF %>% ggplot(aes(score, normalized_score, color = Identity)) + geom_point()
 
 DF <- DF %>% left_join(dnarefdb) 
 
-DF <- DF %>% filter(normalized_score == 1 & score > 8) 
+DF <- DF %>% filter(score >= 18)
 
-DF %>% group_by(subject_name) %>% slice_head(n =1) %>% view()
+DF %>% 
+  group_by(subject_name) %>%
+  summarise(n = n(), across(mirna, .fns = paste_go), .groups = "drop_last") %>%
+  view()
 
-DF %>% view()
+
+DF %>% select(sp) %>%
+  mutate(sp = strsplit(sp, "[|]")) %>%
+  unnest() %>% arrange() %>% distinct() %>% view()
