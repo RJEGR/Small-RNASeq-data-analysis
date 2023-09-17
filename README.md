@@ -12,5 +12,6 @@ Ricardo Gomez-Reyes
 - [Step 3) Non redundant loci](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/B_srna_loci_finder)
 - [Step 4) MicroRNA databases processing](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/MICRORNA_DB)
 - [Step 5) Small RNAs assembly, annotation and quantification](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/SHORTSTACKS4.md)
-- [Step 6) Functional regulatory prediction](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/FUNCTIONAL_PREDICTION.md)
+- [Step 6.1) Functional regulatory prediction](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/FUNCTIONAL_PREDICTION.md)
+- [Step 6.2) Functional regulatory prediction](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/C_srna_regulatory_function)
 - [Step 7) MicroRNA Expression Analysis](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/E_expression_analysis)
