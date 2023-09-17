@@ -15,6 +15,7 @@ multiqc ./fastqc/*zip -o multiqc
 
 ## Mirtrace
 ```bash
+# 1.0.1
 mirtrace qc -s meta_species_all *.fq -w --uncollapse-fasta --t 20
 
 # Subset reads by biotype:
@@ -37,10 +38,9 @@ conda install multiqc
 ## Mirtrace
 ```bash
 conda install -c bioconda mirtrace
+```
 
-# OR conda install -c "bioconda/label/cf201901" mirtrace
-
-mirtrace -v # 1.0.1
-
-mirtrace --help
+## Seqkit
+```bash
+conda install -c bioconda seqkit
 ```
