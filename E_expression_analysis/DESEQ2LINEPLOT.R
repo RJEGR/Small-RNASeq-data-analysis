@@ -17,10 +17,26 @@ dds <- read_rds(paste0(wd, "/DDS_DESEQ2.rds"))
 
 # RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")) %>% filter( padj < 0.05) 
 
+
+# RECODE 7 MIRS FAMILY FROM MIRBASE/MOLLUSC DB
+
+recode_mir <- c(
+  `Cluster_39774` = "miR-242", 
+  `Cluster_17642` = "miR-1989", 
+  `Cluster_38139` = "miR-745", 
+  `Cluster_45860` = "miR-10492a", 
+  `Cluster_47716` = "miR-277b", 
+  `Cluster_37147` = "miR-184", 
+  `Cluster_27861` = "miR-252")
+
 RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05  & abs(log2FoldChange) > 1) %>%
   mutate(star = ifelse(padj <.001, "***", 
     ifelse(padj <.01, "**",
-      ifelse(padj <.05, "*", ""))))
+      ifelse(padj <.05, "*", "")))) %>%
+  dplyr::mutate(Family = dplyr::recode(Family, !!!recode_mir))
+
+
+
 
 # Only mirs upexpressed under low pH
 
@@ -95,7 +111,7 @@ which_group <- which_group %>%
 LOGFC_LABELLER <- which_group  %>% 
   arrange(CONTRAST) %>%
   mutate(log2FoldChange = paste0(Family, " (",log2FoldChange,") ", star)) %>%
-  select(Family, log2FoldChange) %>%
+  dplyr::select(Family, log2FoldChange) %>%
   pull(log2FoldChange, Family)
 
 # downg <- which_group %>% filter(log2FoldChange < 0) %>% pull(Name)
@@ -162,7 +178,7 @@ LOGFC_LABELLER <- which_group  %>%
   filter(CONTRAST %in% intgroup) %>%
   arrange(CONTRAST) %>%
   mutate(log2FoldChange = paste0(Family, " (",log2FoldChange,")")) %>%
-  select(Family, log2FoldChange) %>%
+  dplyr::select(Family, log2FoldChange) %>%
   pull(log2FoldChange, Family)
 
 str(LOGFC_LABELLER)
@@ -223,7 +239,6 @@ recode_to_hpf <- structure(c("24 HPF", "110 HPF"), names = c("110", "24"))
 
 fun.data.trend <- "mean_se" # "mean_cl_boot", "mean_sdl"
 
-
 DF %>%
   dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf)) %>%
   dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_AB)) %>%
@@ -238,6 +253,7 @@ DF %>%
   scale_fill_manual("", values =  c("grey30", "grey70")) +
   theme_bw(base_family = "GillSans", base_size = 11) +
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
+    legend.position = "top",
     panel.border = element_blank(),
     plot.title = element_text(hjust = 0),
     plot.caption = element_text(hjust = 0),
