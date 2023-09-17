@@ -47,7 +47,7 @@ nrow(out <- read_rds(paste0(wd, "SRNA_FUNCTION_PREDICTED.rds")))
 
 # bind seqnames, gene_coords, gene_id, description, type, biotype to predicted srna regulatory func.
 
-nrow(out <- out %>% left_join(gene_features)) # 9566
+nrow(out <- out %>% left_join(gene_features)) # 6372
 
 # bind gene ontology to transcript_id
 
@@ -88,7 +88,7 @@ go_features <- transcript_features %>% dplyr::select(gene_id, GO.ID, n) %>%
 
 # bind go to predicted srna regulatory func.
 
-sum(sort(unique(out$gene_id)) %in% sort(unique(go_features$gene_id))) # 4662 (58.75308 %)
+sum(sort(unique(out$gene_id)) %in% sort(unique(go_features$gene_id))) # 3142 (58.75308 %)
 
 out <- go_features %>% right_join(out, by = "gene_id")
 
@@ -97,7 +97,7 @@ out <- go_features %>% right_join(out, by = "gene_id")
 # view(out)
 
 # group go by query (i.e. by srna to prep for enrichment analysis)
-# Here we look 262 (131+131 miR:miR*) are well annotated (GaD)
+# Here we look 147 miRs are well annotated (GaD)
 # 
 
 SRNA2GO <- out %>%
