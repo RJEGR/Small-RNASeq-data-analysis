@@ -1,5 +1,5 @@
 # MIR Functional regulatory prediction
-Ricardo Gomez-Reyes
+Ricardo Gómez Reyes
 # 1) Running tools
 ## RNAhybrid
 ```bash
@@ -57,7 +57,7 @@ output=${query%.*}_vs_$prefix
 ./targetscan_70.pl $query $target ${output}_targetscan.out &> targetscan.log &
 ```
 
-# Install tools:
+# 2) Installation:
 ## RNAhybrid
 ```bash
 wget https://bibiserv.cebitec.uni-bielefeld.de/applications/rnahybrid/resources/downloads/RNAhybrid-2.1.2.tar.gz
