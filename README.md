@@ -7,7 +7,8 @@ This repository contains notes for the installation and execution of bioinformat
 Ricardo Gomez-Reyes
 
 ## Contents
-- [1) Databases processing and curation](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/DATABASES_CURATION.md)
+- [1) Quality assess and cleaning step](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/PREPROCESSING.md)
+
 - [1.2) Exploratory non redundant genomic annotation](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/BUILD_GENOMIC_MASK.R)
 - [1.3) Curated mollusk miRs multi-Fasta source](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/GENOME_WIDE_MIRS_MOLLUSK.R)
 - [2) small RNAs assembly and quantification](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/SHORTSTACKS.md)
