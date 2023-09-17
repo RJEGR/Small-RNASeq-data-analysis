@@ -26,7 +26,7 @@ for i  in $(ls *fasta); do cat $i | seqkit grep -n -r -p "rnatype:mirna" -p "rna
 ```
 
 
-# Installation
+# 2) Installation
 ## Fastqc
 ```bash
 # FASTQC
