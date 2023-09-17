@@ -65,6 +65,15 @@ N_TARGETS <- .SRNA2GO %>%
   dplyr::rename("Name" = "query") %>%
   right_join(distinct(RES.P, Name, Family))
 
+.SRNA2GO %>% 
+  mutate(query = strsplit(query, ";")) %>%
+  unnest(query) %>%
+  separate(query, into = c("query", "arm"), sep = "[.]") %>% 
+  filter(arm == "mature") %>%
+  filter(predicted == "BOTH") %>% 
+  group_by(query) %>%
+  summarise(n_targets = n(), gene_id = paste_go(gene_id)) %>% view()
+
 # GENERATE GO BY MIR ===
 # read_tsv(paste0(wd, "SRNA2GO.tsv")) %>%
 
@@ -181,7 +190,7 @@ str(query.p <- query.p[names(query.p) %in% query.names])
 
 # allRes1 <- allRes1 %>% mutate(SIGN = WHICH_SIGN, CONTRAST = CONTRAST)
 
-DF < list()
+DF <- list()
 
 for(j in 1:length(CONTRAST)) {
   
@@ -212,3 +221,10 @@ for(j in 1:length(CONTRAST)) {
   
 }
 
+
+allRes2 <- do.call(rbind, DF) %>% as_tibble() %>% mutate(SIGN = WHICH_SIGN)
+
+view(allRes1)
+view(allRes2)
+
+identical(names(allRes1), names(allRes2))
