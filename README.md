@@ -7,17 +7,10 @@ This repository contains notes for the installation and execution of bioinformat
 Ricardo Gomez-Reyes
 
 ## Contents
-- [1) Quality assess and cleaning step](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/PREPROCESSING.md)
-- [2) Databases curation](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/DATABASES.md)
-- [3) Non redundant sRNA loci](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/B_srna_loci_finder)
-- [4) microARN databases processing](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/MICRORNA_DB)
-- [5) small RNAs assembly, annotation and quantification](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/SHORTSTACKS4.md)
-
-
-- [1.2) Exploratory non redundant genomic annotation](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/BUILD_GENOMIC_MASK.R)
-- [1.3) Curated mollusk miRs multi-Fasta source](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/GENOME_WIDE_MIRS_MOLLUSK.R)
-- [2) small RNAs assembly and quantification](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/SHORTSTACKS.md)
-- [2.1) Reference-based Transcriptome assembly](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/REFBASED_TRANSCRIPTOME_ASSEMBLY.md)
-- [3) Functional annotation](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/MIRS_FUNCTIONAL_ANNOT.md)
-- [4) Differential Expression analysis](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/DOWNSTREAM/DIFFEXP) 
-- [5) Exploratory downstream analysis](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/DOWNSTREAM/DIFFEXP/PROFILING_LIBS_BY_READ_LENGTH.R)
+- [Step 1) Quality assess and cleaning step](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/PREPROCESSING.md)
+- [Step 2) Databases curation](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/DATABASES.md)
+- [Step 3) Non redundant loci](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/B_srna_loci_finder)
+- [Step 4) MicroRNA databases processing](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/MICRORNA_DB)
+- [Step 5) Small RNAs assembly, annotation and quantification](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/SHORTSTACKS4.md)
+- [Step 6) Functional regulatory prediction](https://github.com/RJEGR/Small-RNASeq-data-analysis/blob/master/A_UPSTREAM/FUNCTIONAL_PREDICTION.md)
+- [Step 7) MicroRNA Expression Analysis](https://github.com/RJEGR/Small-RNASeq-data-analysis/tree/master/E_expression_analysis)
