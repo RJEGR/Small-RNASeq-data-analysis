@@ -19,6 +19,11 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 path <- "~/Documents/MIRNA_HALIOTIS/GENOME_WIDE_DISCOVERY_AND_FUNCTIONAL_MIRS_IN_MOLLUSCS/"
 
+MTD <- list.files(path = path, pattern = "METADATA.xls", full.names = T)
+
+MTD <- readxl::read_excel(MTD)
+
+
 xls_f <- list.files(path = path, pattern = "^Table S1", full.names = T)
 
 library(tidyverse)
@@ -54,6 +59,8 @@ workbook <- workbook %>% distinct()
 # hist(nchar(workbook$mirna_precursor))
 
 workbook <- workbook %>% filter(nchar(mature_sequence) >= 18)
+
+workbook <- workbook %>% left_join(MTD, by = "sp")
 
 llist <- function(x) {
   x <- paste(x, sep = '|', collapse = '|')
@@ -100,7 +107,7 @@ count_sp <- function(x) {
   # mutate(header = ifelse(n > 5, paste0("Highly_conserved|", n), sp)) %>%
   mutate(header = paste("Mollusk_miR",1:nrow(.), sep = "_")) 
 
-.workbook %>% right_join(workbook, by = "mature_sequence")
+# .workbook %>% right_join(workbook, by = "mature_sequence") 
 
 # 
 # workbook <- workbook %>% 
@@ -121,6 +128,7 @@ count_sp <- function(x) {
 
 
 .workbook %>% arrange(header) %>% distinct(header) 
+
 
 write_rds(.workbook, file = paste0(path, "/molluscs_mature.rds"))
 
