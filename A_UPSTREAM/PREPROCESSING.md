@@ -1,4 +1,4 @@
-# Quality assess and clean step
+# Quality assess and cleaning step
 # 1) Running tools
 ## Fastqc & Multiqc
 ```bash
