@@ -1,4 +1,5 @@
 # Quality assess and cleaning step
+Ricardo Gómez Reyes
 # 1) Running tools
 ## Fastqc & Multiqc
 ```bash
