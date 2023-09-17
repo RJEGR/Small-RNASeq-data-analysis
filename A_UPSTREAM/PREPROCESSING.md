@@ -2,13 +2,15 @@
 # 1) Running tools
 ## Fastqc & Multiqc
 ```bash
-# FastQC v0.11.7
-fastqc -v
-# test
-fastqc *fastq.gz
+# A) FastQC v0.11.7
 
-# MultiQC v1.10.1
-multiqc -v
+mkdir -p fastqc
+
+fastqc *.fastq -t 24 --nogroup -o ./fastqc &> fastqc.log &
+
+# B) MultiQC v1.10.1
+
+multiqc ./fastqc/*zip -o multiqc
 ```
 
 ## Mirtrace
@@ -24,10 +26,20 @@ for i  in $(ls *fasta); do cat $i | seqkit grep -n -r -p "rnatype:mirna" -p "rna
 
 
 # Installation
+## Fastqc
+```bash
+# FASTQC
+conda install -c bioconda fastqc
+# MULTIQC
+conda install multiqc
+```
+
 ## Mirtrace
 ```bash
 conda install -c bioconda mirtrace
+
 # OR conda install -c "bioconda/label/cf201901" mirtrace
+
 mirtrace -v # 1.0.1
 
 mirtrace --help
