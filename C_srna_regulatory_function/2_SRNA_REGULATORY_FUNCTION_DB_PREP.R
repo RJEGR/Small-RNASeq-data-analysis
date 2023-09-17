@@ -42,7 +42,7 @@ f <- list.files(path = wd, pattern = f, full.names = T)
 
 TARGETSCAN <- read_tsv(f)
 
-# BIND TO TARGETSCAN, UPGRADE VERSION OF RESIDUAL 17 MIRS
+# BIND TO TARGETSCAN, UPGRADE VERSION OF RESIDUAL 16 MIRS
 
 f <- "mir_ts_vs_three_prime_utr_rmdup_ts_targetscan.out"
 
@@ -81,10 +81,33 @@ RNAHYBRID <- RNAHYBRID %>%
   mutate(query = sapply(strsplit(query, "::"), `[`, 1) ) %>%
   select(target, query) %>%
   filter(target %in% utr) %>% # <- keep only 3'utr
-  mutate(predicted = "RNAHYBRID") 
+  mutate(predicted = "RNAHYBRID") %>%
+  filter(grepl(".mature", query))
+
+
+# BIND TO RNAHybrid, UPGRADE VERSION OF RESIDUAL 17 MIRS
+
+pattern <- "UPGRADE_MIRS_TARGETS_vs_three_prime_utr_RNAhybrid.tsv"
+
+f <- list.files(path = wd, pattern = pattern, full.names = T)
+
+# AFTER CLEAN RNAHYBRID pval < 0.05, JUST LOAD .out.psig.tsv file:
+
+# RNAHYBRID <- read_tsv(f, col_names = F)
+# colNames <- c("target", "query", "mfe", "pval", "pos", "lenT", "lenQ")
+# colnames(RNAHYBRID) <- colNames
+
+RNAHYBRID <- read_tsv(f, col_names = F) %>% 
+  dplyr::rename("target"="X1", "query"="X2" ,"pval" = "X4") %>%
+  filter(pval < 0.05) %>%
+  select(target, query) %>%
+  filter(target %in% utr) %>% # <- keep only 3'utr
+  mutate(predicted = "RNAHYBRID", query = paste0(query, ".mature")) %>%
+  rbind(RNAHYBRID, .)
+
+nrow(RNAHYBRID %>% distinct(query) %>% filter(grepl(".mature", query))) # MUST BE 147
 
 # 2.3)
-
 
 TARGETSCAN <- TARGETSCAN %>% select(a_Gene_ID, miRNA_family_ID) %>%
   mutate(miRNA_family_ID = sapply(strsplit(miRNA_family_ID, "::"), `[`, 1) ) %>%
@@ -93,7 +116,9 @@ TARGETSCAN <- TARGETSCAN %>% select(a_Gene_ID, miRNA_family_ID) %>%
   select(target, query) %>%
   mutate(predicted = "TARGETSCAN")
 
-identical(names(TARGETSCAN), names(TARGETSCAN))
+TARGETSCAN <- TARGETSCAN %>% filter(grepl(".mature", query))
+
+identical(names(TARGETSCAN), names(RNAHYBRID))
 
 # 3) ====
 
@@ -114,6 +139,9 @@ which_tools <- function(x) {
   x <- paste(x, sep = '|', collapse = '|') }
 
 
+RNAHYBRID %>% distinct(target)
+TARGETSCAN %>% distinct(target)
+
 out <- rbind(RNAHYBRID, TARGETSCAN) %>%
   # sample_n(100) %>%
   group_by(target) %>%
@@ -125,7 +153,10 @@ out <- rbind(RNAHYBRID, TARGETSCAN) %>%
 
 out %>% count(predicted)
 
-nrow(out) # 9565 different 3' utrs predicted to be target by srna
+out %>% distinct(target)
+
+
+nrow(out) # 6372 different 3' utrs predicted to be target by srna
 
 # ES NECESESARIO CARGARA LAS ANOTACIONES  A NIVEL GENOMA Y TRANSCRIPTOMA:
 
