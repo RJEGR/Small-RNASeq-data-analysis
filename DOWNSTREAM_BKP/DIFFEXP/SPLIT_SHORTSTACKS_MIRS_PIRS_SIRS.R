@@ -159,7 +159,6 @@ headers <- fasta_prep %>% pull(Name)
 
 fasta <- c(rbind(headers, seqs))
 
-
 write(fasta, file= paste0(path, "UPGRADE_MIRS_TARGETS.fasta"))
 
 # PREPARE STRUCVIS INPUT
