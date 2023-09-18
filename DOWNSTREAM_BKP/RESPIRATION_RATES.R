@@ -3,6 +3,18 @@
 # GENERATE DATAVIZ
 # RICARDO GOMEZ-REYES, 2023
 
+# Note: values were converted to pmol by: 
+# From (μmol O2⋅larva− 1 ⋅ h− 1 L-1)
+# To (μmol O2⋅larva− 1 ⋅ h− 1).
+# Then ((pmol O2⋅larva− 1 ⋅ h− 1))
+
+# Vol of chamber: 1700 μL OR 0.0017 L
+
+# df_stats <- df_stats %>% 
+#   mutate(r_ind_adj = r_ind_adj * 0.0017) %>%
+#   mutate(r_ind_adj = r_ind_adj * 1E6)
+
+
 
 rm(list = ls());
 
@@ -27,21 +39,33 @@ pHpalette <- c(`7.6`="#ad1f1f", `7.8`= "#abdda4",`8.0`= "#4575b4", `8`= "#4575b4
 
 recode_to <- structure(c("pH 8.0", "pH 7.6"), names = c("8", "7.6"))
 
-recode_hpf <- structure(c("C) 24 HPF", "D) 110 HPF"), names = c("24", "108"))
+recode_hpf <- structure(c("B) 24 HPF", "C) 110 HPF"), names = c("24", "108"))
 
+# View
 
-#
+df_stats %>% select(r_ind_adj) %>%
+  # filter(pH != "7.8") %>%
+  dplyr::mutate(hpf = dplyr::recode(hpf, !!!c("108" = "110"))) %>%
+  rstatix::get_summary_stats(type = 'mean_sd') %>% view()
 
 
 # 1) (REPLACED W/ DONUTS)
 
-ylabs <- expression("Metabolic rate ("*mu*"mol"~O[2]~Ind^-1~h^-1*")")
+
+# ylabs <- expression("Metabolic rate (pmol"~O[2]~Ind^-1~h^-1*")")
+
+ylabs <- expression("Tasa de resp. (pmol"~O[2]~Ind^-1~h^-1*")")
+
+lim <- c(-10, 140)
+
+breaks <- seq(0, lim[2], by = 20)
 
 df_stats %>% select(r_ind_adj) %>%
   filter(pH != "7.8") %>%
   dplyr::mutate(hpf = dplyr::recode(hpf, !!!c("108" = "110"))) %>%
-  rstatix::get_summary_stats(type = 'mean_sd') %>%
-  mutate(facet = "A) Early development") %>%
+  rstatix::get_summary_stats(type = 'mean_sd') %>% 
+  # mutate(facet = "A) Early development") %>%
+  mutate(facet = "A) Desarrollo larval") %>%
   mutate(ymin = mean-sd, ymax = mean+sd) %>%
   ggplot(aes(x = hpf, y = mean, color = pH, group = pH)) +
   facet_grid( ~ facet ) +
@@ -51,13 +75,15 @@ df_stats %>% select(r_ind_adj) %>%
   geom_path(position = position_dodge(width = 0), linewidth = 1) +
   scale_color_manual("", values = pHpalette) +
   labs(y = ylabs, x = "HPF") +
-  scale_y_continuous(breaks = seq(0, 0.08, by = 0.02), limits = c(0,0.08)) -> pleft
+  scale_y_continuous(breaks = breaks, limits = lim) -> pleft1
 
-pleft + theme_bw(base_family = "GillSans", base_size = 14) + 
+
+
+pleft1 + theme_bw(base_family = "GillSans", base_size = 14) + 
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
     panel.border = element_blank(),
     panel.grid.minor.y = element_blank(),
-    legend.position = "none") -> pleft
+    legend.position = "none") -> pleft1
 
 # ggsave(pleft,
 #   filename = 'oxygen_rate_facet_by_hpf.png', path = ggsavepath,
@@ -96,7 +122,7 @@ pleft <- donut_df %>%
   theme_bw(base_family = "GillSans", base_size = 14) +
   xlim(c(0.2, hsize + 0.5)) +
   theme(
-    legend.position = "left",
+    legend.position = "top",
     # panel.background = element_rect(fill = "white"),
     strip.background = element_rect(fill = 'grey89', color = 'white'),
     panel.grid = element_blank(),
@@ -149,22 +175,22 @@ df_stats %>%
 
 recode_to_x <- structure(c("pH 8.0", "pH 7.8", "pH 7.6"), names = c("8","7.8","7.6"))
   
-ylabs <- expression(mu*"mol"~O[2]~Ind^-1~h^-1)
-
+# ylabs <- expression("Metabolic rate (pmol"~O[2]~Ind^-1~h^-1*")")
 
 pbar <- DF %>%
   summarise(mean = mean(y), sd = sd(y), n = n()) %>%
   dplyr::mutate(pH = dplyr::recode(pH, !!!recode_to_x)) %>%
   mutate(ymin = mean-sd, ymax = mean+sd, p.adj.signif = c("", "ns", "ns")) %>%
-  mutate(facet = "D) Total oxygen consumed") %>%
+  # mutate(facet = "D) Total oxygen consumed") %>%
+  mutate(facet = "D) Consumo total de O2") %>%
   ggplot(aes(x = pH, y = mean,  ymin = ymin, ymax = ymax)) +
   facet_grid(~ facet) +
   geom_col(position = position_dodge(0.6), color = 'black', fill = 'grey89') +
   geom_errorbar(width = 0.15, position = position_dodge(0.6)) +
-  geom_text(aes(y = ymax + 0.002, label= p.adj.signif), 
+  geom_text(aes(y = ymax + 2, label= p.adj.signif), 
       size = 3.5, family = 'GillSans',fontface = "bold",
       vjust= 0, color="black", position=position_dodge(width = .6)) +
-  scale_y_continuous(breaks = seq(0, 0.11, by = 0.02), limits = c(0,0.11)) +
+  # scale_y_continuous(breaks = seq(0, 0.11, by = 0.02), limits = c(0,0.11)) +
   theme_bw(base_family = "GillSans", base_size = 14) + 
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
     panel.border = element_blank(),
@@ -227,7 +253,8 @@ plotdf %>%
   labs(y = ylabs, x = "") +
   scale_color_manual("", values = c("#4575b4", "#d73027")) +
   scale_fill_manual("", values = c("#4575b4", "#d73027")) +
-  scale_y_continuous(breaks = seq(0, 0.11, by = 0.02), limits = c(0,0.11)) -> pright
+  # scale_y_continuous(breaks = seq(0, 0.11, by = 0.02), limits = c(0,0.11))
+  scale_y_continuous("",breaks = breaks, limits = lim) -> pright
 
 
 pright <- pright + theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
@@ -270,4 +297,9 @@ ggsave(pright, filename = 'RESPIRATION_RATES_FACET_4.png',
   path = path_out, width = 5, height = 3, device = png, dpi = 300)
 
 
-pbar | pright
+pleft1 | pright
+
+P <- pleft1 + plot_spacer() + pright + patchwork::plot_layout(widths = c(0.8,-0.15, 1.2))
+
+ggsave(P, filename = 'RESPIRATION_RATES_FACET_ES.png', 
+  path = path_out, width = 6, height = 3, device = png, dpi = 300)
