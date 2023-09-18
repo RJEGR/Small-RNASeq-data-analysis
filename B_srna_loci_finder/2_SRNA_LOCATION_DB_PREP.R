@@ -156,7 +156,7 @@ str(which_mirs <- SRNAS %>% filter(SRNAtype == "miR") %>% distinct(Name) %>% pul
 # 
 # assembly %>% as_tibble() %>% filter(grepl(".mature|.star", ID)) %>% select()
   
-.DB <- assembly %>% as_tibble() %>% select(ID, type) %>% rename("Locus_type"="type", "Name"="ID")
+.DB <- assembly %>% as_tibble() %>% select(ID, type) %>% dplyr::rename("Locus_type"="type", "Name"="ID")
 
 # 2)  BIND SEVERAL OUTPUT  ====
 # TO KEEP TRACK READS COUNT PER CLUSTER
@@ -173,11 +173,9 @@ DB <- read_tsv(f) %>%
 
 # SRNAS %>% mutate(RNAType = ifelse(grepl("piR", KnownRNAs)))
 
-.DB <- SRNAS %>% select(-MajorRNA, -KnownRNAs) %>% rename("NKnownRNAs"="n")
+.DB <- SRNAS %>% select(-MajorRNA, -KnownRNAs) %>% dplyr::rename("NKnownRNAs"="n")
 
 DB <- DB %>% left_join(.DB, by = "Name")
-
-
 
 # 4) BIND LOCATION DB ====
 
