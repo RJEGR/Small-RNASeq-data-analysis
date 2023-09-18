@@ -18,22 +18,10 @@ dds <- read_rds(paste0(wd, "/DDS_DESEQ2.rds"))
 # RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")) %>% filter( padj < 0.05) 
 
 
-# RECODE 7 MIRS FAMILY FROM MIRBASE/MOLLUSC DB
-
-recode_mir <- c(
-  `Cluster_39774` = "miR-242", 
-  `Cluster_17642` = "miR-1989", 
-  `Cluster_38139` = "miR-745", 
-  `Cluster_45860` = "miR-10492a", 
-  `Cluster_47716` = "miR-277b", 
-  `Cluster_37147` = "miR-184", 
-  `Cluster_27861` = "miR-252")
-
 RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05  & abs(log2FoldChange) > 1) %>%
   mutate(star = ifelse(padj <.001, "***", 
     ifelse(padj <.01, "**",
-      ifelse(padj <.05, "*", "")))) %>%
-  dplyr::mutate(Family = dplyr::recode(Family, !!!recode_mir))
+      ifelse(padj <.05, "*", "")))) 
 
 
 
