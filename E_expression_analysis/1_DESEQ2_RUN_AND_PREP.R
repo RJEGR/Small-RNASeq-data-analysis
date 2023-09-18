@@ -147,6 +147,19 @@ RES <- read_tsv(paste0(path, "SRNA2MIRGENEDB.tsv")) %>%
 
 RES <- RES %>% mutate(Family = ifelse(is.na(Family), Name, Family))
 
+# RECODE 7 MIRS FAMILY FROM MIRBASE/MOLLUSC DB (FROM 4_MIR_PAIRWISEALIGNMENT.R)
+
+recode_mir <- c(
+  `Cluster_39774` = "miR-242", 
+  `Cluster_17642` = "miR-1989", 
+  `Cluster_38139` = "miR-745", 
+  `Cluster_45860` = "miR-10492a", 
+  `Cluster_47716` = "miR-277b", 
+  `Cluster_37147` = "miR-184", 
+  `Cluster_27861` = "miR-252")
+
+RES <- RES %>% dplyr::mutate(Family = dplyr::recode(Family, !!!recode_mir))
+
 write_tsv(RES, file = paste0(path, "DESEQ_RES.tsv"))
 
 # CREATE A DDS OBJ.
