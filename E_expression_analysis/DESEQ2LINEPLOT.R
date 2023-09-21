@@ -1,6 +1,6 @@
 # GENERATE AVERAGE-LINE-PLOT USING DIFF EXP. MIRS AS INPUTS
 # FOCUS ON MIRS UP-EXPRESSED UNDER LOW PH (i.e CONTRAST A AND B)
-
+# OR ONLY IN EXCLUSIVE MIRS
 # COMPARISON FROM CONTRAST C AND D SHOW HOW REGULATORY NETWORK DURING DEVELOPMENT (AT 110 HPF) CHANGES IN REPONSE TO LOW PH
 
 rm(list = ls())
@@ -23,8 +23,7 @@ RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05  & abs(lo
     ifelse(padj <.01, "**",
       ifelse(padj <.05, "*", "")))) 
 
-
-
+RES.P %>% count(CONTRAST)
 
 # Only mirs upexpressed under low pH
 
@@ -204,11 +203,14 @@ DF %>%
 # 
 ggsave(p, filename = 'DESEQ2UPEXPRESSED_MIRS_IN_DEVELOPMENT_IN_REPONSE_TO_LOW_PH.png', path = wd, width = 5, height = 4.5, device = png, dpi = 300)
 
+# UPGRADE ====
+# EXCLUSIVE FROM THE 2_DESEQ2BARPLOT.R
+
+str(which_unique <- EXCLUSIVE_MIRS %>% distinct(Name) %>% pull())
 
 cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[which_unique,]
 
 # cnts <- DESeq2::varianceStabilizingTransformation(round(cnts))
-
 
 DF <- cnts %>% as_tibble(rownames = "Name") %>% 
   pivot_longer(-Name, names_to = "LIBRARY_ID", values_to = "count")
@@ -220,6 +222,9 @@ DF <- RES.P %>% distinct(Name, Family) %>%
   left_join(as_tibble(SummarizedExperiment::colData(dds)), by = "LIBRARY_ID")
 
 recode_to_hpf <- structure(c("24 HPF", "110 HPF"), names = c("110", "24"))
+recode_to_pH <- structure(c("pH 8.0", "pH 7.6"), names = c("Control", "Low"))
+
+DF %>% count(Name)
 
 "#f44336"
 "grey30"
@@ -228,11 +233,13 @@ recode_to_hpf <- structure(c("24 HPF", "110 HPF"), names = c("110", "24"))
 fun.data.trend <- "mean_se" # "mean_cl_boot", "mean_sdl"
 
 DF %>%
+  # group_by(Family) %>% sample_n(1) %>%
   dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf)) %>%
-  dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_AB)) %>%
+  dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_pH)) %>%
   # mutate(Name = factor(Name, levels = unique(names(LOGFC_LABELLER)))) %>%
   ggplot(aes(x = hpf, y=log2(round(count)+1), color = pH, fill = pH, group = pH)) +
-  ggh4x::facet_nested_wrap(~ Family, scales = "free_y", nest_line = F,ncol = 2) +
+  # ggh4x::facet_nested_wrap(~ Family, scales = "free_y", nest_line = F,ncol = 2) +
+  facet_wrap(~ Family, scales = "free_y") +
   geom_jitter(position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +
   stat_summary(fun.data = fun.data.trend, linewidth = 0.7, size = 0.7, alpha = 0.7) +
   stat_summary(fun = mean, geom = "line") +
