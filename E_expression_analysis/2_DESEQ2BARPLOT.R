@@ -234,6 +234,14 @@ p2 <- p2 + facet_grid(cols = vars(SIGN), scales = "free") +
 ggsave(p2, filename = 'DESEQ2UPSET_CONTRAST_C_D.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
 
 # 3) SPLIT EXCLUSIVE FROM INTERSECTED MIRS ----
+# INCLUDE ALL CONTRAST
+
+UPSETDF <- RES.P %>% 
+  mutate(SIGN = sign(log2FoldChange)) %>%
+  # dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
+  # dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_to)) %>%
+  group_by(Name, SIGN) %>%
+  summarise(across(CONTRAST, .fns = list), n = n())
 
 UPSETDF %>% group_by(n) %>% tally()
 
@@ -258,15 +266,16 @@ RES.P %>%
 
 
 EXCLUSIVE_MIRS <- UPSETDF %>% filter(n == 1) %>%
-  mutate(CONTRAST = unlist(CONTRAST_DE)) %>%
-  left_join(RES %>% dplyr::distinct(Name, Family))
+  mutate(CONTRAST = unlist(CONTRAST)) %>%
+  left_join(RES.P %>% dplyr::distinct(Name, Family))
   # dplyr::select(-n)
-  
+
+EXCLUSIVE_MIRS %>% ungroup() %>% count(SIGN, CONTRAST)  %>% view()
 
 INTERSECTED_MIRS <- UPSETDF %>% filter(n != 1) %>%
-  unnest(CONTRAST_DE) %>%
-  dplyr::rename("CONTRAST" = "CONTRAST_DE") %>%
-  left_join(RES %>% dplyr::distinct(Name, Family))
+  unnest(CONTRAST) %>%
+  # dplyr::rename("CONTRAST" = "CONTRAST_DE") %>%
+  left_join(RES.P %>% dplyr::distinct(Name, Family))
 
 out <- list(EXCLUSIVE_MIRS, INTERSECTED_MIRS)
 
