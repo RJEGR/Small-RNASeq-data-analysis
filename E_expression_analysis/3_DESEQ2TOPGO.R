@@ -25,6 +25,8 @@ wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")) %>% filter( padj < 0.05)
 
+RES.P %>% dplyr::count(CONTRAST_DE)
+
 .UPSETDF <- read_rds(paste0(wd, "UPSETDF.rds"))
 
 EXCLUSIVE_MIRS <- .UPSETDF[[1]] %>% ungroup()
