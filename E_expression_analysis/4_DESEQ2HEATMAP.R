@@ -16,7 +16,7 @@ wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 .UPSETDF <- read_rds(paste0(wd, "UPSETDF.rds"))
 
-EXCLUSIVE_IDS <- .UPSETDF[[1]] %>% distinct(Family) %>% pull()
+EXCLUSIVE_IDS <- .UPSETDF[[1]] %>% distinct(Name) %>% pull()
 
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
@@ -46,16 +46,16 @@ recode_to <- structure(c("Ctrl pH", "Low pH"), names = c("Control", "Low"))
 
 # str(query.ids <- UPSETDF %>% filter( n == 1) %>% distinct(Name) %>% pull())
 
-RES.P %>% filter(abs(log2FoldChange) > 2) %>% count(WRAP, CONTRAST, SIGN)
+RES.P %>% filter(abs(log2FoldChange) > 1) %>% count(WRAP, CONTRAST, SIGN)
 
-RES.P <- RES.P %>% filter(abs(log2FoldChange) > 2)
+RES.P <- RES.P %>% filter(abs(log2FoldChange) > 1)
 
 
 # UPEXPRESSED 
 
 str(query.ids <- RES.P %>% filter(SIGN == "Up") %>% distinct(Name) %>% pull()) # 46
 
-sum(KEEP <- rownames(.COUNT) %in% query.ids)
+sum(KEEP <- rownames(.COUNT) %in% EXCLUSIVE_IDS) # OR query.ids
 
 nrow(COUNT <- .COUNT[KEEP,])
 
@@ -105,10 +105,17 @@ COUNT %>%
   left_join(.colData) %>%
   mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = hc_order)) -> COUNT_LONG
 
+
+COUNT_LONG %>%
+  right_join(distinct(RES.P, Name, Family), by = "Name") %>% 
+  mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family)) %>%
+  group_by(LIBRARY_ID, Family) %>% 
+  summarise(value = sum(value)) 
+
 library(ggh4x)
 
 p1 <- COUNT_LONG %>%
-  ggplot(aes(x = LIBRARY_ID, y = Name, fill = log2(value))) + 
+  ggplot(aes(x = LIBRARY_ID, y = Name, fill = value)) + 
   geom_tile(color = 'white', linewidth = 0.2) +
   scale_fill_viridis_c(option = "B", name = "Log2", direction = -1, na.value = "white") +
   # ggsci::scale_fill_gsea(name = "", reverse = T, na.value = "white") +

@@ -6,6 +6,10 @@
 # 2) Name/Family (list), go.id, term, group/contrast
 # SAVE DF W/ NCOLS AND 147 ROWS MIRS
 
+# The GO terms that should be used for the action of the miRNA on gene expression
+# should be Biological Process terms OR Molecular Function terms
+
+# https://wiki.geneontology.org/index.php/MicroRNA_GO_annotation_manual
 
 rm(list = ls())
 
@@ -20,7 +24,7 @@ wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 print(DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")) %>% filter(SRNAtype == "miR"))
 
-print(RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")) %>% filter( padj < 0.05 & abs(log2FoldChange) > 1))
+print(RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05 & abs(log2FoldChange) > 1))
 
 .UPSETDF <- read_rds(paste0(wd, "UPSETDF.rds"))
 
@@ -35,6 +39,35 @@ INTERSECTED_MIRS %>% count(CONTRAST, SIGN, sort = T)
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 print(.SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
+
+
+# UNNEST MIRS ====
+
+SRNA2GO_DE <- .SRNA2GO %>%
+  filter(predicted == "BOTH") %>%
+  mutate(query = strsplit(query, ";")) %>%
+  unnest(query) %>%
+  separate(query, into = c("query", "arm"), sep = "[.]") %>%
+  filter(arm == "mature") %>%
+  dplyr::rename("Name" = "query") %>%
+  select(-n, -n_rnas, -arm) %>%
+  distinct() %>%
+  right_join(distinct(RES.P, Name, Family))
+
+# HOW POSSIBLE TARGETS REGUALTED BY DEGS? 167
+
+distinct(SRNA2GO_DE, description) # 167
+
+SRNA2GO_DE <- distinct(SRNA2GO_DE, Family, description, GO.ID ) 
+
+# view(SRNA2GO_DE)
+
+SRNA2GO_DE %>% dplyr::count(Family,sort = T)
+
+# REMOVE uncharacterized VARIANT ?
+# SRNA2GO_DE %>% filter(grepl("uncharacterized", description))
+
+write_tsv(SRNA2GO_DE, paste0(wd, "DESEQ2SRNATARGET.tsv"))
 
 # 1) ====
 
@@ -89,17 +122,28 @@ SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$query)
 
 SRNA2GO <- lapply(SRNA2GO, unlist)
 
-str(query.names <- RES.P %>% ungroup() %>% distinct(Name) %>% pull(Name))
+# DEFINE WHICH MIRS?
+
+RES.OUT <- RES.P %>% filter(CONTRAST %in% c("CONTRAST_A","CONTRAST_B"))
+
+str(query.names <- RES.OUT %>% ungroup() %>% distinct(Name) %>% pull(Name))
 
 # str(lapply(SRNA2GO, length))
 
 str(query.names <- query.names[query.names %in% names(SRNA2GO)])
 
-cat("\nUsing ",length(query.names), " Names...\n")
+cat("\nUsing ",length(query.names), " QUERY Names...\n")
 
-query.p <- RES.P %>% group_by(Name) %>% sample_n(1) %>% pull(pvalue, name = Name)
+query.p <- RES.OUT %>% 
+  group_by(Name) %>% sample_n(1) %>% pull(pvalue, name = Name)
+
+query.p <- query.p[match(query.names, names(query.p))]
+
+identical(names(query.p), query.names)
 
 # allResg <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 7)
+
+# BIOLOGICAL PROCES.
 
 allRes <- list()
 
@@ -109,20 +153,164 @@ for (i in 1:length(query.names)) {
   
   cat("\nUsing ",q, " Names...\n")
   
+  n <- lapply(SRNA2GO[names(SRNA2GO) %in% q], length)[[1]]
+  
+  cat("\nUsing ",n, " GO terms\n")
+  
   
   # p <- 0.05
   p <- query.p[i]
   
-  df <- GOenrichment(p, q, SRNA2GO, Nodes = 3)
+  df <- GOenrichment(p, q, SRNA2GO, Nodes = 10, onto = "BP")
   
   allRes[[i]] <- data.frame(df, Name = q)
 }
 
 
-DF <- do.call(rbind, allRes) %>% as_tibble() %>% left_join(distinct(RES.P, Name, Family))
+BPDF <- do.call(rbind, allRes) %>% as_tibble() %>% left_join(distinct(RES.P, Name, Family)) %>% mutate(Onto = "Biological Process")
+
+# CELLULAR COMPOMENTS (OMIT)
+# 
+# allRes <- list()
+# 
+# for (i in 1:length(query.names)) {
+#   
+#   q <- query.names[i]
+#   
+#   cat("\nUsing ",q, " Names...\n")
+#   
+#   n <- lapply(SRNA2GO[names(SRNA2GO) %in% q], length)[[1]]
+#   
+#   cat("\nUsing ",n, " GO terms\n")
+#   
+#   
+#   # p <- 0.05
+#   p <- query.p[i]
+#   
+#   df <- GOenrichment(p, q, SRNA2GO, Nodes = 3, onto = "CC")
+#   
+#   allRes[[i]] <- data.frame(df, Name = q)
+# }
+# 
+# CCDF <- do.call(rbind, allRes) %>% as_tibble() %>% left_join(distinct(RES.P, Name, Family)) %>% mutate(Onto = "Cellular Component")
+
+# MOLLECULAR FUNCTION
+
+allRes <- list()
+
+for (i in 1:length(query.names)) {
+  
+  q <- query.names[i]
+  
+  cat("\nUsing ",q, " Names...\n")
+  
+  n <- lapply(SRNA2GO[names(SRNA2GO) %in% q], length)[[1]]
+  
+  cat("\nUsing ",n, " GO terms\n")
+  
+  
+  # p <- 0.05
+  p <- query.p[i]
+  
+  df <- GOenrichment(p, q, SRNA2GO, Nodes = 10, onto = "MF")
+  
+  allRes[[i]] <- data.frame(df, Name = q)
+}
+
+MFDF <- do.call(rbind, allRes) %>% as_tibble() %>% left_join(distinct(RES.P, Name, Family)) %>% mutate(Onto = "Molecular Function")
+
+DF <- rbind(BPDF, MFDF)
+
+DF %>% group_by(Family, Onto) %>% dplyr::count(Term, sort = T)
+
+# ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top')
+
+BPDF %>% 
+  filter(Family %in% "MIR-2") %>%
+  arrange(desc(Term)) %>%
+  mutate(Term = factor(Term, levels = unique(Term))) %>%
+  # mutate(Term = fct_reorder(Term, Annotated))
+  ggplot(aes(x = Family, y = Term, fill = Annotated) ) +
+  geom_tile(color = 'white', linewidth = 0.2) +
+  scale_x_discrete(position = 'top') +
+  theme_bw(base_size = 10, base_family = "GillSans") +
+  labs(x = '', y = '') +
+  facet_grid(Onto ~ ., scales = "free") +
+  theme(
+    legend.position = "none",
+    # axis.text.y = element_blank(),
+    axis.text.y = element_text(size = 7),
+    axis.text.x = element_text(angle = 75, hjust = -0.05, vjust = 1),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+    ) 
+
+# GENERATE HEATMAP OF PROCESS ====
+
+wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+
+dds <- read_rds(paste0(wd, "/DDS_DESEQ2.rds"))
+
+barplot(COUNT <- DESeq2::counts(dds, normalized = F, replaced = F)[query.names,])
+
+barplot(COUNT <- DESeq2::varianceStabilizingTransformation(round(COUNT)))
+
+
+sample_dist = dist(t(COUNT), method='euclidean')
+
+hc_samples = hclust(sample_dist, method='complete')
+
+hc_order <- hc_samples$labels[hc_samples$order]
+
+srna_dist = dist(COUNT, method='euclidean')
+
+hc_srna = hclust(srna_dist, method='complete')
+
+srna_order <- hc_srna$labels[hc_srna$order]
+
+recode_to <- RES.OUT %>% filter(Name %in% srna_order) %>% distinct(Name, Family)
+
+recode_to <- structure(recode_to$Family, names = recode_to$Name)
+
+identical(sort(names(recode_to)),sort(srna_order))
+
+srna_order <- recode_to[match(srna_order, names(recode_to))]
+
+identical(names(srna_order),  hc_srna$labels[hc_srna$order])
+
+dplyr::count(BPDF, Term,sort = T)
+
+.colData <- as_tibble(SummarizedExperiment::colData(dds)) %>% dplyr::select(LIBRARY_ID, colName,hpf, pH)
+
+COUNT %>% 
+  as_tibble(rownames = 'Name') %>%
+  pivot_longer(-Name, names_to = "LIBRARY_ID") %>%
+  left_join(.colData) %>%
+  mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = hc_order)) -> COUNT_LONG
+
+library(ggh4x)
+
+COUNT_LONG %>%
+  ggplot(aes(x = LIBRARY_ID, y = Name, fill = log2(value))) + 
+  geom_tile(color = 'white', linewidth = 0.2) +
+  scale_fill_viridis_c(option = "B", name = "Log2", direction = -1, na.value = "white") +
+  ggh4x::facet_nested( ~ hpf+pH, nest_line = F, scales = "free", space = "free") +
+  # scale_x_discrete(position = 'top') +
+  # ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
+  ggh4x::scale_y_dendrogram(hclust = hc_srna, position = "left", labels = NULL) +
+  guides(y.sec = guide_axis_manual(labels = srna_order, label_size = 12)) +
+  theme_bw(base_size = 12, base_family = "GillSans") +
+  labs(x = '', y = '') +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = -0.15, vjust = 1))
+  
+
 
 # DF <- DF %>% mutate(SIGN = WHICH_SIGN, CONTRAST = CONTRAST) 
 
+# QUIT ====
 
 DB2 <- DF %>% 
   group_by(GO.ID, Term) %>%

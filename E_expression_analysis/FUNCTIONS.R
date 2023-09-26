@@ -133,18 +133,30 @@ split_pfam <- function(x, hit = "Pfam"){
 }
 
 split_kegg <- function (x, hit = "Kegg")  {
-  library(data.table)
-  y <- x[!is.na(get(hit)), .(get(hit), gene_id, transcript_id, 
-    prot_id)]
-  z <- strsplit(y$V1, "`")
+  
+  # library(data.table)
+  
+  
+  which_vars <- c(hit, "gene_id", "transcript_id", "prot_id")
+  
+  y <- x %>% select_at(vars(all_of(which_vars))) %>% drop_na(any_of(hit))
+  
+  z <- y %>% pull(hit)
+  z <- strsplit(z, "`")
+  
+  # z <- strsplit(y$V1, "`")
   n <- sapply(z, length)
   z <- strsplit(unlist(z), "\\^")
+  
   x1 <- data.frame(gene = rep(y$gene_id, n), 
     transcript = rep(y$transcript_id, n), 
     protein = rep(gsub(".*\\|", "", y$prot_id), n), 
     Kegg = sapply(z, "[", 1), stringsAsFactors = FALSE)
   message(nrow(x1), " ", hit, " annotations")
-  data.table(x1)
+  
+  # data.table(x1)
+  
+  as_tibble(x1)
 }
 
 get_eggnog <- function (x, ids, by = "transcript_id")  {
@@ -162,6 +174,8 @@ get_eggnog <- function (x, ids, by = "transcript_id")  {
     x1 <- x %>% filter(gene_id %in% ids)
     
     y <- unique(x1[!is.na(eggnog), .(gene_id, eggnog)])
+    
+    x1 %>% drop_na(eggnog) %>% distinct(eggnog) %>% pull(eggnog)
     
   }
   
@@ -310,13 +324,18 @@ get_res <- function(dds, contrast, alpha_cutoff = 0.1) {
   res = results(dds, contrast, alpha = alpha_cutoff)
   
   
-  baseMeanA <- rowMeans(DESeq2::counts(dds,normalized=TRUE)[,keepA])
-  baseMeanB <- rowMeans(DESeq2::counts(dds,normalized=TRUE)[,keepB])
+  baseMeanA <- rowMeans(DESeq2::counts(dds,normalized=F)[,keepA])
+  baseMeanB <- rowMeans(DESeq2::counts(dds,normalized=F)[,keepB])
+  
+  
+  # sdA <- apply(DESeq2::counts(dds,normalized=TRUE)[,keepA], 1, sd)
+  # sdB <- apply(DESeq2::counts(dds,normalized=TRUE)[,keepB], 1, sd)
   
   res %>%
     as.data.frame(.) %>%
     cbind(baseMeanA, baseMeanB, .) %>%
     cbind(sampleA = sA, sampleB = sB, .) %>%
+    # cbind(sdA, sdB, .) %>%
     as_tibble(rownames = "Name") %>%
     mutate(padj = ifelse(is.na(padj), 1, padj)) %>%
     mutate_at(vars(!matches("Name|sample|pvalue|padj")),

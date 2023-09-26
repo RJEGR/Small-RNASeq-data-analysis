@@ -167,18 +167,9 @@ write_tsv(RES, file = paste0(path, "DESEQ_RES.tsv"))
 ddsFullCountTable <- DESeqDataSetFromMatrix(
   countData = .COUNTS,
   colData = .colData,
-  design = ~ 1 )
+  design = ~ colName )
 
 dds <- estimateSizeFactors(ddsFullCountTable) 
 
 write_rds(dds,file = paste0(path, "/DDS_DESEQ2.rds"))
-
-RES %>% 
-  filter(abs(log2FoldChange) > 0 & padj < 0.05) %>%
-  mutate(REGULATED = sign(log2FoldChange)) %>%
-  group_by(REGULATED, Name) %>%
-  summarise(
-    across(CONTRAST, .fns = paste_go), 
-    n = n(),
-    .groups = "drop_last")
 

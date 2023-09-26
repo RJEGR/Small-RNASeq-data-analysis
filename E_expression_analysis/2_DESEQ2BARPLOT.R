@@ -21,7 +21,7 @@ library(tidyverse)
 
 wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
-RES <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% mutate(log2FoldChange = log2FoldChange * -1)
+RES <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) # %>% mutate(log2FoldChange = log2FoldChange * -1)
 
 url <- "https://raw.githubusercontent.com/RJEGR/Cancer_sete_T_assembly/main/functions.R"
 
@@ -118,7 +118,7 @@ library(ggupset)
 
 # 1)
 
-recode_fc <- structure(c("pH 7.6","pH 8.0"), names = c(1,-1))
+recode_fc <- structure(c("pH 7.6","pH 8.0"), names = c(-1,1))
 
 recode_to <-  structure(c("24 HPF", "110 HPF"), names = c("CONTRAST_A", "CONTRAST_B"))
 
@@ -189,9 +189,9 @@ recode_to <-  structure(c("pH 7.6","pH 8.0"), names = WHICH_CONTRAST)
 # RES.P %>% filter(CONTRAST_DE %in% WHICH_CONTRAST) %>% distinct(Name)
 
 UPSETDF <- RES.P %>% 
+  filter(CONTRAST_DE %in% WHICH_CONTRAST) %>%
   mutate(SIGN = sign(log2FoldChange)) %>%
   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
-  filter(CONTRAST_DE %in% WHICH_CONTRAST) %>%
   dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_to)) %>%
   group_by(Name, SIGN) %>%
   summarise(across(CONTRAST_DE, .fns = list), n = n())

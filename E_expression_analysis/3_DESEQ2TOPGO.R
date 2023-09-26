@@ -23,9 +23,9 @@ library(tidyverse)
 
 wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
-RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")) %>% filter( padj < 0.05)
+RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05 & abs(log2FoldChange) > 1)
 
-RES.P %>% dplyr::count(CONTRAST_DE)
+RES.P %>% dplyr::count(CONTRAST)
 
 .UPSETDF <- read_rds(paste0(wd, "UPSETDF.rds"))
 

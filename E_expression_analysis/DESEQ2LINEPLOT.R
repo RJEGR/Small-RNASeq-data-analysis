@@ -23,8 +23,16 @@ RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05  & abs(lo
     ifelse(padj <.01, "**",
       ifelse(padj <.05, "*", "")))) 
 
-RES.P %>% count(CONTRAST)
+RES.P %>% dplyr::count(CONTRAST)
 
+RES.P %>% select(Family, log2FoldChange, CONTRAST) %>% 
+  group_by(Family, CONTRAST) %>% 
+  filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+  summarise(log2FoldChange = sum(log2FoldChange)) %>%
+  view()
+
+
+# OMIT
 # Only mirs upexpressed under low pH
 
 RES.P <- RES.P %>% filter(log2FoldChange < 0)
@@ -206,46 +214,104 @@ ggsave(p, filename = 'DESEQ2UPEXPRESSED_MIRS_IN_DEVELOPMENT_IN_REPONSE_TO_LOW_PH
 # UPGRADE ====
 # EXCLUSIVE FROM THE 2_DESEQ2BARPLOT.R
 
-str(which_unique <- EXCLUSIVE_MIRS %>% distinct(Name) %>% pull())
+.UPSETDF <- read_rds(paste0(wd, "UPSETDF.rds"))
 
-cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[which_unique,]
+EXCLUSIVE_MIRS <- .UPSETDF[[1]] %>% ungroup() %>%  
+  mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family))
 
-# cnts <- DESeq2::varianceStabilizingTransformation(round(cnts))
+INTERSECTED_MIRS <- .UPSETDF[[2]]  %>% ungroup() %>%  
+  mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family))
+
+EXCLUSIVE_MIRS %>% 
+  # distinct(Family, SIGN, CONTRAST) %>% 
+  dplyr::count(CONTRAST, SIGN, sort = T) 
+
+INTERSECTED_MIRS %>% 
+  # distinct(Family, SIGN, CONTRAST) %>% 
+  dplyr::count(CONTRAST, SIGN, sort = T) 
+
+
+RES.P %>% 
+  # filter(Name %in% which_unique) %>% 
+  mutate(SIGN = sign(log2FoldChange)) %>%
+  distinct(Name, CONTRAST, SIGN) %>% 
+  dplyr::count(CONTRAST, SIGN, sort = T) %>% view()
+
+str(which_unique <- EXCLUSIVE_MIRS %>% 
+    filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+    distinct(Name) %>% pull())
+
+
+RES.P %>%
+  mutate(SIGN = sign(log2FoldChange)) %>%
+  distinct(Name, Family, CONTRAST, SIGN) %>%
+  mutate(Family = ifelse(Name %in% which_unique, paste0(Family, " *"), Family)) %>%
+  pivot_wider(names_from = CONTRAST, values_from = SIGN, values_fill = 0) %>% view()
+  # dplyr::count(CONTRAST, SIGN, sort = T)
+#   mutate(CONTRAST = ifelse(SIGN == -1 & CONTRAST %in% c("CONTRAST_C"), "110 HPF (Ctr)", CONTRAST)) %>%
+#   mutate(sampleB = ifelse(SIGN == -1 & CONTRAST %in% c("CONTRAST_D"), "110 HPF (Low)", sampleB)) %>%
+#   mutate(sampleB = ifelse(SIGN == -1 & CONTRAST %in% c("CONTRAST_A"), "pH 7.6", sampleB)) %>%
+#   mutate(sampleB = ifelse(SIGN ==  1 & CONTRAST %in% c("CONTRAST_A", "CONTRAST_B"), "pH 8.0", sampleB))
+# dplyr::count(CONTRAST, SIGN, sort = T)
+
+  
+# divide the counts by the size factors or normalization factors before
+barplot(cnts <- DESeq2::counts(dds, normalized = F, replaced = F)[which_unique,])
+
+# barplot(cnts <- DESeq2::varianceStabilizingTransformation(round(cnts)))
 
 DF <- cnts %>% as_tibble(rownames = "Name") %>% 
   pivot_longer(-Name, names_to = "LIBRARY_ID", values_to = "count")
 
-as_tibble(SummarizedExperiment::colData(dds))
+
+MTD <- as_tibble(SummarizedExperiment::colData(dds)) %>% select(LIBRARY_ID, colName,hpf, pH)
 
 DF <- RES.P %>% distinct(Name, Family) %>% 
   right_join(DF, by = "Name") %>% 
-  left_join(as_tibble(SummarizedExperiment::colData(dds)), by = "LIBRARY_ID")
+  mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family)) %>%
+  group_by(LIBRARY_ID, Family) %>% 
+  summarise(count = sum(count)) %>%
+  left_join(MTD, by = "LIBRARY_ID")
+
+# SPLIT MIRS IN RESPONSE TO LOW-PH DURING 24 AND 110 HPF:
+
+# SORT_AB <- RES.P %>% 
+#   mutate(SIGN = sign(log2FoldChange)) %>%
+#   distinct(Name, Family, CONTRAST, SIGN) %>% 
+#   # mutate(Family = ifelse(Name %in% which_unique, paste0(Family, " *"), Family)) %>%
+#   mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family)) %>%
+#   filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+#   arrange(Family) %>%
+#   distinct(Family) %>% pull()
+
+
+unique(DF$Family)
 
 recode_to_hpf <- structure(c("24 HPF", "110 HPF"), names = c("110", "24"))
-recode_to_pH <- structure(c("pH 8.0", "pH 7.6"), names = c("Control", "Low"))
 
-DF %>% count(Name)
+recode_to_pH <- structure(c("pH 8.0", "pH 7.6"), names = c("Control", "Low"))
 
 "#f44336"
 "grey30"
 
+col <- c("#3B4992FF","#EE0000FF") 
 
 fun.data.trend <- "mean_se" # "mean_cl_boot", "mean_sdl"
 
 DF %>%
-  # group_by(Family) %>% sample_n(1) %>%
   dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf)) %>%
   dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_pH)) %>%
   # mutate(Name = factor(Name, levels = unique(names(LOGFC_LABELLER)))) %>%
-  ggplot(aes(x = hpf, y=log2(round(count)+1), color = pH, fill = pH, group = pH)) +
-  # ggh4x::facet_nested_wrap(~ Family, scales = "free_y", nest_line = F,ncol = 2) +
+  mutate(y = log2(round(count)+1)) %>%
+  # mutate(y = count) %>% 
+  ggplot(aes(x = hpf, y = y, color = pH, fill = pH, group = pH)) +
   facet_wrap(~ Family, scales = "free_y") +
   geom_jitter(position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +
   stat_summary(fun.data = fun.data.trend, linewidth = 0.7, size = 0.7, alpha = 0.7) +
   stat_summary(fun = mean, geom = "line") +
-  labs(y = "Expression (Log2)", x = "") +
-  scale_color_manual("", values = c("grey30", "grey70")) +
-  scale_fill_manual("", values =  c("grey30", "grey70")) +
+  labs(y = "Read Count", x = "") +
+  scale_color_manual("", values = c("#EE0000FF", "#3B4992FF")) +
+  scale_fill_manual("", values =  c("#EE0000FF", "#3B4992FF")) +
   theme_bw(base_family = "GillSans", base_size = 11) +
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
     legend.position = "top",
@@ -259,6 +325,10 @@ DF %>%
     axis.text.x = element_text(angle = 90, size = 10))
 
 
+DF %>%
+  dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf)) %>%
+  dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_pH)) %>%
+  group_by(hpf, pH, Family) %>% summarise(mean = mean(count), sd = sd(count)) %>% view()
 
 # out <- list()
 
