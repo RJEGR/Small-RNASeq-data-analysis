@@ -59,7 +59,6 @@ RES.P %>%
     ymin = (abs(log2FoldChange) - lfcSE) * sign(log2FoldChange),
     ymax = (abs(log2FoldChange) + lfcSE) * sign(log2FoldChange),
     y_star = ymax + (0.15+lfcSE)* sign(log2FoldChange)) %>% 
-  # mutate(Phylum = factor(Phylum,  levels = labels)) %>%
   ggplot(aes(x = Family, y = log2FoldChange, fill = SIGN)) + 
   geom_bar(stat = "identity", width = 0.5, 
     position = position_identity()) +
@@ -87,7 +86,7 @@ RES.P %>%
     axis.text.y = element_text(angle = 0, size = 5),
     axis.text.x = element_text(angle = 0)) -> p
 
-p <- p +  ggh4x::facet_nested( YWRAP ~ CONTRAST+WRAP, nest_line = F, scales = "free_y", space = "free_y") +
+p <- p +  ggh4x::facet_nested( YWRAP ~ CONTRAST_DE, nest_line = F, scales = "free_y", space = "free_y") +
   theme(strip.background = element_rect(fill = 'grey89', color = 'white')) 
   
 ggsave(p, filename = 'DESEQ2BARPLOT.png', path = wd, width = 5, height = 10, device = png, dpi = 300)

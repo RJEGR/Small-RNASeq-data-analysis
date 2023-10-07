@@ -242,6 +242,10 @@ str(which_unique <- EXCLUSIVE_MIRS %>%
     distinct(Name) %>% pull())
 
 
+str(which_unique <- RES.P %>% 
+    filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+    distinct(Name) %>% pull())
+
 RES.P %>%
   mutate(SIGN = sign(log2FoldChange)) %>%
   distinct(Name, Family, CONTRAST, SIGN) %>%
@@ -256,7 +260,7 @@ RES.P %>%
 
   
 # divide the counts by the size factors or normalization factors before
-barplot(cnts <- DESeq2::counts(dds, normalized = F, replaced = F)[which_unique,])
+barplot(cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[which_unique,])
 
 # barplot(cnts <- DESeq2::varianceStabilizingTransformation(round(cnts)))
 
@@ -264,7 +268,7 @@ DF <- cnts %>% as_tibble(rownames = "Name") %>%
   pivot_longer(-Name, names_to = "LIBRARY_ID", values_to = "count")
 
 
-MTD <- as_tibble(SummarizedExperiment::colData(dds)) %>% select(LIBRARY_ID, colName,hpf, pH)
+MTD <- as_tibble(SummarizedExperiment::colData(dds)) %>% dplyr::select(LIBRARY_ID, colName,hpf, pH)
 
 DF <- RES.P %>% distinct(Name, Family) %>% 
   right_join(DF, by = "Name") %>% 
@@ -302,8 +306,8 @@ DF %>%
   dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf)) %>%
   dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_pH)) %>%
   # mutate(Name = factor(Name, levels = unique(names(LOGFC_LABELLER)))) %>%
-  mutate(y = log2(round(count)+1)) %>%
-  # mutate(y = count) %>% 
+  # mutate(y = log2(round(count)+1)) %>%
+  mutate(y = count) %>%
   ggplot(aes(x = hpf, y = y, color = pH, fill = pH, group = pH)) +
   facet_wrap(~ Family, scales = "free_y") +
   geom_jitter(position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +

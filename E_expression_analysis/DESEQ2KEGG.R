@@ -30,11 +30,35 @@ annot <- read_tsv(annot_f, na = ".")
 
 names(annot)[1] <- "gene_id"
 
+annot <- annot %>% drop_na(gene_ontology_BLASTX)
+
+annot <- dplyr::select(annot, transcript_id, prot_id, eggnog, Kegg) %>% left_join(genome_feat, by = "transcript_id")
+
+# OR
+
+blastx_df <- split_blast(annot, hit = "BLASTX") # HARD TO RUN THIS TIME
+
+DB <- blastx_df %>% dplyr::filter(domain == "Eukaryota")
+
+blastx_df %>% dplyr::count(genus, sort = T)
+
+
+DB <- DB %>% 
+    group_by(gene) %>%
+    arrange(desc(identity)) %>%
+    sample_n(1) %>%
+    ungroup()
+
+DB %>% dplyr::count(genus, sort = T)
+
 genome_feat <- read_rds("/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/genome_features.rds")[[1]]
 
-genome_feat <- genome_feat %>% select(gene_id, transcript_id)
+genome_feat <- genome_feat %>% dplyr::select(gene_id, transcript_id)
 
-annot <- select(annot, transcript_id, prot_id, eggnog, Kegg) %>% left_join(genome_feat, by = "transcript_id")
+names(DB)[c(1,2)] <- c("gene_id", "transcript_id")
+
+DB %>% dplyr::select(-align, -identity, -evalue, -gene_id) %>%
+  left_join(genome_feat, by = "transcript_id")
 
 # EXAMPLE:
 

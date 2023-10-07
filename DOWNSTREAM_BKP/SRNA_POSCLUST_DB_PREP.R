@@ -71,7 +71,7 @@ READS_AND_FREQ <- GCOUNTS %>%
 DB <- READS_AND_FREQ %>% 
   summarise(Freq = sum(Freq)) %>% # Reads = sum(Reads), 
   left_join(.DB) %>% 
-  dplyr::rename("SampleFreq" = "Freq") %>%
+  # dplyr::rename("Freq" = "SampleFreq") %>%
   arrange(match(MajorRNA, rownames(GCOUNTS)))
   # arrange(match(Name, rownames(SORTED_MAT)))
 
@@ -148,7 +148,7 @@ dim(M <- COUNTS[match(query.ids, rownames(COUNTS)),])
 heatmap(edgeR::cpm(M))
 
 
-# # Generate multiple-sequence-alignment:
+# # Generate multiple-sequence-alignment: ====
 # SUBSEQ BY FOLLOW CRITERIO:
 
 # USING MSA (in R)
@@ -184,7 +184,7 @@ print(bioseq::rna(.align))
 
 # PREP SRNA-SEQUENCE POS-CLUSTERING: 
 
-table(SEQ_CLUSTERS <- bioseq::seq_cluster(bioseq::rna(.align), threshold = 0.01, method = "single"))
+table(SEQ_CLUSTERS <- bioseq::seq_cluster(bioseq::rna(.align), threshold = 0.45, method = "single"))
 
 
 print(bioseq::rna(.align)[SEQ_CLUSTERS])
@@ -216,6 +216,7 @@ seqs_order <- recode_to[match(seqs_order, names(recode_to))]
 
 identical(names(seqs_order),  hc_seqs$labels[hc_seqs$order])
 
+library(ggh4x)
 
 ps <- out %>%
   # filter(grepl("^MIR-10", Family)) %>%
@@ -273,5 +274,10 @@ ggsave(p, filename = "ALIGMENT_TREE.png",
   path = path, width = 3.5, height = 8, device = png, dpi = 300)
 
 
-# EX.
+# MEME ===
 
+# devtools::install_github("omarwagih/ggseqlogo")
+
+library(ggseqlogo)
+
+ggseqlogo::ggseqlogo(.align)

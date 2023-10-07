@@ -40,6 +40,39 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 print(.SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
 
+# BIND SWISSPROT TO SRNA2GO
+ref_path <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/ANNOTATIONS/"
+
+annot_f <- list.files(path = ref_path, pattern = "Trinotate.xls", full.names = T)
+
+annot <- read_tsv(annot_f, na = ".")
+
+names(annot)[c(1,2)] <- c("gene_id", "transcript_id")
+
+annot <- annot %>% drop_na(gene_ontology_BLASTX)
+
+blastx_df <- split_blast(annot, hit = "BLASTX") # HARD TO RUN THIS TIME
+
+DB <- blastx_df %>% dplyr::filter(domain == "Eukaryota")
+
+# blastx_df %>% dplyr::count(genus, sort = T)
+
+DB <- DB %>% 
+  group_by(gene) %>%
+  arrange(desc(identity)) %>%
+  sample_n(1) %>%
+  ungroup()
+
+# DB %>% dplyr::count(genus, sort = T)
+
+genome_feat <- read_rds("/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/genome_features.rds")[[1]]
+
+genome_feat <- genome_feat %>% dplyr::select(gene_id, transcript_id)
+
+DB <- DB %>% 
+  dplyr::select(-align, -identity, -evalue, -gene_id, -protein,-lineage, -domain, -genus) %>%
+  right_join(genome_feat, by = "transcript_id") 
+
 
 # UNNEST MIRS ====
 
@@ -50,22 +83,31 @@ SRNA2GO_DE <- .SRNA2GO %>%
   separate(query, into = c("query", "arm"), sep = "[.]") %>%
   filter(arm == "mature") %>%
   dplyr::rename("Name" = "query") %>%
-  select(-n, -n_rnas, -arm) %>%
+  dplyr::select(-n, -n_rnas, -arm) %>%
   distinct() %>%
   right_join(distinct(RES.P, Name, Family))
 
+
+
 # HOW POSSIBLE TARGETS REGUALTED BY DEGS? 167
+
+SRNA2GO_DE <- DB %>% distinct(gene_id, uniprot, name) %>%
+  right_join(SRNA2GO_DE, by = "gene_id") %>%
+  distinct(Family, description, GO.ID, uniprot, name)
 
 distinct(SRNA2GO_DE, description) # 167
 
-SRNA2GO_DE <- distinct(SRNA2GO_DE, Family, description, GO.ID ) 
+# SRNA2GO_DE <- distinct(SRNA2GO_DE, Family, description, GO.ID )
 
 # view(SRNA2GO_DE)
 
 SRNA2GO_DE %>% dplyr::count(Family,sort = T)
 
+
 # REMOVE uncharacterized VARIANT ?
 # SRNA2GO_DE %>% filter(grepl("uncharacterized", description))
+
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 write_tsv(SRNA2GO_DE, paste0(wd, "DESEQ2SRNATARGET.tsv"))
 
@@ -124,7 +166,9 @@ SRNA2GO <- lapply(SRNA2GO, unlist)
 
 # DEFINE WHICH MIRS?
 
-RES.OUT <- RES.P %>% filter(CONTRAST %in% c("CONTRAST_A","CONTRAST_B"))
+RES.OUT <- RES.P # %>% filter(CONTRAST %in% c("CONTRAST_A","CONTRAST_B"))
+
+RES.OUT <- RES.P %>% filter(!grepl("Cluster", Family))
 
 str(query.names <- RES.OUT %>% ungroup() %>% distinct(Name) %>% pull(Name))
 
@@ -167,7 +211,8 @@ for (i in 1:length(query.names)) {
 }
 
 
-BPDF <- do.call(rbind, allRes) %>% as_tibble() %>% left_join(distinct(RES.P, Name, Family)) %>% mutate(Onto = "Biological Process")
+BPDF <- do.call(rbind, allRes) %>% as_tibble() %>% 
+  left_join(distinct(RES.P, Name, Family)) %>% mutate(Onto = "Biological Process")
 
 # CELLULAR COMPOMENTS (OMIT)
 # 
@@ -223,16 +268,70 @@ DF <- rbind(BPDF, MFDF)
 
 DF %>% group_by(Family, Onto) %>% dplyr::count(Term, sort = T)
 
-# ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top')
+# 
+
+BPDF
+
+str(GO.ID <- BPDF %>% distinct(GO.ID) %>% pull())
+
+# hsGO <- GOSemSim::godata('org.Hs.eg.db', ont="BP")
+
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
+
+
+hsGO <- read_rds(paste0(wd, '/hsGO_BP.rds'))
+
+termSim <- GOSemSim::termSim(GO.ID, GO.ID,  semData = hsGO, method = "Wang")
+
+# heatmap(termSim)
+
+cmds <- termSim %>% 
+  # use distance metric
+  dist(method = "euclidean") %>%
+  # compute cMDS
+  cmdscale() %>%
+  data.frame() %>%
+  rownames_to_column(var= 'GO.ID')
+
+hclust <- termSim %>% 
+  # use distance metric
+  dist(method = "euclidean") %>%
+  # compute cMDS
+  hclust()
+
+cutree <- hclust %>% cutree(., 7)
+
+go_order <- hclust$labels[hclust$order]
+
+recode_to <- BPDF %>% filter(GO.ID %in% go_order) %>% distinct(GO.ID, Term)
+
+recode_to <- structure(recode_to$Term, names = recode_to$GO.ID)
+
+identical(sort(names(recode_to)),sort(go_order))
+
+go_order <- recode_to[match(go_order, names(recode_to))]
+
+identical(names(go_order),  hclust$labels[hclust$order])
+
+
+# Sanity check
+
+identical(cmds$GO.ID, names(cutree))
+
+head(cmds <- cbind(cmds, cutree) %>% mutate(cutree = as.factor(cutree)))
+
+BPDF <- BPDF %>% left_join(cmds)
 
 BPDF %>% 
-  filter(Family %in% "MIR-2") %>%
-  arrange(desc(Term)) %>%
-  mutate(Term = factor(Term, levels = unique(Term))) %>%
+  # filter(Family %in% "MIR-190") %>%
+  # arrange(desc(Term)) %>%
+  # mutate(Term = factor(Term, levels = unique(Term))) %>%
   # mutate(Term = fct_reorder(Term, Annotated))
-  ggplot(aes(x = Family, y = Term, fill = Annotated) ) +
+  ggplot(aes(x = Family, y = GO.ID, fill = Annotated) ) +
   geom_tile(color = 'white', linewidth = 0.2) +
   scale_x_discrete(position = 'top') +
+  ggh4x::scale_y_dendrogram(hclust = hclust, position = "left", labels = NULL) +
+  guides(y.sec = guide_axis_manual(labels = go_order, label_size = 5)) +
   theme_bw(base_size = 10, base_family = "GillSans") +
   labs(x = '', y = '') +
   facet_grid(Onto ~ ., scales = "free") +
@@ -293,7 +392,7 @@ COUNT %>%
 library(ggh4x)
 
 COUNT_LONG %>%
-  ggplot(aes(x = LIBRARY_ID, y = Name, fill = log2(value))) + 
+  ggplot(aes(x = LIBRARY_ID, y = Name, fill = value)) + 
   geom_tile(color = 'white', linewidth = 0.2) +
   scale_fill_viridis_c(option = "B", name = "Log2", direction = -1, na.value = "white") +
   ggh4x::facet_nested( ~ hpf+pH, nest_line = F, scales = "free", space = "free") +
