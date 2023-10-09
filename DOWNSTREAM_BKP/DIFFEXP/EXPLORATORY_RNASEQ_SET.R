@@ -42,6 +42,15 @@ count <- count %>% select_if(is.double) %>% as(., "matrix")
 
 rownames(count) <- query.ids
 
+blastp_df %>% filter(grepl("Protein argonaute-2", name)) %>% 
+  distinct(transcript) %>%
+  pull()
+
+count[which(query.ids %in% "MSTRG.1578.9"),] %>%
+  as_tibble(rownames = "LIBRARY_ID") %>% 
+  pivot_longer(-LIBRARY_ID) %>%
+  right_join(colData) %>% view()
+
 # 1) Filter data by removing low-abundance genes ----
 # 
 
