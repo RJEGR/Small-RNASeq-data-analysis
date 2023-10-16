@@ -111,6 +111,17 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 write_tsv(SRNA2GO_DE, paste0(wd, "DESEQ2SRNATARGET.tsv"))
 
+SRNA2GO_DE <- read_tsv(paste0(wd, "DESEQ2SRNATARGET.tsv"))
+
+SRNA2GO_DE %>% 
+  distinct(Family, name) %>%
+  mutate(values_from = 1) %>%
+  drop_na(name) %>%
+  mutate(name = factor(name, levels = unique(name))) %>%
+  # pivot_wider(names_from = Family, values_from = values_from)
+  ggplot(aes(x = Family, y = name, fill = values_from)) + 
+  geom_tile(color = 'white', linewidth = 0.2) 
+
 # 1) ====
 
 print(DB1 <- .SRNA2GO %>% 
