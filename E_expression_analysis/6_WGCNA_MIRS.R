@@ -43,7 +43,7 @@ rownames(datExpr) <- COUNT$Family
 
 # THEN,
 
-datExpr <- log2(datExpr+1)
+# datExpr <- log2(datExpr+1)
 
 datExpr <- t(datExpr) # log2(count+1) # 
 
@@ -71,7 +71,7 @@ par(mfrow=c(1,2))
 hist(k)
 scaleFreePlot(k, main="Check scale free topology\n")
 
-max_power <- 10
+max_power <- 20
 
 powers = c(c(1:10), seq(from = 10, to = max_power, by=1)) 
 
@@ -139,7 +139,7 @@ enableWGCNAThreads()
 # specify network type
 
 adjacency <- adjacency(datExpr, 
-  power = 5, 
+  power = softPower, 
   type = "unsigned")
 
 
@@ -160,7 +160,7 @@ plot(geneTree, xlab="", sub="",
 
 #This sets the minimum number of genes to cluster into a module
 
-minClusterSize <- 3
+minClusterSize <- 5
 
 dynamicMods <- cutreeDynamic(dendro= geneTree, 
   distM = dissTOM,
@@ -343,6 +343,7 @@ library(patchwork)
 p1 + p2 + plot_layout(widths = c(6, 5)) + labs(caption = '* corPvalueStudent < 0.05 ') 
 
 # network ====
+
 library(igraph)
 library(tidygraph)
 library(ggraph)
@@ -385,26 +386,27 @@ exportNet <- function(TOMobj, moduleColors, threshold = 0.9) {
   
 }
 
-g <- exportNet(TOM, moduleColors, threshold = 0)
+g <- exportNet(TOM, moduleColors, threshold = 0.3)
 
 layout = create_layout(g, layout = 'igraph', algorithm = 'kk')
 
-g %>% 
-  activate("nodes") %>% filter(nodeName %in% "BANTAM") -> g
+# g %>% activate("nodes") %>% filter(nodeName %in% "BANTAM") -> g
 
-g %>% activate('nodes') %>% left_join(df %>% select(nodeName, parentTerm)) -> g
+# g %>% activate('nodes') %>% left_join(df %>% select(nodeName, parentTerm)) -> g
 
+scale_col <- g %>% activate("nodes") %>% 
+  as_tibble() %>% distinct(`nodeAttr[nodesPresent, ]`) %>% pull()
 
 ggraph(layout) +
   # facet_nodes(~ module) +
-  # scale_color_manual('', values = structure(psME, names = psME) ) +
-  # geom_edge_arc(aes(edge_alpha = weight), strength = 0.1) + # edge_width
-  geom_node_point(aes(color = `nodeAttr[nodesPresent, ]`, size = degree)) +
+  scale_color_manual('', values = structure(scale_col, names = scale_col) ) +
+  geom_edge_arc(aes(edge_alpha = weight), strength = 0.1) + # edge_width
+  geom_node_point(aes(color = `nodeAttr[nodesPresent, ]`)) +
   # geom_node_text(aes(label = parentTerm), repel = TRUE, size = 2) +
   ggrepel::geom_text_repel(data = layout, aes(x, y, label = nodeName)) +
   scale_edge_width(range = c(0.3, 1)) +
   theme_graph(base_family = "GillSans") +
   guides(fill=guide_legend(nrow = 2)) +
   theme(legend.position = "top") +
-  coord_fixed() +
-  scale_color_brewer(type = 'qual')
+  coord_fixed() 
+  # scale_color_brewer(type = 'qual')
