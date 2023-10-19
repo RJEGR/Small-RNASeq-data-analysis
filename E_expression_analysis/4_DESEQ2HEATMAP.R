@@ -341,11 +341,21 @@ library(GOSemSim)
 
 str(GO.ID <- rbind(TOPGO_INTERSECTED, TOPGO_EXCLUSIVE) %>% distinct(GO.ID) %>% pull())
 
+# org.Dr.eg.db # ZEBRAFISH
+# org.Ce.eg.db # WORM
+# org.Xl.eg.db # XENOPUS
+
+WHICH_DB <- "org.Ce.eg.db"
+
+BiocManager::install(WHICH_DB)
+
+GOSEM <- GOSemSim::godata(WHICH_DB, ont="BP")
+
 # hsGO <- GOSemSim::godata('org.Hs.eg.db', ont="BP")
 
-hsGO <- read_rds(paste0(wd, '/hsGO_BP.rds'))
+# hsGO <- read_rds(paste0(wd, '/hsGO_BP.rds'))
 
-termSim <- GOSemSim::termSim(GO.ID, GO.ID,  semData = hsGO, method = "Wang")
+termSim <- GOSemSim::termSim(GO.ID, GO.ID,  semData = GOSEM, method = "Wang")
 
 # heatmap(termSim)
 
