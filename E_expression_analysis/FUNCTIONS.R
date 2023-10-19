@@ -252,7 +252,7 @@ runtopGO <- function(topGOdata, topNodes = 20, conservative = TRUE) {
   return(allRes)
 }
 
-GOenrichment <- function(query.p, query.names, gene2GO, cons = T, onto = "BP", Nodes = Inf) {
+GOenrichment <- function(query.p, query.names, gene2GO, cons = T, onto = "BP", Nodes = Inf, mapping = NULL) {
   
   require(topGO)
   
@@ -271,6 +271,27 @@ GOenrichment <- function(query.p, query.names, gene2GO, cons = T, onto = "BP", N
   
   description <- "complete topGO enrichment using split_annot"
   
+  if(is.null(mapping)) {
+    
+    topGOdata <- new("topGOdata", 
+      ontology = onto, 
+      description = description,
+      allGenes = query.p,
+      # geneSel = function(x) { x == 1 },
+      geneSel = function(x) x,
+      annot = annFUN.gene2GO,
+      gene2GO = gene2GO)
+  } else {
+    
+    topGOdata <- new("topGOdata", 
+      ontology = onto, 
+      description = description,
+      allGenes = query.p,
+      geneSel = function(x) x,
+      annot = annFUN.gene2GO,
+      mapping = mapping, 
+      gene2GO = gene2GO)
+  }
   
   topGOdata <- new("topGOdata", 
     ontology = onto, 
