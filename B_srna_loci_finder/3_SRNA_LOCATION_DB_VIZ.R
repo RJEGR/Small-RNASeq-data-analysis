@@ -18,6 +18,8 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out
 
 print(DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
 
+print(DE <- read_tsv(paste0(path, "DESEQ_RES.tsv")) )
+
 
 pattern <- "multi_genome.newid.gff3$" # <- to get sequence-region per chromosome
 
@@ -89,7 +91,7 @@ query.chr <- DB %>% filter(SRNAtype == "miR") %>% distinct(Chrom) %>% pull()
 
 # scales::show_col(see::material_colors())
 
-"#f44336"
+
 
 col_recode <- structure(c("#E7DFD5", "#FFC107", "#2196F3"), names = c("siR", "piR", "miR"))
 
@@ -140,6 +142,101 @@ p <- ggplot() +
 
 ggplot2::ggsave(p, filename = "SRNA_LOCATION2.png", path = wd, width = 7, height = 7, device = png, dpi = 300)
 
+# ONLY MIRS BY CATEGORY ====
+
+
+DBMIR <- DB %>% 
+  filter(SRNAtype == "miR") %>%
+  filter(Chrom %in% query.chr ) 
+
+DB_FAM <- DE %>% distinct(Name, Family)
+
+
+DE <- DE %>% filter( padj < 0.05 & abs(log2FoldChange) > 1) 
+
+WHICH_DE <- DE %>% filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>% distinct(Family) %>% pull()
+
+DBMIR <- DBMIR %>%
+  left_join(DB_FAM, by = "Name") %>% 
+  mutate(facet = ifelse(grepl("^Cluster", Family), "A)", "B)")) 
+
+DBMIR %>% dplyr::count(facet)
+
+col_recode <- structure(c("#f44336", "#FFC107", "#2196F3"), names = c("Other ncRNA", "Intergenic", "Intragenic"))
+
+p <- ggplot() +
+  geom_segment(data = G, aes(x = Start, xend = End, yend = Chrom, y = Chrom), linewidth = 0.5, color="#E7DFD5", linetype="dashed") +
+  geom_gene_arrow(data = DBMIR, aes(xmin = Start, xmax = End, y = Chrom, fill = biotype_best_rank, color = biotype_best_rank)) +
+  facet_grid(~ facet) +
+  theme_genes() +
+  scale_x_continuous("Tamaño (Nucleótidos)", 
+    labels = scales::number_format(scale = 1/1000000, suffix = " Gb")) +
+  labs(y = "Andamios del genoma") +
+  scale_color_manual("",values = col_recode) +
+  scale_fill_manual("",values = col_recode) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(
+    legend.position = "top",
+    # axis.text.x = element_blank(),
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.text.y = element_text(size = 7),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major = element_blank(),
+    # panel.grid.major = element_line(linewidth = 0.5, color = "grey89", linetype = "dashed"),
+    panel.grid.major.x = element_blank())
+
+ggplot2::ggsave(p, filename = "SRNA_LOCATION_MIRS.png", path = wd, width = 5, height = 5, device = png, dpi = 300)
+
+# and by barplot
+
+DBMIR %>% 
+  group_by(facet, biotype_best_rank) %>%
+  # dplyr::count()
+  summarise(Reads = sum(Reads), n = n()) %>% 
+  ggplot(aes(x = biotype_best_rank, y = n, fill = facet)) +
+  geom_col(position = position_identity()) +
+  scale_color_manual("",values = col_recode) +
+  # scale_fill_manual("",values = col_recode) +
+  scale_y_continuous("Freq. of reads",labels = scales::comma) +
+  theme_bw(base_family = "GillSans", base_size = 11) +
+  theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
+    legend.position = 'top',
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank())
+
+# IN RESPONSE TO ACIDIFICATION
+
+WHICH_DE <- DE %>% 
+  filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>% 
+  dplyr::distinct(CONTRAST, Family) %>%
+  pull(Family)
+
+
+DBMIR %>% 
+  filter(Family %in% WHICH_DE) %>%
+  group_by(biotype_best_rank) %>%
+  # dplyr::count()
+  summarise(Reads = sum(Reads), n = n()) 
+
+# IN RESPONSE TO DEV
+# 110 HPF
+WHICH_DE <- DE %>% 
+  filter(log2FoldChange > 0) %>%
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>% 
+  dplyr::distinct(CONTRAST, Family) %>%
+  dplyr::count(Family, sort = T) %>% 
+  filter(n > 1) %>% pull(Family)
+
+DBMIR %>% 
+  filter(Family %in% WHICH_DE) %>%
+  group_by(biotype_best_rank) %>%
+  # dplyr::count()
+  summarise(Reads = sum(Reads), n = n()) 
 
 # p
 
