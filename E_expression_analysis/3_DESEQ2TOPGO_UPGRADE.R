@@ -39,12 +39,6 @@ SRNA2GO <- SRNA2GO %>%
   separate(query, into = c("query", "arm"), sep = "[.]") %>%
   filter(arm == "mature")
 
-# RES.P <- SRNA2GO %>% 
-#   dplyr::rename("Name" = "query") %>%
-#   dplyr::select(Name, GO.ID) %>%
-#   right_join(RES.P)
-
-
 SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$query)
 
 SRNA2GO <- lapply(SRNA2GO, unlist)
@@ -67,8 +61,9 @@ WHICH_DB <- "org.Ce.eg.db"
 MAPPING <- read_rds(paste0(wd, WHICH_DB, ".rds"))
 
 # 24 HPF UP EXPRESSED BY OA ====
-CONTRAST <- "CONTRAST_A"
-query.names <- RES.P %>% filter(CONTRAST %in% CONTRAST) %>% 
+WCONTRAST <- "CONTRAST_A"
+
+query.names <- RES.P %>% filter(CONTRAST %in% WCONTRAST) %>% 
   filter(log2FoldChange < 0) %>%
   distinct(Name) %>% pull()
 
