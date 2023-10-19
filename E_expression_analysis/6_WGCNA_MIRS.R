@@ -33,9 +33,9 @@ COUNT <- COUNT %>% as_tibble(rownames = "Name") %>%
   group_by(Family) %>%
   summarise_at(vars(colnames(COUNT)), sum) 
 
-which_cols <- COUNT %>% select_if(is.double) %>% colnames()
+which_cols <- COUNT %>% dplyr::select_if(is.double) %>% colnames()
 
-datExpr <- COUNT %>% select(all_of(which_cols))
+datExpr <- COUNT %>% dplyr::select(all_of(which_cols))
 
 datExpr <- as(datExpr, "matrix")
 
@@ -215,6 +215,8 @@ cat('Number of mudules obtained\n :', length(nm))
 
 print(nm)
 
+write_rds(as_tibble(moduleColors, rownames = "Family") %>% rename("value" = "WGCNA"), 
+  file = paste0(path, "WGCNA_MIRS.rds"))
 
 # Plot TOM
 plotTOM = dissTOM^7
@@ -285,7 +287,9 @@ df1 %>%
       ifelse(corPvalueStudent <.05, "*", "")))) -> df1
 
 df1 %>%
-  mutate(facet = ifelse(name %in% c('HR11076', 'HR2476'), 'Low pH', 'Control')) %>%
+  # mutate(facet = ifelse(name %in% c('HR11076', 'HR2476'), 'Low pH', 'Control')) %>%
+  mutate(facet = ifelse(grepl("^HR110", name), '110 HPF', '24 HPF')) %>%
+  mutate(facet = factor(facet, levels = c('24 HPF', '110 HPF'))) %>%
   mutate(moduleTraitCor = round(moduleTraitCor, 2)) %>%
   mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), moduleTraitCor)) %>%
   # mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), '')) %>%
@@ -321,7 +325,7 @@ p1 <- p1 + theme(panel.spacing.x = unit(-0.5, "mm"))
 p2 <- stats %>% 
   mutate(module = factor(module, levels = hclust$labels[hclust$order])) %>%
   ggplot(aes(y = module)) +
-  scale_x_continuous("miRs") +
+  scale_x_continuous("Número de miRs") +
   geom_col(aes(x = n), width = 0.95, position = position_stack(reverse = TRUE)) +
   # geom_col(aes(x = reads_frac), width = 0.95, fill = "grey")
   # scale_fill_manual(name = '', values = c("#303960", "#647687", "#E7DFD5")) + # grey90
@@ -340,9 +344,16 @@ library(patchwork)
 
 # p1 + plot_spacer() + p2 + plot_layout(widths = c(5,-0.5, 10))  #& theme(plot.margin = 0)
 
-p1 + p2 + plot_layout(widths = c(6, 5)) + labs(caption = '* corPvalueStudent < 0.05 ') 
+psave <- p1 +  plot_spacer() + p2 + plot_layout(widths = c(7, -0.9, 3)) + labs(caption = '* corPvalueStudent < 0.05 ') 
+
+
+ggsave(psave, filename = 'WGCNA_MIRS2HEATMAP.png', path = path, width = 7, height = 5, device = png, dpi = 300)
 
 # network ====
+
+module_members_1 <- c("grey", "black", "yellow", "pink", "turquoise")
+
+module_members_2 <- c("brown", "red", "green", "blue")
 
 library(igraph)
 library(tidygraph)
@@ -388,25 +399,97 @@ exportNet <- function(TOMobj, moduleColors, threshold = 0.9) {
 
 g <- exportNet(TOM, moduleColors, threshold = 0.3)
 
+str(SORT_MIRS <- c("MIR-278","LET-7","MIR-133",
+  "Cluster_55760","Cluster_55776","MIR-2","MIR-315", "MIR-153", "BANTAM", "MIR-190", "MIR-2722", "MIR-1988", 
+  "MIR-92", "MIR-277B", "MIR-216"))
+
+# g %>% activate("nodes") %>% mutate(nodeName %in% SORT_MIRS)
+
+scale_col <- g %>% activate("nodes") %>% as_tibble() %>% distinct(`nodeAttr[nodesPresent, ]`) %>% pull()
+
+g <- g %>% activate("nodes") %>%  
+  mutate(betweenness = betweenness(.), degree = centrality_degree(),
+  membership = igraph::cluster_louvain(., igraph::E(g)$weight)$membership,
+  pageRank = page_rank(.)$vector)
+
+Levels <- c(module_members_2, module_members_1)
+
+g <- g %>% activate("nodes") %>%
+  mutate(`nodeAttr[nodesPresent, ]` = factor(`nodeAttr[nodesPresent, ]`, levels = Levels))
+
 layout = create_layout(g, layout = 'igraph', algorithm = 'kk')
 
-# g %>% activate("nodes") %>% filter(nodeName %in% "BANTAM") -> g
-
-# g %>% activate('nodes') %>% left_join(df %>% select(nodeName, parentTerm)) -> g
-
-scale_col <- g %>% activate("nodes") %>% 
-  as_tibble() %>% distinct(`nodeAttr[nodesPresent, ]`) %>% pull()
 
 ggraph(layout) +
-  # facet_nodes(~ module) +
   scale_color_manual('', values = structure(scale_col, names = scale_col) ) +
   geom_edge_arc(aes(edge_alpha = weight), strength = 0.1) + # edge_width
-  geom_node_point(aes(color = `nodeAttr[nodesPresent, ]`)) +
-  # geom_node_text(aes(label = parentTerm), repel = TRUE, size = 2) +
-  ggrepel::geom_text_repel(data = layout, aes(x, y, label = nodeName)) +
+  geom_node_point(aes(color = `nodeAttr[nodesPresent, ]`, size = degree)) +
+  # ggrepel::geom_text_repel(data = layout, aes(x, y, label = nodeName), max.overlaps = 50, family = "GillSans") +
   scale_edge_width(range = c(0.3, 1)) +
   theme_graph(base_family = "GillSans") +
   guides(fill=guide_legend(nrow = 2)) +
-  theme(legend.position = "top") +
-  coord_fixed() 
-  # scale_color_brewer(type = 'qual')
+  theme(legend.position = "none") +
+  coord_fixed() -> psleft
+
+# ggsave(psave, filename = 'WGCNA_MIRS2NETWORK.png', path = path, width = 10, height = 10, device = png, dpi = 300)
+
+
+node_labs <- paste(LETTERS[1:length(Levels)], ") ", Levels, sep = "")
+names(node_labs) <- Levels
+
+
+ggraph(layout) +
+  facet_nodes(~ `nodeAttr[nodesPresent, ]`, labeller = labeller(`nodeAttr[nodesPresent, ]` = node_labs), 
+    scales = "free") +
+  scale_color_manual('', values = structure(scale_col, names = scale_col) ) +
+  geom_edge_arc(aes(edge_alpha = weight), strength = 0.1) + # edge_width
+  geom_node_point(aes(color = `nodeAttr[nodesPresent, ]`, size = degree)) +
+  ggrepel::geom_text_repel(data = layout, aes(x, y, label = nodeName), max.overlaps = 50, family = "GillSans") +
+  scale_edge_width(range = c(0.3, 1)) +
+  theme_graph(base_family = "GillSans") +
+  guides(fill=guide_legend(nrow = 2)) +
+  # coord_fixed() +
+  guides(color = "none") +
+  ggforce::geom_mark_hull(
+    aes(x, y, group = as.factor(`nodeAttr[nodesPresent, ]`)),
+    color = NA, fill = "grey76",
+    concavity = 4,
+    con.size = 0.3,
+    con.linetype = 2,
+    expand = unit(2, "mm"),
+    alpha = 0.25)  +
+  guides(fill = FALSE) +
+  theme(legend.position = "top",
+    strip.background = element_rect(fill = 'grey89', color = 'white')) -> ps
+
+
+#
+library(patchwork)
+
+psave <- psleft + ps + patchwork::plot_layout(widths = c(0.7, 1.2))
+
+ggsave(psave, filename = 'WGCNA_MIRS2NETWORK_2.png', path = path, width = 12, height = 8, device = png, dpi = 300)
+
+
+# EXIT
+
+g %>% 
+  activate("nodes") %>% 
+  as_data_frame(., "vertices") %>% 
+  pivot_longer(cols = c('degree', 'betweenness')) %>%
+  ggplot(aes(value, pageRank, color = as.factor(membership))) + 
+  geom_point() +
+  facet_grid(~name, scales = 'free')
+
+
+g %>% 
+  activate("nodes") %>% 
+  as_data_frame(., "vertices") %>% 
+  pivot_longer(cols = c('degree', 'betweenness', 'pageRank')) %>%
+  ggplot(aes(value)) +
+  facet_grid(~ name, scales = "free") +
+  geom_histogram()
+
+# separate go analysis by modules ====
+# GO TO 5_SRNA_REGULATORY_FUNC.R
+
