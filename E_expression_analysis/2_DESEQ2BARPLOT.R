@@ -91,7 +91,59 @@ p <- p +  ggh4x::facet_nested( YWRAP ~ CONTRAST_DE, nest_line = F, scales = "fre
   
 ggsave(p, filename = 'DESEQ2BARPLOT.png', path = wd, width = 5, height = 10, device = png, dpi = 300)
 
+# ONLY CONTRAST A AND B ====
 
+str(SORT_MIRS <- c("MIR-278","MIR-133","LET-7",
+  "Cluster_55760","Cluster_55776","MIR-2","MIR-315", "MIR-153", "BANTAM", "MIR-190", "MIR-2722", "MIR-1988", 
+  "MIR-92", "MIR-277B", "MIR-216"))
+
+
+recode_c <- structure(c("24 HPF","110 HPF"), names = c("CONTRAST_A", "CONTRAST_B"))
+recode_fc <- structure(c("pH 8.0","pH 7.6"), names = c("Up","Down"))
+
+
+RES.P %>%
+  filter(CONTRAST_DE %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+  dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_c)) %>%
+  dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>% 
+  arrange(desc(log2FoldChange)) %>%
+  mutate(Family = factor(Family, levels = unique(Family))) %>%
+  mutate(
+    ymin = (abs(log2FoldChange) - lfcSE) * sign(log2FoldChange),
+    ymax = (abs(log2FoldChange) + lfcSE) * sign(log2FoldChange),
+    y_star = ymax + (0.15+lfcSE)* sign(log2FoldChange)) %>% 
+  mutate(Family = factor(Family, levels = SORT_MIRS)) %>%
+  ggplot(aes(x = Family, y = log2FoldChange, fill = SIGN)) + 
+  geom_bar(stat = "identity", width = 0.5, 
+    position = position_identity()) +
+  coord_flip() +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.25,
+    position = position_identity(), color = "black") + 
+  geom_text(aes(y = y_star, label=star), 
+    vjust=  .7, color="black", position = position_identity(), family = "GillSans", size = 1.5) +
+  ggsci::scale_fill_aaas() +
+  guides(color = "top") +
+  labs(x = NULL, y = "Log fold change") +
+  guides(fill = guide_legend(title = "", nrow = 1)) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  # theme_classic(base_size = 16, base_family = "GillSans") + 
+  # geom_abline(slope = 0, intercept = 0, linetype = "dashed", alpha = 0.5) +
+  theme(legend.position = "top",
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    strip.background.y = element_blank(),
+    # axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 0, size = 2.5),
+    axis.text.y = element_text(angle = 0, size = 10),
+    axis.text.x = element_text(angle = 0)) +  
+  ggh4x::facet_nested(  ~ CONTRAST_DE, nest_line = F, scales = "free_y", space = "free_y") +
+  theme(strip.background = element_rect(fill = 'grey89', color = 'white')) -> p
+
+
+ggsave(p, filename = 'DESEQ2BARPLOT_ONLY_DEGS.png', path = wd, width = 4, height = 5, device = png, dpi = 300)
 
 # 2 ====
 # not only unique
@@ -115,16 +167,16 @@ library(ggupset)
 #   group_by(Name, SIGN) %>%
 #   summarise(across(CONTRAST, .fns = list), n = n()) 
 
-# 1)
+# 1) omit
 
 recode_fc <- structure(c("pH 7.6","pH 8.0"), names = c(-1,1))
 
 recode_to <-  structure(c("24 HPF", "110 HPF"), names = c("CONTRAST_A", "CONTRAST_B"))
 
 UPSETDF <- RES.P %>% 
+  filter(CONTRAST_DE %in% c("CONTRAST_A", "CONTRAST_B")) %>%
   mutate(SIGN = sign(log2FoldChange)) %>%
   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
-  filter(CONTRAST_DE %in% c("CONTRAST_A", "CONTRAST_B")) %>%
   dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_to)) %>%
   group_by(Name, SIGN) %>%
   summarise(across(CONTRAST_DE, .fns = list), n = n()) %>%
@@ -176,14 +228,63 @@ p1 <- p1 + theme(legend.position = "top",
 ggsave(p1, filename = 'DESEQ2UPSET_CONTRAST_A_B.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
 
 
-# 2)
+# 2) BY DEVELOPMENT ====
+
+# INCLUDE VOLCANO ====
 
 
 WHICH_CONTRAST <- c("CONTRAST_C", "CONTRAST_D")
 
-recode_fc <- structure(c("A) 24 HPF","B) 110 HPF"), names = c(1,-1))
+recode_to <-  structure(c("A) pH 8.0", "B) pH 7.6"), names = WHICH_CONTRAST)
 
-recode_to <-  structure(c("pH 7.6","pH 8.0"), names = WHICH_CONTRAST)
+RES_CC <- prep_DE_data(RES, alpha = 0.05, lfcThreshold = 2)
+
+colors_fc <- c("forestgreen",  "#4169E1", "red2")
+
+c("#DADADA", "#D4DBC2")
+
+upplot <- RES_CC %>% 
+  filter(CONTRAST %in% WHICH_CONTRAST) %>%
+  dplyr::mutate(SIGN = sign(logFC)) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  filter(cc != "NS") %>%
+  mutate(logFC = logFC*-1) %>% # reverse sort of HPF
+  ggplot(aes(x = logFC, y = -log10(padj))) +
+  facet_grid(~ CONTRAST) +
+  geom_rect(
+    aes(xmin=-15, xmax = -1, ymin = 1, ymax = Inf), fill = '#DADADA') +
+  geom_rect(
+    aes(xmin=1, xmax = 30, ymin = 1, ymax = Inf), fill = '#D4DBC2') +
+  geom_point(aes(color = cc), alpha = 3/5) +
+  scale_color_manual(name = "", values = colors_fc) +
+  labs(x= expression(Log[2] ~ "Fold Change"), 
+    y = expression(-Log[10] ~ "padj")) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  geom_abline(slope = 0, intercept = -log10(0.05), linetype="dashed", alpha=0.5) +
+  geom_vline(xintercept = 1, linetype="dashed", alpha=0.5) +
+  geom_vline(xintercept = -1, linetype="dashed", alpha=0.5) +
+  annotate("text", x = -10, y = 150, label = "24 HPF", family = "GillSans") +
+  annotate("text", x = 10, y = 150, label = "110 HPF", family = "GillSans") +
+  xlim(-15, 30)
+
+upplot <- upplot + theme(legend.position = "top",
+  panel.border = element_blank(),
+  strip.background = element_rect(fill = 'grey89', color = 'white'),
+  plot.title = element_text(hjust = 0),
+  plot.caption = element_text(hjust = 0),
+  panel.grid.minor.y = element_blank(),
+  # panel.grid.major.y = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  strip.background.y = element_blank(),
+  # axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 0, size = 2.5),
+  # axis.text.y = element_text(angle = 0, size = 5),
+  axis.text.x = element_text(angle = 0))
+
+# ggsave(upplot, filename = 'DESEQ2VOLCANO_CONTRAST_C_D.png', path = wd, width = 5, height = 3, device = png, dpi = 300)
+
+recode_fc <- structure(c("24 HPF","110 HPF"), names = c(1,-1))
+
+recode_to <-  structure(c("pH 8.0", "pH 7.6"), names = WHICH_CONTRAST)
 
 # RES.P %>% filter(CONTRAST_DE %in% WHICH_CONTRAST) %>% distinct(Name)
 
@@ -200,23 +301,24 @@ UPSETDF <- UPSETDF %>%
   left_join(distinct(RES.P, Name, Family)) %>%
   distinct(Family, .keep_all = T)
 
-
 UPSETDF %>%
+  mutate(facet = "C)") %>%
   ggplot(aes(x = CONTRAST_DE, fill = SIGN)) +
   geom_bar(position = position_dodge(width = 1)) +
   geom_text(stat='count', aes(label = after_stat(count)), 
-    position = position_dodge(width = 1), vjust = -0.5, family = "GillSans", size = 3.5) +
+    position = position_dodge(width = 1), vjust = -0.2, family = "GillSans", size = 3.5) +
   scale_x_upset(order_by = "degree", reverse = F) +
-  theme_bw(base_family = "GillSans") +
+  theme_bw(base_family = "GillSans", base_size = 12) +
   theme_combmatrix(combmatrix.panel.point.color.fill = "black",
     combmatrix.panel.line.size = 0, base_family = "GillSans") +
   axis_combmatrix(levels = c("pH 8.0", "pH 7.6"), clip = "off") +
-  labs(x = '', y = 'Number of miRs') +
-  scale_color_manual("", values = c("grey30", "grey70")) +
-  scale_fill_manual("", values =  c("grey30", "grey70")) +
-  guides(fill = guide_legend(title = "", nrow = 1)) -> p2
+  labs(x = '', y = 'Número de miRs') +
+  scale_color_manual("", values = c("#DADADA", "#D4DBC2")) +
+  scale_fill_manual("", values =  c("#DADADA", "#D4DBC2")) +
+  guides(fill = guide_legend(title = "", nrow = 1)) +
+  ylim(c(0,50)) -> p2
 
-p2 <- p2 + theme(legend.position = "none",
+p2 <- p2 + theme(legend.position = "top",
   panel.border = element_blank(),
   plot.title = element_text(hjust = 0),
   plot.caption = element_text(hjust = 0),
@@ -226,11 +328,17 @@ p2 <- p2 + theme(legend.position = "none",
   panel.grid.minor.x = element_blank(),
   strip.background.y = element_blank())
 
-p2 <- p2 + facet_grid(cols = vars(SIGN), scales = "free") +
+p2 <- p2 + facet_grid(cols = vars(facet), scales = "free") +
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'))
 
 
-ggsave(p2, filename = 'DESEQ2UPSET_CONTRAST_C_D.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
+# ggsave(p2, filename = 'DESEQ2UPSET_CONTRAST_C_D.png', path = wd, width = 5, height = 3.5, device = png, dpi = 300)
+
+psave <- upplot + p2 + plot_layout(width = c(6, 3)) 
+
+
+ggsave(psave, filename = 'DESEQ2PLOT_CONTRAST_C_D.png', path = wd, width = 7, height = 3.2, device = png, dpi = 300)
+
 
 # 3) SPLIT EXCLUSIVE FROM INTERSECTED MIRS ----
 # INCLUDE ALL CONTRAST
