@@ -23,6 +23,7 @@ if(!is.null(dev.list())) dev.off()
 options(stringsAsFactors = FALSE)
 
 library(tidyverse)
+library(rstatix)
 
 path_out <- '~/Documents/MIRNA_HALIOTIS/'
 
@@ -283,7 +284,7 @@ library(patchwork)
 
 # p <- pleft / plot_spacer() / pright + patchwork::plot_layout(widths = c(3, -1.2, 3), heights = c(20,0,4))
 
-cowplot::plot_grid(pleft, pbar, ncol=2, align='hv', nrow = 1, rel_widths = c(1, .6), rel_heights = c(1.25, 0.25))
+cowplot::plot_grid(pleft, pbar, ncol=2, align='hv', nrow = 1, rel_widths = c(1, .6), rel_heights = c(1.25, 0.2))
 
 # wrap_plots(pleft, pbar)
 
