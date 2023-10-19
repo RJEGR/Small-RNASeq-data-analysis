@@ -40,6 +40,7 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 print(.SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
 
+# SKIP ====
 # BIND SWISSPROT TO SRNA2GO
 ref_path <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/ANNOTATIONS/"
 
@@ -70,7 +71,8 @@ genome_feat <- read_rds("/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/genome_f
 genome_feat <- genome_feat %>% dplyr::select(gene_id, transcript_id)
 
 DB <- DB %>% 
-  dplyr::select(-align, -identity, -evalue, -gene_id, -protein,-lineage, -domain, -genus) %>%
+  dplyr::select(-align, -identity, -evalue, -gene, -protein,-lineage, -domain, -genus) %>%
+  rename("transcript" = "transcript_id") %>%
   right_join(genome_feat, by = "transcript_id") 
 
 
@@ -111,16 +113,135 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 write_tsv(SRNA2GO_DE, paste0(wd, "DESEQ2SRNATARGET.tsv"))
 
+# CONTINUE HERE ====
 SRNA2GO_DE <- read_tsv(paste0(wd, "DESEQ2SRNATARGET.tsv"))
+
+str(query_under_OA <- RES.P %>% filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>% 
+  # filter(log2FoldChange < 0) %>% 
+  distinct(Family) %>% pull())
+
+str(query_24HPF <- RES.P %>% 
+    filter(log2FoldChange > 0) %>%
+    filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>% 
+    dplyr::distinct(CONTRAST, Family) %>%
+    dplyr::count(Family, sort = T) %>% # keeping if are presented in both, low and control pH
+    filter(n > 1) %>% 
+    filter(!Family %in% query_under_OA) %>%
+    pull(Family))
+
+str(query_110HPF <- RES.P %>% 
+    filter(log2FoldChange < 0) %>%
+    filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>% 
+    dplyr::distinct(CONTRAST, Family) %>%
+    dplyr::count(Family, sort = T) %>% 
+    filter(n > 1) %>% 
+    filter(!Family %in% query_under_OA) %>%
+    pull(Family))
 
 SRNA2GO_DE %>% 
   distinct(Family, name) %>%
+  filter(!Family %in% query_under_OA) %>%
   mutate(values_from = 1) %>%
   drop_na(name) %>%
   mutate(name = factor(name, levels = unique(name))) %>%
   # pivot_wider(names_from = Family, values_from = values_from)
   ggplot(aes(x = Family, y = name, fill = values_from)) + 
-  geom_tile(color = 'white', linewidth = 0.2) 
+  geom_tile(color = 'white', linewidth = 0.2) +
+  scale_x_discrete(position = 'top') +
+  theme_bw(base_size = 10, base_family = "GillSans") +
+  theme(
+    legend.position = "none",
+    # axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    # panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    # panel.grid.major.x = element_blank()
+    ) 
+
+
+# GO ENRICHMENT
+# IN RESPONSE TO OA DURING 24 HPF
+
+str(SORT_MIRS <- c("MIR-278","LET-7","MIR-133",
+  "Cluster_55760","Cluster_55776","MIR-2","MIR-315", "MIR-153", "BANTAM", "MIR-190", "MIR-2722", "MIR-1988", 
+  "MIR-92", "MIR-277B", "MIR-216"))
+
+
+RES.P %>% filter(CONTRAST %in% c("CONTRAST_A","CONTRAST_B")) %>% 
+  filter(log2FoldChange < 0) %>%
+  distinct(Family) %>%
+  left_join(SRNA2GO_DE) %>%
+  # filter(!grepl("uncharacterized", description)) %>%
+  # mutate(name = description) %>%
+  distinct(Family, name) %>%
+  mutate(values_from = 1) %>%
+  drop_na(name) %>%
+  mutate(Family = factor(Family, levels = SORT_MIRS)) %>%
+  mutate(name = factor(name, levels = unique(name))) %>%
+  ggplot(aes(x = Family, y = name, fill = values_from)) + 
+  geom_tile(color = 'white', linewidth = 0.2) +
+  scale_x_discrete(position = 'top') +
+  theme_bw(base_size = 10, base_family = "GillSans") +
+  theme(
+    legend.position = "none",
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+  ) 
+  
+  
+
+SRNA2GO_DE %>% 
+  filter(Family %in% query_under_OA) %>%
+  distinct(Family, GO.ID) %>%
+  mutate(GO.ID = strsplit(GO.ID, ";")) %>%
+  unnest(GO.ID) %>%
+  distinct(GO.ID) %>%
+  arrange(GO.ID) %>%
+  pull(GO.ID) -> GO.ID
+
+length(GO.ID)
+
+# org.Dr.eg.db # ZEBRAFISH
+# org.Ce.eg.db # WORM
+# org.Xl.eg.db # XENOPUS
+
+WHICH_DB <- "org.Ce.eg.db"
+
+# BiocManager::install(WHICH_DB)
+
+GOSEM <- GOSemSim::godata(WHICH_DB, ont="BP")
+
+# hsGO <- GOSemSim::godata('org.Hs.eg.db', ont="BP")
+# hsGO <- read_rds(paste0(wd, '/hsGO_BP.rds'))
+
+termSim <- GOSemSim::termSim(GO.ID, GO.ID,  semData = GOSEM, method = "Wang")
+
+
+# heatmap(termSim)
+
+cmds <- termSim %>% 
+  # use distance metric
+  dist(method = "euclidean") %>%
+  # compute cMDS
+  cmdscale() %>%
+  data.frame() %>%
+  rownames_to_column(var= 'GO.ID')
+
+
+allRes <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 20)
+
 
 # 1) ====
 
