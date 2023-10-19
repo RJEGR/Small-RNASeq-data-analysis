@@ -262,7 +262,7 @@ RES.P %>%
 # divide the counts by the size factors or normalization factors before
 barplot(cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[which_unique,])
 
-# barplot(cnts <- DESeq2::varianceStabilizingTransformation(round(cnts)))
+barplot(cnts <- DESeq2::varianceStabilizingTransformation(round(cnts)))
 
 DF <- cnts %>% as_tibble(rownames = "Name") %>% 
   pivot_longer(-Name, names_to = "LIBRARY_ID", values_to = "count")
@@ -291,21 +291,28 @@ DF <- RES.P %>% distinct(Name, Family) %>%
 
 unique(DF$Family)
 
-recode_to_hpf <- structure(c("24 HPF", "110 HPF"), names = c("110", "24"))
+recode_to_hpf <- structure(c("24 HPF", "110 HPF"), names = c("24", "110"))
 
 recode_to_pH <- structure(c("pH 8.0", "pH 7.6"), names = c("Control", "Low"))
 
-"#f44336"
-"grey30"
 
-col <- c("#3B4992FF","#EE0000FF") 
+scale_col_pH <- structure(c("#3B4992FF","#EE0000FF"), names = c("pH 8.0", "pH 7.6"))
+
 
 fun.data.trend <- "mean_se" # "mean_cl_boot", "mean_sdl"
 
+
+str(SORT_MIRS <- c("MIR-278","LET-7","MIR-133",
+  "Cluster_55760","Cluster_55776","MIR-2","MIR-315", "MIR-153", "BANTAM", "MIR-190", "MIR-2722", "MIR-1988", 
+  "MIR-92", "MIR-277B", "MIR-216"))
+
+
+
 DF %>%
-  dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf)) %>%
+  ungroup() %>%
+  dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf, .ordered = T)) %>%
   dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_pH)) %>%
-  # mutate(Name = factor(Name, levels = unique(names(LOGFC_LABELLER)))) %>%
+  mutate(Family = factor(Family, levels = SORT_MIRS)) %>%
   # mutate(y = log2(round(count)+1)) %>%
   mutate(y = count) %>%
   ggplot(aes(x = hpf, y = y, color = pH, fill = pH, group = pH)) +
@@ -314,8 +321,8 @@ DF %>%
   stat_summary(fun.data = fun.data.trend, linewidth = 0.7, size = 0.7, alpha = 0.7) +
   stat_summary(fun = mean, geom = "line") +
   labs(y = "Read Count", x = "") +
-  scale_color_manual("", values = c("#EE0000FF", "#3B4992FF")) +
-  scale_fill_manual("", values =  c("#EE0000FF", "#3B4992FF")) +
+  scale_color_manual("", values = scale_col_pH) +
+  scale_fill_manual("", values =  scale_col_pH) +
   theme_bw(base_family = "GillSans", base_size = 11) +
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
     legend.position = "top",
@@ -326,7 +333,9 @@ DF %>%
     panel.grid.major.y = element_blank(),
     panel.grid.minor.x = element_blank(),
     axis.text.y = element_text(angle = 0, size = 7),
-    axis.text.x = element_text(angle = 90, size = 10))
+    axis.text.x = element_text(angle = 90, size = 10)) -> p
+
+ggsave(p, filename = 'DESEQ2LINEPLOT_ONLY_DEGS.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
 
 
 DF %>%
