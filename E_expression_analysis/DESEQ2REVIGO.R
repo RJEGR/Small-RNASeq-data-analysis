@@ -115,10 +115,9 @@ SEMANTIC_SEARCH <- function(x, orgdb = "org.Ce.eg.db", semdata = semdata) {
   
   data <- reduceSimMatrix(SimMatrix, threshold = 0.9, orgdb = orgdb) 
   
-  y <- cmdscale(as.matrix(as.dist(1 - SimMatrix)), eig = TRUE, k = 2)
+  # y <- cmdscale(as.matrix(as.dist(1 - SimMatrix)), eig = TRUE, k = 2)
   
-  data <- cbind(as.data.frame(y$points), 
-    data[match(rownames(y$points), data$go),])
+  # data <- cbind(as.data.frame(y$points), data[match(rownames(y$points), data$go),])
   
   return(data)
 }
@@ -204,8 +203,8 @@ data %>%
   # group_by(DE) %>%
   mutate(size = size / max(size)) %>%
   ungroup() %>%
-  mutate(DE = factor(DE, levels = c("24 HPF", "110 HPF"))) %>%
-  
+  # mutate(DE = factor(DE, levels = c("24 HPF", "110 HPF"))) %>%
+  dplyr::mutate(DE = dplyr::recode_factor(DE, !!!recode_to)) %>%
   mutate(parentTerm = fct_reorder2(parentTerm, DE, size, .desc = F)) %>%
   ggplot(aes(y = parentTerm, x = size, fill = DE, color = DE)) + # 
   geom_segment(aes(x = size, xend = 0, yend = parentTerm), size = 4) +
@@ -214,7 +213,7 @@ data %>%
   labs(x = "", y = "") +
   scale_color_manual("", values = c("#DADADA", "#D4DBC2")) +
   scale_fill_manual("", values =  c("#DADADA", "#D4DBC2")) +
-  theme(legend.position = "top",
+  theme(legend.position = "none",
     strip.background = element_rect(fill = 'grey89', color = 'white'),
     panel.border = element_blank(),
     plot.title = element_text(hjust = 0),
@@ -226,7 +225,7 @@ data %>%
     axis.text.y = element_text(angle = 0, size = 10),
     axis.text.x = element_text(size = 10)) -> p
 
-ggsave(p, filename = 'DESEQ2REVIGO_UP_BY_DEV.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
+ggsave(p, filename = 'DESEQ2REVIGO_UP_BY_DEV.png', path = wd, width = 5, height = 4.5, device = png, dpi = 300)
 
 
 data %>%
