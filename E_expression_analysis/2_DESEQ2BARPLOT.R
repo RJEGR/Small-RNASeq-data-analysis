@@ -98,7 +98,7 @@ str(SORT_MIRS <- c("MIR-278","MIR-133","LET-7",
   "MIR-92", "MIR-277B", "MIR-216"))
 
 
-recode_c <- structure(c("24 HPF","110 HPF"), names = c("CONTRAST_A", "CONTRAST_B"))
+recode_c <- structure(c("A) 24 HPF","B) 110 HPF"), names = c("CONTRAST_A", "CONTRAST_B"))
 recode_fc <- structure(c("pH 8.0","pH 7.6"), names = c("Up","Down"))
 
 
@@ -112,7 +112,7 @@ RES.P %>%
     ymin = (abs(log2FoldChange) - lfcSE) * sign(log2FoldChange),
     ymax = (abs(log2FoldChange) + lfcSE) * sign(log2FoldChange),
     y_star = ymax + (0.15+lfcSE)* sign(log2FoldChange)) %>% 
-  mutate(Family = factor(Family, levels = SORT_MIRS)) %>%
+  mutate(Family = factor(Family, levels = srna_order)) %>%
   ggplot(aes(x = Family, y = log2FoldChange, fill = SIGN)) + 
   geom_bar(stat = "identity", width = 0.5, 
     position = position_identity()) +
@@ -126,24 +126,22 @@ RES.P %>%
   labs(x = NULL, y = "Log fold change") +
   guides(fill = guide_legend(title = "", nrow = 1)) +
   theme_bw(base_family = "GillSans", base_size = 12) +
-  # theme_classic(base_size = 16, base_family = "GillSans") + 
-  # geom_abline(slope = 0, intercept = 0, linetype = "dashed", alpha = 0.5) +
   theme(legend.position = "top",
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
     panel.border = element_blank(),
     plot.title = element_text(hjust = 0),
     plot.caption = element_text(hjust = 0),
     panel.grid.minor.y = element_blank(),
     panel.grid.major.y = element_blank(),
     panel.grid.minor.x = element_blank(),
-    strip.background.y = element_blank(),
-    # axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 0, size = 2.5),
-    axis.text.y = element_text(angle = 0, size = 10),
+    axis.text.y = element_text(angle = 0, size = 6),
     axis.text.x = element_text(angle = 0)) +  
-  ggh4x::facet_nested(  ~ CONTRAST_DE, nest_line = F, scales = "free_y", space = "free_y") +
-  theme(strip.background = element_rect(fill = 'grey89', color = 'white')) -> p
+  ggh4x::facet_nested(~ CONTRAST_DE , nest_line = F, scales = "free_y", space = "free_y") -> p
 
 
 ggsave(p, filename = 'DESEQ2BARPLOT_ONLY_DEGS.png', path = wd, width = 4, height = 5, device = png, dpi = 300)
+
+# SEE DESEQ2TOPGO_UPGRADE TO BIND HEATMAP OF MULTIPLE TARGET PROCESS.
 
 # 2 ====
 # not only unique
