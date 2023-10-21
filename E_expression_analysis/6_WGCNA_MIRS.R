@@ -399,11 +399,15 @@ exportNet <- function(TOMobj, moduleColors, threshold = 0.9) {
 
 g <- exportNet(TOM, moduleColors, threshold = 0.3)
 
+g <- exportNet(TOM, moduleColors, threshold = 0)
+
+g %>% activate("edges")
+
 str(SORT_MIRS <- c("MIR-278","LET-7","MIR-133",
   "Cluster_55760","Cluster_55776","MIR-2","MIR-315", "MIR-153", "BANTAM", "MIR-190", "MIR-2722", "MIR-1988", 
   "MIR-92", "MIR-277B", "MIR-216"))
 
-# g %>% activate("nodes") %>% mutate(nodeName %in% SORT_MIRS)
+g1 <- g %>% activate("nodes") %>% filter(nodeName %in% SORT_MIRS)
 
 scale_col <- g %>% activate("nodes") %>% as_tibble() %>% distinct(`nodeAttr[nodesPresent, ]`) %>% pull()
 
