@@ -195,7 +195,7 @@ mergedMEs = merge$newMEs
 #plot dendrogram with module colors below it
 plotDendroAndColors(geneTree, dynamicColors, c("Modules"), dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang=0.05)
 
-#plotDendroAndColors(geneTree, cbind(dynamicColors, mergedColors), c("Dynamic Tree Cut", "Merged dynamic\n(cutHeight=0.2)"), dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang=0.05)
+plotDendroAndColors(geneTree, cbind(dynamicColors, mergedColors), c("Dynamic Tree Cut", "Merged dynamic\n(cutHeight=0.2)"), dendroLabels= FALSE, hang=0.03, addGuide= TRUE, guideHang=0.05)
 
 moduleColors <- mergedColors
 
@@ -215,7 +215,7 @@ cat('Number of mudules obtained\n :', length(nm))
 
 print(nm)
 
-write_rds(as_tibble(moduleColors, rownames = "Family") %>% rename("value" = "WGCNA"), 
+write_rds(as_tibble(moduleColors, rownames = "Family") %>% dplyr::rename("value" = "WGCNA"), 
   file = paste0(path, "WGCNA_MIRS.rds"))
 
 # Plot TOM
@@ -227,6 +227,22 @@ TOMplot(plotTOM, dendro = geneTree, Colors = moduleColors)
 
 #
 
+# LABEL MIRS?
+
+RES.P <- read_tsv(paste0(path, "DESEQ_RES.tsv")) %>% filter( padj < 0.05 & abs(log2FoldChange) > 1)
+
+query.names_1 <- RES.P %>% filter(CONTRAST %in% "CONTRAST_A") %>% 
+  filter(log2FoldChange < 0) %>%
+  distinct(Family) %>% pull()
+
+query.names_2_up <- RES.P %>% filter(CONTRAST %in% "CONTRAST_B") %>% 
+  filter(log2FoldChange < 0) %>%
+  distinct(Family) %>% pull()
+
+query.names_2_down <- RES.P %>% filter(CONTRAST %in% "CONTRAST_B") %>% 
+  filter(log2FoldChange > 0) %>%
+  distinct(Family) %>% pull()
+
 reads <- colSums(datExpr)
 
 Total <- sum(reads)
@@ -237,27 +253,44 @@ identical(names(colSums(datExpr)), names(moduleColors))
 
 data.frame(reads, moduleColors) %>% 
   as_tibble(rownames = "Name") %>% 
-  group_by(moduleColors) %>% 
+  mutate(DE = "Basal") %>%
+  mutate(DE = ifelse(Name %in% query.names_1, "24 HPF (Up)", DE)) %>%
+  mutate(DE = ifelse(Name %in% query.names_2_up, "110 HPF (Up)", DE)) %>%
+  mutate(DE = ifelse(Name %in% query.names_2_down, "110 HPF (Down)", DE)) %>%
+  group_by(moduleColors, DE) %>% 
   summarise(n = n(), reads = sum(reads)) %>%
   dplyr::rename('module' = 'moduleColors') -> stats
 
-# Prep binary datTraits
+# INSTEAD OF BINARY USE DATA FROM RESPIROMETRY AND MORPHOLOGY
 
-datTraits <- gsub(".clean.newid.subset", "", rownames(datExpr))
+datTraits <- read_tsv(paste0(path, "/WGCNA_datTraits.tsv"), )
 
-HR11076 <- grepl('HR11076', datTraits)
+row_names <- datTraits$Row
 
-HR1108 <- grepl('HR1108', datTraits)
+datTraits$Row <- NULL
 
-HR2476 <- grepl('HR2476', datTraits)
+datTraits <- as(datTraits, "matrix")
 
-HR248 <- grepl('HR248', datTraits)
+rownames(datTraits) <- row_names
 
-datTraits <- data.frame(HR11076, HR1108, HR2476, HR248)
 
-datTraits <- 1*datTraits
+# OR Prep binary datTraits
 
-rownames(datTraits) <- rownames(datExpr)
+# datTraits <- gsub(".clean.newid.subset", "", rownames(datExpr))
+# 
+# HR11076 <- grepl('HR11076', datTraits)
+# 
+# HR1108 <- grepl('HR1108', datTraits)
+# 
+# HR2476 <- grepl('HR2476', datTraits)
+# 
+# HR248 <- grepl('HR248', datTraits)
+# 
+# datTraits <- data.frame(HR11076, HR1108, HR2476, HR248)
+# 
+# datTraits <- 1*datTraits
+
+# rownames(datTraits) <- rownames(datExpr)
 
 # Recalculate MEs with color labels
 
@@ -270,7 +303,6 @@ names(MEs) <- str_replace_all(names(MEs), '^ME', '')
 moduleTraitCor = cor(MEs, datTraits, use= "p")
 
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(datTraits))
-
 
 moduleTraitCor %>% as_tibble(rownames = 'module') %>% 
   pivot_longer(-module, values_to = 'moduleTraitCor') -> df1
@@ -286,10 +318,18 @@ df1 %>%
     ifelse(corPvalueStudent <.01, "**",
       ifelse(corPvalueStudent <.05, "*", "")))) -> df1
 
+# recode_to <- structure(c("Development", "Growth", "Calcification", "Respiration", "pH 7.6", "pH 8.0", "pH 7.6", "pH 8.0"), names = colnames(datTraits))
+recode_to <- structure(c("Desarrollo", "Crecimiento", "Calcificación", "Respiración", "pH 7.6", "pH 8.0", "pH 7.6", "pH 8.0"), names = colnames(datTraits))
+
+  
 df1 %>%
-  # mutate(facet = ifelse(name %in% c('HR11076', 'HR2476'), 'Low pH', 'Control')) %>%
-  mutate(facet = ifelse(grepl("^HR110", name), '110 HPF', '24 HPF')) %>%
-  mutate(facet = factor(facet, levels = c('24 HPF', '110 HPF'))) %>%
+  mutate(facet = "") %>%
+  mutate(facet = ifelse(!grepl("^HR", name), 'A) Evaluación', facet)) %>%
+  mutate(facet = ifelse(grepl("^HR24", name), 'B) 24 HPF', facet)) %>% 
+  mutate(facet = ifelse(grepl("^HR110", name), 'C) 110 HPF', facet)) %>% 
+  mutate(facet = factor(facet, levels = c('A) Evaluación', 'B) 24 HPF', 'C) 110 HPF'))) %>%
+  mutate(name = recode_factor(name, !!!recode_to, .ordered = T)) %>%
+  # mutate(name = factor(name, levels = )) %>%
   mutate(moduleTraitCor = round(moduleTraitCor, 2)) %>%
   mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), moduleTraitCor)) %>%
   # mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), '')) %>%
@@ -309,8 +349,8 @@ df1 %>%
     label.theme = element_text(size = 10))) +
   theme_classic(base_size = 12, base_family = "GillSans") +
   theme(legend.position = "top",
-    strip.background = element_rect(fill = 'white', color = 'white')) +
-  facet_wrap(~ facet, scales = 'free_x') -> p1 
+    strip.background = element_rect(fill = 'grey89', color = 'white')) +
+  facet_grid(~ facet, scales = 'free_x',space = "free_x") -> p1
 
 p1 <- p1 + theme(
   axis.line.x = element_blank(),
@@ -322,16 +362,17 @@ p1 <- p1 + theme(panel.spacing.x = unit(-0.5, "mm"))
 
 # BARPLOT
 
+
 p2 <- stats %>% 
   mutate(module = factor(module, levels = hclust$labels[hclust$order])) %>%
-  ggplot(aes(y = module)) +
+  ggplot(aes(y = module)) + #  fill = DE, color = DE
   scale_x_continuous("Número de miRs") +
   geom_col(aes(x = n), width = 0.95, position = position_stack(reverse = TRUE)) +
   # geom_col(aes(x = reads_frac), width = 0.95, fill = "grey")
   # scale_fill_manual(name = '', values = c("#303960", "#647687", "#E7DFD5")) + # grey90
   theme_classic(base_size = 14, base_family = "GillSans") +
   theme(legend.position = "top",
-    strip.background = element_rect(fill = 'white', color = 'white'),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
     axis.title.y = element_blank(), 
     axis.text.y= element_blank(),
     axis.ticks.y =element_blank(), 
@@ -344,10 +385,11 @@ library(patchwork)
 
 # p1 + plot_spacer() + p2 + plot_layout(widths = c(5,-0.5, 10))  #& theme(plot.margin = 0)
 
-psave <- p1 +  plot_spacer() + p2 + plot_layout(widths = c(7, -0.9, 3)) + labs(caption = '* corPvalueStudent < 0.05 ') 
+psave <- p1 +  plot_spacer() + p2 + plot_layout(widths = c(7, -0.25, 1.5)) + labs(caption = '* corPvalueStudent < 0.05 ') 
 
+# psave 
 
-ggsave(psave, filename = 'WGCNA_MIRS2HEATMAP.png', path = path, width = 7, height = 5, device = png, dpi = 300)
+ggsave(psave, filename = 'WGCNA_MIRS2HEATMAP_2.png', path = path, width = 10, height = 5, device = png, dpi = 300)
 
 # network ====
 
@@ -397,17 +439,19 @@ exportNet <- function(TOMobj, moduleColors, threshold = 0.9) {
   
 }
 
-g <- exportNet(TOM, moduleColors, threshold = 0.3)
-
-g <- exportNet(TOM, moduleColors, threshold = 0)
-
-g %>% activate("edges")
-
 str(SORT_MIRS <- c("MIR-278","LET-7","MIR-133",
   "Cluster_55760","Cluster_55776","MIR-2","MIR-315", "MIR-153", "BANTAM", "MIR-190", "MIR-2722", "MIR-1988", 
   "MIR-92", "MIR-277B", "MIR-216"))
 
-g1 <- g %>% activate("nodes") %>% filter(nodeName %in% SORT_MIRS)
+# g <- exportNet(TOM, moduleColors, threshold = 0.3)
+
+g <- exportNet(TOM, moduleColors, threshold = 0)
+
+g <- g %>% activate("edges") %>% mutate(weight = ifelse(weight < 0.3, NA, weight)) %>% filter(!is.na(weight))
+
+moduleColors[names(moduleColors) %in% SORT_MIRS] %>% as_tibble(rownames = "Family") %>% view()
+
+# g1 <- g %>% activate("nodes") %>% 
 
 scale_col <- g %>% activate("nodes") %>% as_tibble() %>% distinct(`nodeAttr[nodesPresent, ]`) %>% pull()
 
@@ -448,7 +492,7 @@ ggraph(layout) +
   scale_color_manual('', values = structure(scale_col, names = scale_col) ) +
   geom_edge_arc(aes(edge_alpha = weight), strength = 0.1) + # edge_width
   geom_node_point(aes(color = `nodeAttr[nodesPresent, ]`, size = degree)) +
-  ggrepel::geom_text_repel(data = layout, aes(x, y, label = nodeName), max.overlaps = 50, family = "GillSans") +
+  ggrepel::geom_text_repel(data = layout, aes(x, y, label = nodeName), max.overlaps = 50, family = "GillSans", size = 2) +
   scale_edge_width(range = c(0.3, 1)) +
   theme_graph(base_family = "GillSans") +
   guides(fill=guide_legend(nrow = 2)) +
