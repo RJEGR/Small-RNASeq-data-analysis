@@ -95,7 +95,7 @@ for (i in 1:length(query.names)) {
   
   p <- query.p[i]
   
-  df <- GOenrichment(p, q, SRNA2GO, Nodes = 10, onto = "BP", mapping = NULL)
+  df <- GOenrichment(p, q, SRNA2GO, Nodes = 10, onto = "BP") # mapping = NULL
   
   allRes[[i]] <- data.frame(df, Name = q)
 }
@@ -156,6 +156,8 @@ str(query.names <- RES.P %>%
     # filter(!grepl("Cluster", Family)) %>%
     distinct(Name) %>% pull())
 
+names_down_under_OA_110 <- query.names
+
 str(query.names <- query.names[query.names %in% names(SRNA2GO)])
 
 cat("\nUsing ",length(query.names), " QUERY Names...\n")
@@ -163,8 +165,6 @@ cat("\nUsing ",length(query.names), " QUERY Names...\n")
 query.p <- RES.P %>% 
   group_by(Name) %>% sample_n(1) %>% 
   pull(pvalue, name = Name)
-
-names_down_under_OA_110 <- query.names
 
 query.p <- query.p[match(query.names, names(query.p))]
 
@@ -241,7 +241,7 @@ SRNA2GO <- SRNA2GO %>% mutate(DE = ifelse(query %in% names_under_OA_24, "24 HPF"
 SRNA2GO <- SRNA2GO %>% mutate(DE = ifelse(query %in% names_under_OA_110, "110 HPF", DE))
 SRNA2GO <- SRNA2GO %>% mutate(DE = ifelse(query %in% names_down_under_OA_110, "-110 HPF", DE))
 
-DEDF <- SRNA2GO %>% drop_na(DE) %>% distinct(query, DE) %>% rename("query" = "Name")
+DEDF <- SRNA2GO %>% drop_na(DE) %>% distinct(query, DE) %>% dplyr::rename("Name" = "query")
 
 GODF <- SRNA2GO %>% 
   drop_na(DE) %>%
@@ -256,6 +256,8 @@ GODF <- SRNA2GO %>%
 GODF <- split(strsplit(GODF$GO.ID, ";") , GODF$DE)
 
 GODF <- lapply(GODF, unlist)
+
+orgdb <- "org.Ce.eg.db"
 
 semdata <- read_rds(paste0(wd, orgdb, ".rds"))
 
@@ -324,9 +326,13 @@ data2 <- data2 %>% left_join(distinct(RES.P, Name, Family))
 
 write_tsv(data2, file = paste0(wd, "DESEQ2REVIGO_BY_MIR.tsv"))
 
+# data2 <- read_tsv(paste0(wd, "DESEQ2REVIGO_BY_MIR.tsv"))
+
+
 which_dup <- data2 %>% distinct(Name ,parentTerm) %>% dplyr::count(parentTerm) %>% filter(n == 2) %>% pull(parentTerm)
 
 recode_to <- structure(c("A) 24 HPF", "B) 110 HPF", "B) 110 HPF"),names = c("24 HPF", "110 HPF", "-110 HPF"))
+
 
 sum_data2 <- data2 %>%
   # filter(!parentTerm %in% which_dup) %>%
@@ -337,7 +343,11 @@ sum_data2 <- data2 %>%
   group_by(Family) %>%
   mutate(size = size / max(size)) %>%
   mutate(size = ifelse(DE %in% "110 HPF", -size, size)) %>%
+  mutate(size = ifelse(DE %in% "24 HPF", -size, size)) %>%
   dplyr::mutate(DE = dplyr::recode_factor(DE, !!!recode_to)) 
+
+# DUPLICATE MIR-133 IN THE 24 HPF
+sum_data2 <- sum_data2 %>% filter(Family == "MIR-133") %>% mutate(DE = "A) 24 HPF", size = -size) %>% rbind(sum_data2)
 
 sum_data2 %>%
   # filter(abs(size) > 0) %>%
@@ -391,7 +401,7 @@ DF <- .SRNA2GO %>%
   distinct(query, gene_id) %>%
   separate(query, into = c("query", "arm"), sep = "[.]") %>%
   filter(arm == "mature") %>%
-  rename("query" = "Name") %>%
+  dplyr::rename("Name" = "query" ) %>%
   right_join(distinct(RES.P, Name, Family))
   
 
