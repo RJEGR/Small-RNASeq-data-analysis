@@ -115,9 +115,9 @@ SEMANTIC_SEARCH <- function(x, orgdb = "org.Ce.eg.db", semdata = semdata) {
   
   data <- reduceSimMatrix(SimMatrix, threshold = 0.9, orgdb = orgdb) 
   
-  # y <- cmdscale(as.matrix(as.dist(1 - SimMatrix)), eig = TRUE, k = 2)
+  y <- cmdscale(as.matrix(as.dist(1 - SimMatrix)), eig = TRUE, k = 2)
   
-  # data <- cbind(as.data.frame(y$points), data[match(rownames(y$points), data$go),])
+  data <- cbind(as.data.frame(y$points), data[match(rownames(y$points), data$go),])
   
   return(data)
 }
