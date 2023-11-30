@@ -4,6 +4,7 @@
 # 3) BIND DE OUTPUT TO MIRGENDB AND SRNA_REGULATORY DB
 # 4) SAVE AS RDATA FILE 
 # 
+
 rm(list = ls())
 
 if(!is.null(dev.list())) dev.off()
