@@ -41,6 +41,7 @@ datExpr <- as(datExpr, "matrix")
 
 rownames(datExpr) <- COUNT$Family
 
+# SPLIT IN NORMAL AND TREATMENT SEA WATER??
 # THEN,
 
 # datExpr <- log2(datExpr+1)
@@ -215,7 +216,8 @@ cat('Number of mudules obtained\n :', length(nm))
 
 print(nm)
 
-write_rds(as_tibble(moduleColors, rownames = "Family") %>% dplyr::rename("value" = "WGCNA"), 
+write_rds(as_tibble(moduleColors, rownames = "Family") %>% 
+    dplyr::rename("WGCNA" = "value"), 
   file = paste0(path, "WGCNA_MIRS.rds"))
 
 # Plot TOM
@@ -264,14 +266,22 @@ data.frame(reads, moduleColors) %>%
 # INSTEAD OF BINARY USE DATA FROM RESPIROMETRY AND MORPHOLOGY
 
 datTraits <- read_tsv(paste0(path, "/WGCNA_datTraits.tsv"), )
-
+  
 row_names <- datTraits$Row
+
+identical(rownames(datExpr),row_names)
+
+keep <- grepl(c("HR11076|HR2476"), row_names)
+
+datTraits <- datTraits %>% filter(Row %in% row_names[keep])
 
 datTraits$Row <- NULL
 
 datTraits <- as(datTraits, "matrix")
 
-rownames(datTraits) <- row_names
+rownames(datTraits) <- row_names[keep]
+
+# rownames(datTraits) <- row_names
 
 
 # OR Prep binary datTraits
@@ -294,13 +304,15 @@ rownames(datTraits) <- row_names
 
 # Recalculate MEs with color labels
 
+# MEs0 = moduleEigengenes(datExpr[,keep], moduleColors)$eigengenes
+
 MEs0 = moduleEigengenes(datExpr, moduleColors)$eigengenes
 
 MEs = orderMEs(MEs0)
 
 names(MEs) <- str_replace_all(names(MEs), '^ME', '')
 
-moduleTraitCor = cor(MEs, datTraits, use= "p")
+moduleTraitCor = WGCNA::cor(MEs[keep,], datTraits, use= "p")
 
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(datTraits))
 
