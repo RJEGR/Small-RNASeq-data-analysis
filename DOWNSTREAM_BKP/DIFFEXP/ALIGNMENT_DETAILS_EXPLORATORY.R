@@ -35,7 +35,7 @@ alignment_details %>% group_by(readfile) %>% tally(count) # <- concordantly w/ i
 
 # 1)
 
-ylab <- "Frac"
+ylab <- "Frac."
 
 read_lengthL <- c("<21","21","22","23","24",">24")
 repL <- c("HR248", "HR1108", "HR2476", "HR11076")
@@ -167,21 +167,29 @@ ps <- p1/p2  + patchwork::plot_layout(heights = c(1,0.7))
 ggsave(ps, filename = 'ALIGNMENT_DETAILS_HEATMAP.png', path = wd, width = 11, height = 6, dpi = 300, device = png)
 
 # mapping_type read_length   count
+# ES
+# recode_to <- c(`U` = "Único ", `P`= "Múltiple (mmap)",`R` = "mmap aleatorio", `H` = "mmap (>=50 hits)", `N` = "Sin mapeo")
 
+# simplificar a mapeos unicos, multiples y sin mapeo
+recode_to <- c(`U` = "Único ", `P`= "Múltiple",`H` = "Múltiple", `R` = "Múltiple", `N` = "Sin mapeo")
+
+ylab <- "% Lecturas"
+xlab <- "Longitud (Nucleótidos)"
 
 alignment_details %>%
+  dplyr::mutate(mapping_type = dplyr::recode_factor(mapping_type, !!!recode_to)) %>%
   group_by(mapping_type, read_length) %>% 
   summarise(n = sum(count)) %>%
   group_by(read_length) %>%
   mutate(frac = n/sum(n)) %>%
-  dplyr::mutate(mapping_type = dplyr::recode_factor(mapping_type, !!!recode_to)) %>%
   dplyr::mutate(read_length = factor(read_length, levels = read_lengthL)) %>%
   ggplot(aes(x = read_length, y = frac, fill = mapping_type)) +
   geom_col(width = 0.85) + # position="dodge"
   scale_y_continuous(ylab, labels = scales::percent) +
-  guides(fill = guide_legend(title = "")) + #  nrow = 5
+  labs(x = xlab) +
+  guides(fill = guide_legend(title = "Mapeo")) + #  nrow = 5
   see::scale_fill_pizza(reverse = T) +
-  theme_bw(base_family = "GillSans", base_size = 11) +
+  theme_bw(base_family = "GillSans", base_size = 10) +
   theme(strip.background = element_rect(fill = 'white', color = 'white'),
     legend.position = 'right',
     panel.border = element_blank(),
@@ -189,7 +197,7 @@ alignment_details %>%
 
 # https://easystats.github.io/see/articles/seecolorscales.html#overview-of-palette-colors
 
-ggsave(ps, filename = 'ALIGNMENT_DETAILS.png', path = wd, width = 5, height = 2.5, device = png)
+ggsave(ps, filename = 'ALIGNMENT_DETAILS_ES.png', path = wd, width = 4, height = 2, device = png)
 
 
 # CHECK IF, DICERCALL PROFILE
