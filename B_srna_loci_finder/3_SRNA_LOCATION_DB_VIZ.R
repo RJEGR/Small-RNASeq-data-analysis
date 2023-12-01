@@ -18,7 +18,7 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out
 
 print(DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")))
 
-print(DE <- read_tsv(paste0(path, "DESEQ_RES.tsv")) )
+print(DE <- read_tsv(paste0(wd, "/DESEQ_RES.tsv")) )
 
 
 pattern <- "multi_genome.newid.gff3$" # <- to get sequence-region per chromosome
@@ -31,7 +31,7 @@ G <- rtracklayer::import(f)
 
 length(G <- G[G$type == "region"])
 
-G <- G %>% as_tibble() %>% select(seqnames, start,  end)
+G <- G %>% as_tibble() %>% dplyr::select(seqnames, start,  end)
 
 # view(DB)
 
@@ -162,19 +162,27 @@ DBMIR <- DBMIR %>%
 
 DBMIR %>% dplyr::count(facet)
 
-col_recode <- structure(c("#f44336", "#FFC107", "#2196F3"), names = c("Other ncRNA", "Intergenic", "Intragenic"))
+key_recode <- structure(c("Intergénico", "Intragénico", "Otros ncRNA"), 
+  names = c("Intergenic", "Intragenic", "Other ncRNA"))
+
+DBMIR <- DBMIR %>%
+  dplyr::mutate(biotype_best_rank = dplyr::recode_factor(biotype_best_rank, !!!key_recode)) 
+
+# col_recode <- structure(c("#f44336", "#FFC107", "#2196F3"), names = c("Other ncRNA", "Intergenic", "Intragenic"))
+
+col_recode <- structure(c("#f44336", "#FFC107", "#2196F3"), names = c("Otros ncRNA", "Intergénico", "Intragénico"))
 
 p <- ggplot() +
   geom_segment(data = G, aes(x = Start, xend = End, yend = Chrom, y = Chrom), linewidth = 0.5, color="#E7DFD5", linetype="dashed") +
   geom_gene_arrow(data = DBMIR, aes(xmin = Start, xmax = End, y = Chrom, fill = biotype_best_rank, color = biotype_best_rank)) +
-  facet_grid(~ facet) +
+  # facet_grid(~ facet) +
   theme_genes() +
   scale_x_continuous("Tamaño (Nucleótidos)", 
     labels = scales::number_format(scale = 1/1000000, suffix = " Gb")) +
   labs(y = "Andamios del genoma") +
   scale_color_manual("",values = col_recode) +
   scale_fill_manual("",values = col_recode) +
-  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme_bw(base_family = "GillSans", base_size = 10) +
   theme(
     legend.position = "top",
     # axis.text.x = element_blank(),
@@ -190,7 +198,7 @@ p <- ggplot() +
     # panel.grid.major = element_line(linewidth = 0.5, color = "grey89", linetype = "dashed"),
     panel.grid.major.x = element_blank())
 
-ggplot2::ggsave(p, filename = "SRNA_LOCATION_MIRS.png", path = wd, width = 5, height = 5, device = png, dpi = 300)
+ggplot2::ggsave(p, filename = "SRNA_LOCATION_MIRS_ES.png", path = wd, width = 7, height = 5, device = png, dpi = 300)
 
 # and by barplot
 
