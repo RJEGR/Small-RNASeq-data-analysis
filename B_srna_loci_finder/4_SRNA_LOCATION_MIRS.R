@@ -2,7 +2,7 @@
 # SRNA_LOCATION_MIRS.R
 # REPLACE DATA FROM WGCNA FOR ONLY MIRS (6_WGCNA_MIRS.R)
 
-wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out"
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 .DB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")) %>% dplyr::filter(SRNAtype == "miR") %>%
   dplyr::select(-WGCNA)
@@ -11,7 +11,9 @@ WGCNA <- read_rds(paste0(wd, "/WGCNA_MIRS.rds"))
 
 # read_tsv(paste0(wd, "/SRNA2MIRGENEDB.tsv")) %>%
   
-FAMILYDB <- read_tsv(paste0(path, "DESEQ_RES.tsv")) %>% distinct(Name, Family)
+# path <- "/Users/cigom/Documents/MIRNA_HALIOTIS/"
+
+FAMILYDB <- read_tsv(paste0(wd, "/DESEQ_RES.tsv")) %>% distinct(Name, Family)
 
 module_members_1 <- c("grey", "black", "yellow", "pink", "turquoise")
 
