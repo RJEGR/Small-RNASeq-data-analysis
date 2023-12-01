@@ -266,12 +266,17 @@ data.frame(reads, moduleColors) %>%
 # INSTEAD OF BINARY USE DATA FROM RESPIROMETRY AND MORPHOLOGY
 
 datTraits <- read_tsv(paste0(path, "/WGCNA_datTraits.tsv"), )
-  
+
+which_cols <- colnames(datTraits)[!grepl(c("^HR"), colnames(datTraits))]  
+
+datTraits <- datTraits %>% dplyr::select_at(which_cols)
+
 row_names <- datTraits$Row
 
 identical(rownames(datExpr),row_names)
 
 keep <- grepl(c("HR11076|HR2476"), row_names)
+
 
 datTraits <- datTraits %>% filter(Row %in% row_names[keep])
 
@@ -306,13 +311,15 @@ rownames(datTraits) <- row_names[keep]
 
 # MEs0 = moduleEigengenes(datExpr[,keep], moduleColors)$eigengenes
 
-MEs0 = moduleEigengenes(datExpr, moduleColors)$eigengenes
+MEs0 = moduleEigengenes(datExpr[keep,], moduleColors)$eigengenes
 
 MEs = orderMEs(MEs0)
 
 names(MEs) <- str_replace_all(names(MEs), '^ME', '')
 
-moduleTraitCor = WGCNA::cor(MEs[keep,], datTraits, use= "p")
+# heatmap(as(MEs, "matrix"))
+
+moduleTraitCor = WGCNA::cor(MEs, datTraits, use= "p")
 
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(datTraits))
 
@@ -329,6 +336,30 @@ df1 %>%
   mutate(star = ifelse(corPvalueStudent <.001, "***", 
     ifelse(corPvalueStudent <.01, "**",
       ifelse(corPvalueStudent <.05, "*", "")))) -> df1
+
+
+df1 %>%
+  mutate(moduleTraitCor = round(moduleTraitCor, 2)) %>%
+  mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), moduleTraitCor)) %>%
+  # mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), '')) %>%
+  ggplot(aes(y = module, x = name, fill = moduleTraitCor)) +
+  geom_tile(color = 'white', size = 0.7, width = 1) +
+  # geom_raster() +
+  geom_text(aes(label = star),  vjust = 0.5, hjust = 0.5, size= 4, family =  "GillSans") +
+  ggsci::scale_fill_gsea(name = "", reverse = T, na.value = "white") +
+  # scale_fill_viridis_c(name = "Membership", na.value = "white") +
+  ggh4x::scale_y_dendrogram(hclust = hclust) +
+  labs(x = '', y = 'Module') +
+  guides(fill = guide_colorbar(barwidth = unit(3.5, "in"),
+    barheight = unit(0.1, "in"), label.position = "top",
+    alignd = 0.5,
+    ticks.colour = "black", ticks.linewidth = 0.5,
+    frame.colour = "black", frame.linewidth = 0.5,
+    label.theme = element_text(size = 10))) +
+  theme_classic(base_size = 12, base_family = "GillSans") +
+  theme(legend.position = "top",
+    strip.background = element_rect(fill = 'grey89', color = 'white')) 
+  # facet_grid(~ facet, scales = 'free_x',space = "free_x")
 
 # recode_to <- structure(c("Development", "Growth", "Calcification", "Respiration", "pH 7.6", "pH 8.0", "pH 7.6", "pH 8.0"), names = colnames(datTraits))
 recode_to <- structure(c("Desarrollo", "Crecimiento", "Calcificación", "Respiración", "pH 7.6", "pH 8.0", "pH 7.6", "pH 8.0"), names = colnames(datTraits))
