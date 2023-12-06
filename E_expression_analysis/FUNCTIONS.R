@@ -431,3 +431,28 @@ paste_go <- function(x) {
   x <- unique(sort(x))
   x <- paste(x, sep = ';', collapse = ';')
 }
+
+
+SEMANTIC_SEARCH <- function(x, orgdb = "org.Ce.eg.db", semdata = semdata) {
+  
+  
+  require(rrvgo)
+  
+  # semdata <- read_rds(paste0(wd, orgdb, ".rds"))
+  
+  x <- sort(x)
+  
+  SimMatrix <- calculateSimMatrix(x, 
+    orgdb = orgdb,
+    ont="BP", 
+    semdata = semdata,
+    method = 'Wang')
+  
+  data <- reduceSimMatrix(SimMatrix, threshold = 0.9, orgdb = orgdb) 
+  
+  # y <- cmdscale(as.matrix(as.dist(1 - SimMatrix)), eig = TRUE, k = 2)
+  
+  # data <- cbind(as.data.frame(y$points), data[match(rownames(y$points), data$go),])
+  
+  return(data)
+}
