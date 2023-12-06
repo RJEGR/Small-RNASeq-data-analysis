@@ -113,16 +113,21 @@ head(DATA <- assay(vst))
 
 
 sample_cor = cor(DATA, method='pearson', use='pairwise.complete.obs')
-sample_dist = dist(sample_cor, method='euclidean')
-hc_samples = hclust(sample_dist, method='complete')
 
-hc_order <- hc_samples$labels[hc_samples$order]
+# sample_dist = dist(sample_cor, method='euclidean')
+# hc_samples = hclust(sample_dist, method='complete')
+
+# plot(hc_samples)
+
+# 
+# hc_order <- hc_samples$labels[hc_samples$order]
 
 # hc_samples <- as.hclust(reorder(as.dendrogram(hc_samples), 12:1))
 
 h <- heatmap(sample_cor, col = cm.colors(12), keep.dendro = T)
 
 hc_samples <- as.hclust(h$Rowv)
+
 hc_order <- hc_samples$labels[h$rowInd]
 
 sample_cor %>% 
@@ -170,7 +175,7 @@ P
 
 # TOP
 
-recode_to <- c(`24` = "24 hpf", `110` = "110 hpf")
+recode_to <- c(`110` = "110 hpf", `24` = "24 hpf", )
 
 TOPDF <- sample_cor_long %>%
   distinct(LIBRARY_ID, hpf, pH) %>%
