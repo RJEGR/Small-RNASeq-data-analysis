@@ -261,8 +261,8 @@ upplot <- RES_CC %>%
   geom_abline(slope = 0, intercept = -log10(0.05), linetype="dashed", alpha=0.5) +
   geom_vline(xintercept = 1, linetype="dashed", alpha=0.5) +
   geom_vline(xintercept = -1, linetype="dashed", alpha=0.5) +
-  annotate("text", x = -10, y = 150, label = "24 HPF", family = "GillSans") +
-  annotate("text", x = 10, y = 150, label = "110 HPF", family = "GillSans") +
+  annotate("text", x = -10, y = 150, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 10, y = 150, label = "110 hpf", family = "GillSans") +
   xlim(-15, 30)
 
 upplot <- upplot + theme(legend.position = "top",
@@ -280,7 +280,7 @@ upplot <- upplot + theme(legend.position = "top",
 
 # ggsave(upplot, filename = 'DESEQ2VOLCANO_CONTRAST_C_D.png', path = wd, width = 5, height = 3, device = png, dpi = 300)
 
-recode_fc <- structure(c("24 HPF","110 HPF"), names = c(1,-1))
+recode_fc <- structure(c("24 hpf","110 hpf"), names = c(1,-1))
 
 recode_to <-  structure(c("pH 8.0", "pH 7.6"), names = WHICH_CONTRAST)
 
@@ -299,15 +299,17 @@ UPSETDF <- UPSETDF %>%
   left_join(distinct(RES.P, Name, Family)) %>%
   distinct(Family, .keep_all = T)
 
+library(ggupset)
+
 UPSETDF %>%
   mutate(facet = "C)") %>%
   ggplot(aes(x = CONTRAST_DE, fill = SIGN)) +
   geom_bar(position = position_dodge(width = 1)) +
   geom_text(stat='count', aes(label = after_stat(count)), 
     position = position_dodge(width = 1), vjust = -0.2, family = "GillSans", size = 3.5) +
-  scale_x_upset(order_by = "degree", reverse = F) +
+  ggupset::scale_x_upset(order_by = "degree", reverse = F) +
   theme_bw(base_family = "GillSans", base_size = 12) +
-  theme_combmatrix(combmatrix.panel.point.color.fill = "black",
+  ggupset::theme_combmatrix(combmatrix.panel.point.color.fill = "black",
     combmatrix.panel.line.size = 0, base_family = "GillSans") +
   axis_combmatrix(levels = c("pH 8.0", "pH 7.6"), clip = "off") +
   labs(x = '', y = 'Número de miRs') +
