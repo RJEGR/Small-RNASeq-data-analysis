@@ -15,6 +15,8 @@ RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05 & abs(log
 
 RES.P %>% dplyr::count(CONTRAST)
 
+orgdb <- "org.Ce.eg.db"
+
 semdata <- read_rds(paste0(wd, orgdb, ".rds"))
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
@@ -124,7 +126,9 @@ SEMANTIC_SEARCH <- function(x, orgdb = "org.Ce.eg.db", semdata = semdata) {
 
 str(GODF)
 
-OUT <- lapply(GODF, SEMANTIC_SEARCH)
+# OUT <- lapply(GODF, SEMANTIC_SEARCH)
+
+OUT <- lapply(GODF, function(x) SEMANTIC_SEARCH(x, semdata = semdata))
 
 OUT
 
@@ -194,7 +198,7 @@ c("#DADADA", "#D4DBC2")
 
 which_proc <- data %>% distinct(DE ,parentTerm) %>% dplyr::count(parentTerm) %>% filter(n == 2) %>% pull(parentTerm)
 
-recode_to <- structure(c("A) 24 HPF", "B) 110 HPF"),names = c("24 HPF", "110 HPF"))
+recode_to <- structure(c("A) 24 hpf", "B) 110 hpf"),names = c("24 HPF", "110 HPF"))
 
 data %>%
   filter(!parentTerm %in% which_proc) %>%
@@ -235,7 +239,8 @@ data %>%
   # group_by(DE) %>%
   mutate(size = size / max(size)) %>%
   ungroup() %>%
-  mutate(DE = factor(DE, levels = c("24 HPF", "110 HPF"))) %>%
+  #mutate(DE = factor(DE, levels = c("24 HPF", "110 HPF"))) %>%
+  dplyr::mutate(DE = dplyr::recode_factor(DE, !!!recode_to)) %>%
   mutate(parentTerm = fct_reorder2(parentTerm, DE, size, .desc = F)) %>%
   ggplot(aes(y = parentTerm, x = size, fill = DE, color = DE)) + # 
   geom_segment(aes(x = size, xend = 0, yend = parentTerm), size = 3) +
