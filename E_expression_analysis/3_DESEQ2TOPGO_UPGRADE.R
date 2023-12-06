@@ -100,7 +100,7 @@ for (i in 1:length(query.names)) {
   allRes[[i]] <- data.frame(df, Name = q)
 }
 
-DF1 <- do.call(rbind, allRes) %>% as_tibble() %>% mutate(facet = CONTRAST)
+DF1 <- do.call(rbind, allRes) %>% as_tibble() %>% mutate(facet = WCONTRAST)
 
 # df <- GOenrichment(query.p, query.names, SRNA2GO, Nodes = 10, onto = "BP", mapping = NULL)
 
@@ -189,7 +189,7 @@ for (i in 1:length(query.names)) {
   allRes[[i]] <- data.frame(df, Name = q)
 }
 
-DF3 <- do.call(rbind, allRes) %>% as_tibble() %>% mutate(facet = WCONTRAST, col = "Down")
+DF3 <- do.call(rbind, allRes) %>% as_tibble() %>% mutate(facet = WCONTRAST)
 
 recode_to_contrat <- structure(c("24 HPF", "110 HPF"), names = c("CONTRAST_A", "CONTRAST_B"))
 
@@ -269,7 +269,7 @@ write_tsv(data, file = paste0(wd, "DESEQ2REVIGO_BY_GROUP.tsv"))
 
 which_dup <- data %>% distinct(DE ,parentTerm) %>% dplyr::count(parentTerm) %>% filter(n == 2) %>% pull(parentTerm)
 
-recode_to <- structure(c("24 HPF", "110 HPF", "110 HPF"),names = c("24 HPF", "110 HPF", "-110 HPF"))
+recode_to <- structure(c("24 hpf", "110 hpf", "110 hpf"),names = c("24 HPF", "110 HPF", "-110 HPF"))
 
 data %>%
   # filter(!parentTerm %in% which_dup) %>%
@@ -326,12 +326,14 @@ data2 <- data2 %>% left_join(distinct(RES.P, Name, Family))
 
 write_tsv(data2, file = paste0(wd, "DESEQ2REVIGO_BY_MIR.tsv"))
 
-# data2 <- read_tsv(paste0(wd, "DESEQ2REVIGO_BY_MIR.tsv"))
+# CONTINUE here =====
+
+data2 <- read_tsv(paste0(wd, "DESEQ2REVIGO_BY_MIR.tsv"))
 
 
 which_dup <- data2 %>% distinct(Name ,parentTerm) %>% dplyr::count(parentTerm) %>% filter(n == 2) %>% pull(parentTerm)
 
-recode_to <- structure(c("A) 24 HPF", "B) 110 HPF", "B) 110 HPF"),names = c("24 HPF", "110 HPF", "-110 HPF"))
+recode_to <- structure(c("A) 24 hpf", "B) 110 hpf", "B) 110 hpf"),names = c("24 HPF", "110 HPF", "-110 HPF"))
 
 
 sum_data2 <- data2 %>%
@@ -347,13 +349,13 @@ sum_data2 <- data2 %>%
   dplyr::mutate(DE = dplyr::recode_factor(DE, !!!recode_to)) 
 
 # DUPLICATE MIR-133 IN THE 24 HPF
-sum_data2 <- sum_data2 %>% filter(Family == "MIR-133") %>% mutate(DE = "A) 24 HPF", size = -size) %>% rbind(sum_data2)
+sum_data2 <- sum_data2 %>% filter(Family == "MIR-133") %>% mutate(DE = "A) 24 hpf", size = -size) %>% rbind(sum_data2)
 
 sum_data2 %>%
   # filter(abs(size) > 0) %>%
   ungroup() %>%
   mutate(parentTerm = fct_reorder2(parentTerm, Family, size, .desc = F)) %>%
-  dplyr::mutate(DE = factor(DE, levels = c("A) 24 HPF", "B) 110 HPF"))) %>%
+  dplyr::mutate(DE = factor(DE, levels = c("A) 24 hpf", "B) 110 hpf"))) %>%
   ggplot(aes(y = parentTerm, x = Family, fill = size, color = size)) +
   labs(x = "", y = "") +
   ggh4x::facet_nested(DE~ ., nest_line = F, scales = "free_y", space = "free_y") +
@@ -379,7 +381,9 @@ sum_data2 %>%
       panel.grid.minor.x = element_blank(),
       panel.grid.major.x = element_blank(),
       axis.text.y = element_text(angle = 0, size = 10),
-      axis.text.x = element_text(angle = 90, size = 10)) -> p2
+      axis.text.x.top = element_text(angle = 90, size = 10, hjust = 0, vjust = 0)) -> p2
+
+# p2
 
 ggsave(p2, filename = 'DESEQ2REVIGO_OA_RESPONSE_HEATMAP.png', path = wd, width = 7, height = 10, device = png, dpi = 300)
 
@@ -393,6 +397,9 @@ data2 %>%
     .groups = "drop_last") %>% view()
 
 # COMPLEMENT W/ USING GENE_ID AS Y AXIS
+
+print(.SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
+
 
 DF <- .SRNA2GO %>%
   filter(predicted == "BOTH") %>%
