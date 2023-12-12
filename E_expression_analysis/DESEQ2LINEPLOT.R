@@ -264,6 +264,10 @@ barplot(cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[which_unique,]
 
 barplot(cnts <- DESeq2::varianceStabilizingTransformation(round(cnts)))
 
+# as z score
+
+cnts <- t(scale(t(cnts)))
+
 DF <- cnts %>% as_tibble(rownames = "Name") %>% 
   pivot_longer(-Name, names_to = "LIBRARY_ID", values_to = "count")
 
