@@ -388,3 +388,89 @@ out <- list(EXCLUSIVE_MIRS, INTERSECTED_MIRS)
 
 write_rds(out, file = paste0(wd, "UPSETDF.rds"))
 
+
+# HEATMAP OF DEGS (z-score) ====
+
+dds <- read_rds(paste0(wd, "/DDS_DESEQ2.rds"))
+
+which_mirs <- RES.P %>% 
+  # filter(CONTRAST_DE %in% WHICH_CONTRAST) %>%
+  distinct(Name) %>% pull()
+
+str(which_mirs)  
+  
+# divide the counts by the size factors or normalization factors before
+barplot(cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[which_mirs,])
+
+barplot(cnts <- DESeq2::varianceStabilizingTransformation(round(cnts)))
+
+# as z score
+
+cnts <- t(scale(t(cnts)))
+
+heatmap(cnts)
+
+#
+
+RES %>% 
+  # filter(CONTRAST %in% WHICH_CONTRAST) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  # filter(cc != "NS") %>%
+  mutate(log2FoldChange = log2FoldChange*-1) %>% # reverse sort of HPF
+  ggplot(aes(x = log10(baseMean), y = log2FoldChange)) +
+  facet_grid(~ CONTRAST) +
+  # geom_rect(
+  #   aes(ymin=-15, ymax = -1, xmin = 1, xmax = Inf), fill = '#DADADA') +
+  # geom_rect(
+  #   aes(ymin=1, ymax = 30, xmin = 1, xmax = Inf), fill = '#D4DBC2') +
+  geom_point(aes(alpha = -log10(padj)), color = 'black') +
+  # scale_color_manual(name = "", values = colors_fc) +
+  labs(y= expression(Log[10] ~ "BaseMean")) +
+  theme_bw(base_family = "GillSans", base_size = 12) + 
+  geom_abline(slope = 0, intercept = -2, linetype="dashed", alpha=0.5) +
+  geom_abline(slope = 0, intercept = 2, linetype="dashed", alpha=0.5) +
+  geom_density_2d(aes(color = ..level..), linewidth = 0.5) +
+  scale_color_viridis_c() +
+  theme(legend.position = "top",
+    panel.border = element_blank(),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    # panel.grid.major = element_blank(),
+    panel.grid = element_blank(),
+    strip.background.y = element_blank(),
+    axis.text.x = element_text(angle = 0)) +
+  # geom_vline(xintercept = 1, linetype="dashed", alpha=0.5) +
+  # geom_vline(xintercept = -1, linetype="dashed", alpha=0.5) +
+  annotate("text", x = -10, y = 150, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 10, y = 150, label = "110 hpf", family = "GillSans") +
+  xlim(-15, 30)
+
+RES %>% 
+  filter(CONTRAST %in% WHICH_CONTRAST) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  mutate(log2FoldChange = log2FoldChange*-1) %>% # reverse sort of HPF
+  ggplot(aes(x = log10(baseMean), y = log2FoldChange)) +
+  geom_point(aes(alpha = -log10(padj)), color = 'black') +
+  # geom_density_2d(aes(color = CONTRAST), linewidth = 0.5) +
+  theme_bw(base_family = "GillSans", base_size = 12) + 
+  facet_grid(~ CONTRAST) +
+  stat_density_2d(
+    geom = "raster",
+    aes(fill = after_stat(density)),
+    contour = FALSE
+  ) +
+  geom_abline(slope = 0, intercept = -2, linetype="dashed", alpha=0.5) +
+  geom_abline(slope = 0, intercept = 2, linetype="dashed", alpha=0.5) +
+  theme(legend.position = "top",
+    panel.border = element_blank(),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    # panel.grid.major = element_blank(),
+    panel.grid = element_blank(),
+    strip.background.y = element_blank(),
+    axis.text.x = element_text(angle = 0)) 
+  
+  
+  
