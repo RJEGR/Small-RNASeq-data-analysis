@@ -61,6 +61,24 @@ LOCI2TARGETDB %>% distinct(gene_id, target) %>% filter(gene_id  ==  target)
 
 write_tsv(LOCI2TARGETDB, file = paste0(wd, "LOCI2TARGETDB.tsv"))
 
+# what genes are host of 66 mirs?
+
+DB <- read_tsv(paste0("/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/", "GENOME_FEATURES_UNIPROT.tsv")) %>% dplyr::rename("uniprot_name" = "name")
+
+path <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out"
+
+MIRLOCI_BIOTYPES <- read_tsv(paste0(path, "MIRLOCI_BIOTYPES_best_rank.tsv"))
+
+MIRLOCI_BIOTYPES %>% count(biotype_best_rank)
+
+query.ids <- MIRLOCI_BIOTYPES %>% filter(biotype_best_rank %in% "Intragénico") %>% pull(Name)
+
+LOCI2TARGETDB %>% filter(Name  %in% query.ids) %>% distinct(Name, gene_id) %>% 
+  left_join(distinct(DB, gene_id, uniprot_name), by = "gene_id") %>% 
+  distinct(Name, gene_id, uniprot_name) %>% 
+  view()
+
+
 # GO ENRICHMENT BY WGCNA MODULE ====
 # USING REVIGO
 # https://bioconductor.org/packages/release/bioc/html/rrvgo.html
