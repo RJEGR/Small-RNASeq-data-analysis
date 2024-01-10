@@ -200,6 +200,8 @@ p <- ggplot() +
 
 ggplot2::ggsave(p, filename = "SRNA_LOCATION_MIRS_ES.png", path = wd, width = 7, height = 5, device = png, dpi = 300)
 
+write_tsv(DBMIR, file = paste0(wd, "MIRLOCI_BIOTYPES_best_rank.tsv"))
+
 # and by barplot
 
 DBMIR %>% 
