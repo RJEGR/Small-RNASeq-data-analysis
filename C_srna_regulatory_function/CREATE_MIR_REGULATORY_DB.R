@@ -76,6 +76,8 @@ DB <- DB %>%
   right_join(genome_feat, by = "transcript_id") 
 
 
+write_tsv(DB, paste0("/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/", "GENOME_FEATURES_UNIPROT.tsv"))
+
 # UNNEST MIRS ====
 
 SRNA2GO_DE <- .SRNA2GO %>%
@@ -88,7 +90,6 @@ SRNA2GO_DE <- .SRNA2GO %>%
   dplyr::select(-n, -n_rnas, -arm) %>%
   distinct() %>%
   right_join(distinct(RES.P, Name, Family))
-
 
 
 # HOW POSSIBLE TARGETS REGUALTED BY DEGS? 167
