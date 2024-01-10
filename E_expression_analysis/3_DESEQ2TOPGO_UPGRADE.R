@@ -139,7 +139,7 @@ for (i in 1:length(query.names)) {
   
   p <- query.p[i]
   
-  df <- GOenrichment(p, q, SRNA2GO, Nodes = 10, onto = "BP", mapping = NULL)
+  df <- GOenrichment(p, q, SRNA2GO, Nodes = 10, onto = "BP")# , mapping = NULL
   
   allRes[[i]] <- data.frame(df, Name = q)
 }
