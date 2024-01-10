@@ -175,7 +175,7 @@ P
 
 # TOP
 
-recode_to <- c(`110` = "110 hpf", `24` = "24 hpf", )
+recode_to <- c(`110` = "110 hpf", `24` = "24 hpf")
 
 TOPDF <- sample_cor_long %>%
   distinct(LIBRARY_ID, hpf, pH) %>%
@@ -244,3 +244,222 @@ PCAdf %>%
   theme(plot.title = element_text(hjust = 0.5), legend.position = 'none')
 
 
+# heatmap of z-score ====
+
+# including only degs
+
+wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+
+RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05 & abs(log2FoldChange) > 1) # abs(log2FoldChange) > 2 &
+
+RES.P <- RES.P %>% filter(CONTRAST %in% c("CONTRAST_A","CONTRAST_B")) # ,  "CONTRAST_D"
+
+str(query.names <- RES.P %>% distinct(Name) %>% pull())
+
+dim(M <- assay(vst))
+
+datExpr <- M %>% as_tibble(rownames = 'Name') %>%
+  right_join(distinct(RES.P, Name, Family), by = "Name") %>%
+  group_by(Family) %>%
+  summarise_at(vars(colnames(M)), sum)
+
+# BY SAMPLE
+
+# datExpr <- datExpr %>% 
+#   pivot_longer(-Family, names_to = "LIBRARY_ID") %>%
+#   left_join(.colData, by = "LIBRARY_ID") %>%
+#   group_by(Family, colName) %>% summarise(value = mean(value)) %>%
+#   pivot_wider(names_from = colName, values_from = value) %>%
+#   ungroup()
+
+which_cols <- datExpr %>% dplyr::select_if(is.double) %>% colnames()
+
+M <- datExpr %>% dplyr::select(all_of(which_cols))
+
+M <- as(M, "matrix")
+
+rownames(M) <- datExpr$Family
+
+head(M)
+
+heatmap(t(apply(M, 1, z_scores)))
+
+# 
+# plot(density(M[1,]), type = "b", pch = 19)
+# 
+# abline(v = mean(M[1,]), col="red", lwd=3, lty=2)
+# 
+# abline(col="blue", lwd=3, lty=2, v = mean(M[1,])+sd(M[1,]))
+# abline(col="blue", lwd=3, lty=2, v = mean(M[1,])-sd(M[1,]))
+# 
+# hist(apply(t(M), 1, z_scores)[1,])
+
+# keep_mirs <- rownames(M) %in% query.names
+
+# dim(M <- M[keep_mirs,])
+
+# head(M <- t(scale(t(M))))
+
+z_scores <- function(x) {(x-mean(x))/sd(x)}
+
+heatmap(M <- apply(M, 1, z_scores))
+
+
+# head(M1 <- apply(M[!grepl("24", rownames(M)),], 2, z_scores))
+# head(M2 <- apply(M[grepl("24", rownames(M)),], 2, z_scores))
+# 
+# 
+# dim(M <- rbind(M1, M2))
+
+# head(M1 <- t(scale(t(M[,!grepl("24", colnames(M))]))))
+# head(M2 <- t(scale(t(M[,grepl("24", colnames(M))]))))
+# 
+# dim(M <- cbind(M1, M2))
+
+# scale to zscore by groups
+
+# head(M1 <- t(scale(t(M[,!grepl("24", colnames(M))]))))
+# head(M2 <- t(scale(t(M[,grepl("24", colnames(M))]))))
+# dim(M <- cbind(M1, M2))
+# M[is.na(M)] <- 0
+
+h <- heatmap(t(M), col = cm.colors(12), keep.dendro = T)
+
+hc_samples <- as.hclust(h$Colv)
+plot(hc_samples)
+hc_order <- hc_samples$labels[h$colInd]
+
+hc_mirs <- as.hclust(h$Rowv)
+plot(hc_mirs)
+order_mirs <- hc_mirs$labels[h$rowInd]
+
+summary(M)
+
+
+DATA <- M %>% 
+  as_tibble(rownames = 'LIBRARY_ID') %>%
+  pivot_longer(cols = colnames(M), values_to = 'fill', names_to = "Name") %>%
+  left_join(.colData, by = "LIBRARY_ID") %>%
+  mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = rev(hc_order)))
+
+
+DATA %>%
+  dplyr::mutate(pH = dplyr::recode_factor(pH, !!!c(`Low` = "pH 7.6",`Control` = "pH 8.0"))) %>%
+  dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!c(`24` = "24 hpf", `110` = "110 hpf"))) %>%
+  ggplot(aes(x = LIBRARY_ID, y = Name, fill = fill)) +  
+  geom_tile(linewidth = 0.2) +
+  # facet_grid(~ hpf+pH, scales = "free_x") +
+  ggsci::scale_fill_gsea(name = "", reverse = T) +
+  ggsci::scale_color_gsea(name = "", reverse = T) +
+  # scale_x_discrete(position = 'bottom') +
+  # ggh4x::scale_x_dendrogram(hclust = hc_samples, position = "top", labels = NULL) 
+  # guides(x.sec = guide_axis_manual(labels = hc_order, label_size = 5, label_family = "GillSans")) 
+  ggh4x::scale_y_dendrogram(hclust = hc_mirs, position = "left", labels = NULL) +
+  guides(y.sec = guide_axis_manual(labels = order_mirs, label_size = 5, label_family = "GillSans")) +
+  theme_bw(base_size = 7, base_family = "GillSans") +
+  labs(x = '', y = '') +
+  theme(
+    legend.position = "bottom",
+    # axis.text.x = element_blank(),
+    # axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 5),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_blank()) -> P
+
+P <- P + ggh4x::facet_nested(~ hpf+pH, nest_line = T, scales = "free_x", space = "free_x") +
+  theme(strip.background = element_rect(fill = 'white', color = 'white')) 
+
+P <- P + guides(
+  fill = guide_colorbar(barwidth = unit(1.5, "in"),
+    barheight = unit(0.05, "in"), label.position = "bottom",
+    alignd = 0.5,
+    ticks.colour = "black", ticks.linewidth = 0.5,
+    frame.colour = "black", frame.linewidth = 0.5,
+    label.theme = element_text(family = "GillSans", size = 7)))
+
+P
+
+recode_to <- c(`24` = "24 hpf", `110` = "110 hpf")
+
+TOPDF <- DATA %>%
+  distinct(LIBRARY_ID, hpf, pH) %>%
+  dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to)) %>%
+  mutate(label = ifelse(pH %in% "Low", "*", "")) %>%
+  mutate(y = 1)
+
+topplot <- TOPDF %>%
+  ggplot(aes(y = y, x = LIBRARY_ID)) + # color = as.factor(hpf)
+  # geom_point(shape = 15, size = 2) +
+  # geom_text(aes(label = label),  vjust = -0.7, hjust = 0.5, size = 1.5, family =  "GillSans", color = "#d73027") +
+  ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top', labels = NULL) +
+  # ggh4x::guide_dendro()
+  # guides(x.sec = guide_axis_manual(labels = hc_order, label_size = 3.5)) +
+  theme_bw(base_family = "GillSans", base_size = 10) +
+  # see::scale_color_pizza(name = "", reverse = T) +
+  scale_color_manual("", values = c("#DADADA", "#D4DBC2")) + # "#4575b4", "#d73027"
+  theme(legend.position = 'top',
+    panel.border = element_blank(), 
+    plot.background = element_rect(fill='transparent', color = 'transparent'),
+    plot.margin = unit(c(0,0,0,0), "pt"),
+    panel.grid.minor = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title = element_blank(),
+    panel.grid.major = element_blank()) 
+
+
+library(patchwork)
+
+psave <- topplot/ plot_spacer() /P + plot_layout(heights = c(0.5, -0.5, 5))
+
+# psave
+
+ggsave(psave, filename = 'DESEQ2_OADEGS_HEATMAP_MIR.png', path = path, width = 3, height = 3.5, device = png, dpi = 300)
+
+# by log2fc
+.RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% 
+  filter(CONTRAST %in% c("CONTRAST_A","CONTRAST_B"))
+  # filter( padj < 0.05 & abs(log2FoldChange) > 1)
+
+subset <- .RES.P %>% filter(Name %in% query.names) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!c(`CONTRAST_A` = "24 hpf",
+    `CONTRAST_B` = "110 hpf"))) %>%
+  mutate(cc = ifelse(padj < 0.05, "p-value","")) 
+
+.RES.P %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!c(`CONTRAST_A` = "24 hpf",
+    `CONTRAST_B` = "110 hpf"))) %>%
+  mutate(pHcc = ifelse(log2FoldChange < 0, "pH 7.6","pH 8.0")) %>%
+  ggplot(aes(x = log10(baseMean), y = log2FoldChange)) + 
+  facet_grid(~ CONTRAST) +
+  geom_abline(slope = 0, intercept = 0, linetype="dashed", alpha=0.5) +
+  # geom_abline(slope = 0, intercept = -1, linetype="dashed", alpha=0.5) +
+  # geom_abline(slope = 0, intercept = 1, linetype="dashed", alpha=0.5) +
+  # geom_rect( aes(xmin=-Inf, xmax = Inf, ymin = 1, ymax = Inf), fill = "grey89") +
+  # geom_rect( aes(xmin=-Inf, xmax = Inf, ymin = -1, ymax = -Inf), fill = "grey89") +
+  # annotate("text", x = 5, y = 20, label = "pH 8.0", family = "GillSans", color = "black") +
+  # annotate("text", x = 5, y = -10, label = "pH 7.6", family = "GillSans",  color = "black") +
+  geom_point(shape = 1, alpha = 1, aes(color = pHcc)) +
+  ggrepel::geom_text_repel(data = subset, aes(label = Family), size = 2.5, family = "GillSans", max.overlaps = 50) +
+  scale_color_manual("", values = c(`pH 8.0` = "#4169E1", `pH 7.6` = "#d73027")) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(legend.position = "top",
+    panel.border = element_blank(),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    # panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    strip.background.y = element_blank(),
+    # axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 0, size = 2.5),
+    # axis.text.y = element_text(angle = 0, size = 5),
+    axis.text.x = element_text(angle = 0)) -> p
+
+ggsave(p, filename = 'DESEQ2_MEANvs_log2fc_MIR.png', path = path, width = 6, height = 4.5, device = png, dpi = 300)
