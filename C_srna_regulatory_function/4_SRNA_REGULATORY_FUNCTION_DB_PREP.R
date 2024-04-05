@@ -52,7 +52,7 @@ GTF <- rtracklayer::import(f)
 
 print(GTF2DF <- GTF %>% as_tibble() %>% distinct(gene_id, transcript_id, ref_gene_id) %>% filter(!is.na(ref_gene_id))) # A tibble: 70,001 × 3
 
-nrow(GTF2DF <- GTF2DF %>% filter(ref_gene_id %in% query.ids)) # 17532
+# nrow(GTF2DF <- GTF2DF %>% filter(ref_gene_id %in% query.ids)) # 17532
 
 GTF2DF %>% count(ref_gene_id, sort = T)
 
@@ -85,12 +85,18 @@ f <- list.files(path = wd, pattern = "gene_count_matrix.csv", full.names = T)
 
 .COUNT <- read_csv(f)
 
+.COUNT %>% distinct(gene_id) %>% nrow() # 58592 genes assembled
+
+any(GTF2DF$gene_id %in% .COUNT$gene_id)
+
+GTF2DF <- GTF2DF[GTF2DF$gene_id %in% .COUNT$gene_id,]
+
 COUNT <- GTF2DF %>% 
-  distinct(gene_id, ref_gene_id) %>% 
-  left_join(.COUNT) %>%
+  distinct(gene_id, ref_gene_id) %>%
+  right_join(.COUNT) %>%
   rename("assembled_id" = "gene_id", "gene_id" = "ref_gene_id")
 
-View(COUNT)
+# View(COUNT)
 
 DB <- RES.P %>% 
   mutate(gene_id = strsplit(gene_id, ";")) %>%
@@ -208,7 +214,151 @@ ggsave(p, filename = "DESEQ2HEATMAP_TRANSCRIPTOME.png", path = wd, width = 5, he
 
 # COMO COLAPSAR INFORMACION DE NAME (I.E MIRS) PARA IDENTIFICAR EL TARGET EN UN HEATMAP U OTRO DATAVIZ???
 
-DB %>% unnest(Name) %>% 
-  # dplyr::select(all_of(c("Name",which_cols))) %>% 
-  right_join(RES.P %>% dplyr::select(Name, Family) %>% filter(Family == "MIR-278")) %>%
-  view()
+# GAD, 
+# CORRELACIONAR CONTEOS TOTAL DE MIRS POR TARGET
+# GENERAR UNA TABLA QUE CONTENGA TRES COLUMNAS:
+# gene_id, EXPRESSION, MIR-TARGET-EXPRESSION
+# 1) LEER CONTEOS DE MICRORNAS Y SUMAR POR TARGET
+# 2) LEER CONTEOS DE GENE-EXPRESSION RNA-SEQ Y SUMAR INDEPENDIENTE DE LA ETAPA DE DESARROLLO
+# 3) VERIFICAR SI ALGUNO DE LOS TARGET SE ENCUENTRA EXPRESADO DURANTE EL DESARROLLO (VISUAL)
+# 4) HACER JOIN DE LOS CONTEOS DE LOS MIR-TARGET-EXPRESSION Y GENE-EXPRESSION
+# 5) GRAFICAR UN SCATTERPLOT CON COEFICIENTES PEARSON 
+# (OPTIONAL) CALCULAR MATRIZ DE CORRELACION POR ETAPA DE DESARROLLO?
+
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+
+dim(MIR_COUNT <- read_rds(paste0(wd, "COUNT.rds"))) # must match 147 rows x 12 cols
+
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
+
+TARGET <- read_tsv(paste0(wd, "LOCI2TARGETDB.tsv"))
+
+TARGET %>% distinct(Name) %>% nrow() # must match 147 mirs
+
+bind_srnas <- function(x) {
+  x <- paste(x, sep = ';', collapse = ';')
+}
+
+MIR_EXPRESSION <- TARGET %>% 
+  group_by(Name) %>%
+  summarise(across(target, .fns = bind_srnas), .groups = "drop_last") %>%
+  right_join(rowSums(MIR_COUNT) %>% as_tibble(rownames = 'Name')) %>% view()
+  mutate(target = strsplit(target, ";")) %>%
+  unnest(target) %>%
+  group_by(target) %>%
+  summarise(across(Name, .fns = bind_srnas), n_mirs= n(), mir_exp = sum(value),
+    .groups = "drop_last") %>%
+  dplyr::rename("gene_id" = "target")
+
+# 2) LEER CONTEOS DE GENE-EXPRESSION RNA-SEQ Y SUMAR INDEPENDIENTE DE LA ETAPA DE DESARROLLO
+
+GTF <- "transcripts.gtf"
+
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/"
+
+f <- list.files(path = wd, pattern = "METADATA_RNASEQ", full.names = T)
+
+.colData <- read_csv(f)
+
+f <- list.files(path = wd, pattern = GTF, full.names = T)
+
+GTF <- rtracklayer::import(f)
+
+print(GTF2DF <- GTF %>% as_tibble() %>% 
+    distinct(gene_id, transcript_id, ref_gene_id) %>% 
+    filter(!is.na(ref_gene_id))) # A tibble: 70,001 × 3
+
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/QUANTIFICATION/"
+
+f <- list.files(path = wd, pattern = "gene_count_matrix.csv", full.names = T)
+
+.COUNT <- read_csv(f)
+
+.COUNT %>% distinct(gene_id) %>% nrow() # 58592 genes assembled
+
+any(GTF2DF$gene_id %in% .COUNT$gene_id)
+
+GTF2DF <- GTF2DF[GTF2DF$gene_id %in% .COUNT$gene_id,]
+
+COUNT <- GTF2DF %>% 
+  distinct(gene_id, ref_gene_id) %>%
+  right_join(.COUNT) %>%
+  rename("assembled_id" = "gene_id", "gene_id" = "ref_gene_id")
+
+# 3) VERIFICAR SI ALGUNO DE LOS TARGET SE ENCUENTRA EXPRESADO DURANTE EL DESARROLLO (VISUAL) ====
+
+# how many targets?
+
+TARGET %>% distinct(target) %>% nrow() # 168
+
+q.targets <- TARGET %>% distinct(target) %>% pull()
+
+COUNT %>% filter(gene_id %in% q.targets) %>% nrow() # 155 targets are usually expressed during larval dev.
+
+COUNT <- COUNT %>% filter(gene_id %in% q.targets)
+
+which_cols <- COUNT %>% select_if(is.double) %>% names()
+
+z_scores <- function(x) {(x-mean(x))/sd(x)}
+
+M <- COUNT %>% dplyr::select(starts_with("SRR")) %>% as(., "matrix")
+
+M <- apply(M, 1, z_scores)
+
+M[is.na(M)] <- 0
+
+heatmap(M)
+
+dpfLevel <- c("0.5 dpf","1 dpf", "6 dpf","7 dpf","21 dpf", "30 dpf","Female" )
+
+LONGERCOUNT <- COUNT %>% 
+  filter(gene_id %in% q.targets) %>%
+  pivot_longer(all_of(which_cols),names_to = "LIBRARY_ID") %>%
+  filter(value > 0) %>%
+  # mutate(value = ifelse(value == 0, NA, value)) %>%
+  left_join(.colData) %>%
+  group_by(gene_id, CONTRAST_B) %>%
+  summarise(value = sum(value)) %>%
+  mutate(CONTRAST_B = factor(CONTRAST_B, levels = dpfLevel))
+
+LONGERCOUNT %>%
+  mutate(value = z_scores(value)) %>%
+  ggplot(aes(x = CONTRAST_B, y = gene_id, fill = value)) + 
+  geom_tile(color = 'white', linewidth = 0.2) +
+  scale_fill_viridis_c(option = "B", name = "z", direction = -1, na.value = "white")
+
+# 4) HACER JOIN DE LOS CONTEOS DE LOS MIR-TARGET-EXPRESSION Y GENE-EXPRESSION ====
+# 5) GRAFICAR UN SCATTERPLOT CON COEFICIENTES PEARSON 
+
+
+GENE_EXPRESSION <- LONGERCOUNT %>% summarise(gene_exp = sum(value))
+
+GENE_EXPRESSION %>% left_join(MIR_EXPRESSION) %>%
+  arrange(desc(n_mirs)) %>%
+  mutate(gene_exp = log10(gene_exp), mir_exp = log10(mir_exp)) %>%
+  ggplot(aes(gene_exp, n_mirs)) + geom_point() +
+  geom_smooth(method = "lm", linetype="dashed", size = 0.5, alpha=0.5,
+    se = F, na.rm = TRUE) +
+  ggpubr::stat_cor(method = "spearman", cor.coef.name = "R", p.accuracy = 0.001) +
+  theme_bw(base_size = 16, base_family = "GillSans")
+
+# (OPTIONAL) CALCULAR MATRIZ DE CORRELACION POR ETAPA DE DESARROLLO?
+library(rstatix)
+
+# M <- COUNT %>% dplyr::select(starts_with("SRR")) # %>% as(., "matrix")
+# 
+# M <- apply(M, 1, z_scores)
+# 
+# M[is.na(M)] <- 0
+# 
+
+cor.mat <- COUNT %>% 
+  # mutate_at(vars(contains(c("SRR"))), z_scores) %>%
+  left_join(MIR_EXPRESSION) %>%
+  dplyr::select(contains(c("SRR", "n_mirs", "mir_exp"))) %>% 
+  rstatix::cor_mat()
+
+cor.mat %>%
+  cor_reorder() %>%
+  pull_lower_triangle() %>%
+  cor_plot(label = TRUE)
