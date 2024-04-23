@@ -172,51 +172,15 @@ ggsave(psave, filename = 'DESEQ2PLOT_CONTRAST_C_D.png', path = path_out, width =
 # using density func
 
 
-pdens <- RES_CC %>%
-  filter(CONTRAST %in% WHICH_CONTRAST) %>%
-  dplyr::mutate(SIGN = sign(logFC)) %>%
-  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
-  ggplot(aes(x = log2(baseMean), y = logFC)) +
-  facet_grid(~ CONTRAST, scales = "free") +
-  geom_point(aes(alpha = -log10(padj)), color = 'grey') +
-  # stat_density_2d(aes(fill = ..level..), geom = "polygon") +
-  # scale_fill_viridis_c() +
-  geom_density_2d(aes(color = ..level..), linewidth = 0.5) +
-  scale_color_viridis_c() +
-  # stat_density_2d(
-  #   geom = "raster",
-  #   aes(fill = after_stat(density)),
-  #   contour = FALSE
-  # ) +
-  geom_abline(slope = 0, intercept = 0, linetype="dashed", alpha=0.5) +
-  theme_bw(base_family = "GillSans", base_size = 12) +
-  theme(legend.position = "top",
-    panel.border = element_blank(),
-    strip.background = element_rect(fill = 'grey89', color = 'white'),
-    plot.title = element_text(hjust = 0),
-    plot.caption = element_text(hjust = 0),
-    # panel.grid.major = element_blank(),
-    panel.grid = element_blank(),
-    strip.background.y = element_blank(),
-    axis.text.x = element_text(angle = 0))
-
-
-
+WHICH_CONTRAST <- c("CONTRAST_A", "CONTRAST_B")
+recode_to <- structure(c("24 hpf", "110 hpf"), names = WHICH_CONTRAST)
 SUBSET_RES <- RES_CC %>%
-  mutate(cc = ifelse(padj < 0.05, "p-value","")) %>%
+  filter(CONTRAST %in% WHICH_CONTRAST) %>%
   # left_join(ANNOT, by = "transcript_id") %>%
-  filter(abs(logFC) > 5) %>%
+  filter(padj < 0.05 & abs(logFC) > 1 ) %>%
   dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to))
 
 
-pdens +
-  # ylim(c(-10,10))
-  geom_rect(
-    aes(ymin=-30, ymax = -1, xmin = 1, xmax = Inf), fill = '#DADADA', alpha = 0.02) +
-  geom_rect(
-    aes(ymin=1, ymax = 30, xmin = 1, xmax = Inf), fill = '#DADADA', alpha = 0.02) +
-  ggrepel::geom_text_repel(data = SUBSET_RES, aes(label = Name),
-    size = 5, family = "GillSans", max.overlaps = 100)
 
 
 library(ggdensity)
@@ -249,3 +213,44 @@ RES_CC %>%
     axis.text.x = element_text(angle = 0)) +
   ggrepel::geom_text_repel(data = SUBSET_RES, aes(label = Name),
     size = 3, family = "GillSans", max.overlaps = 100)
+
+# 
+
+
+pdens <- RES_CC %>%
+  filter(CONTRAST %in% WHICH_CONTRAST) %>%
+  dplyr::mutate(SIGN = sign(logFC)) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  ggplot(aes(x = log2(baseMean), y = logFC)) +
+  facet_grid(~ CONTRAST, scales = "free") +
+  geom_point(aes(alpha = -log10(padj)), color = 'grey') +
+  # stat_density_2d(aes(fill = ..level..), geom = "polygon") +
+  # scale_fill_viridis_c() +
+  geom_density_2d(aes(color = ..level..), linewidth = 0.5) +
+  scale_color_viridis_c() +
+  # stat_density_2d(
+  #   geom = "raster",
+  #   aes(fill = after_stat(density)),
+  #   contour = FALSE
+  # ) +
+  geom_abline(slope = 0, intercept = 0, linetype="dashed", alpha=0.5) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  theme(legend.position = "top",
+    panel.border = element_blank(),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    # panel.grid.major = element_blank(),
+    panel.grid = element_blank(),
+    strip.background.y = element_blank(),
+    axis.text.x = element_text(angle = 0))
+
+
+pdens +
+  # ylim(c(-10,10))
+  geom_rect(
+    aes(ymin=-30, ymax = -1, xmin = 1, xmax = Inf), fill = '#DADADA', alpha = 0.02) +
+  geom_rect(
+    aes(ymin=1, ymax = 30, xmin = 1, xmax = Inf), fill = '#DADADA', alpha = 0.02) +
+  ggrepel::geom_text_repel(data = SUBSET_RES, aes(label = Name),
+    size = 5, family = "GillSans", max.overlaps = 100)
