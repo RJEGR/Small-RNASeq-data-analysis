@@ -37,25 +37,27 @@ df_stats <- .x[[1]]
 
 pHpalette <- c(`7.6`="#ad1f1f", `7.8`= "#abdda4",`8.0`= "#4575b4", `8`= "#4575b4")
 
+pHpalette <- c(`7.6`="black", `7.8`= "#abdda4",`8.0`= "gray68", `8`= "gray68")
+
+
 
 recode_to <- structure(c("pH 8.0", "pH 7.6"), names = c("8", "7.6"))
 
-recode_hpf <- structure(c("B) 24 HPF", "C) 110 HPF"), names = c("24", "108"))
+recode_hpf <- structure(c("B) 24 hpf", "C) 110 hpf"), names = c("24", "108"))
 
 # View
 
 df_stats %>% select(r_ind_adj) %>%
   # filter(pH != "7.8") %>%
   dplyr::mutate(hpf = dplyr::recode(hpf, !!!c("108" = "110"))) %>%
-  rstatix::get_summary_stats(type = 'mean_sd') %>% view()
+  rstatix::get_summary_stats(type = 'mean_sd') # %>% view()
 
 
 # 1) (REPLACED W/ DONUTS)
 
+ylabs <- expression("RM (pmol"~O[2]~Ind^-1~h^-1*")")
 
-# ylabs <- expression("Metabolic rate (pmol"~O[2]~Ind^-1~h^-1*")")
-
-ylabs <- expression("Tasa de resp. (pmol"~O[2]~Ind^-1~h^-1*")")
+#ylabs <- expression("Tasa de resp. (pmol"~O[2]~Ind^-1~h^-1*")")
 
 lim <- c(-10, 140)
 
@@ -65,8 +67,8 @@ df_stats %>% select(r_ind_adj) %>%
   filter(pH != "7.8") %>%
   dplyr::mutate(hpf = dplyr::recode(hpf, !!!c("108" = "110"))) %>%
   rstatix::get_summary_stats(type = 'mean_sd') %>% 
-  # mutate(facet = "A) Early development") %>%
-  mutate(facet = "A) Desarrollo larval") %>%
+  mutate(facet = "A) Larval development") %>%
+  # mutate(facet = "A) Desarrollo larval") %>%
   mutate(ymin = mean-sd, ymax = mean+sd) %>%
   ggplot(aes(x = hpf, y = mean, color = pH, group = pH)) +
   facet_grid( ~ facet ) +
@@ -75,7 +77,7 @@ df_stats %>% select(r_ind_adj) %>%
     width = 0.1, position = position_dodge(width = 0)) +
   geom_path(position = position_dodge(width = 0), linewidth = 1) +
   scale_color_manual("", values = pHpalette) +
-  labs(y = ylabs, x = "HPF") +
+  labs(y = ylabs, x = "Time (hpf)") +
   scale_y_continuous(breaks = breaks, limits = lim) -> pleft1
 
 
@@ -170,7 +172,16 @@ df_stats %>%
   ungroup() %>%
   # tukey_hsd(r_ind_adj ~ pH) %>%
   pairwise_t_test(r_ind_adj ~ pH, ref.group = '8') %>%
-  # pairwise_wilcox_test(r_ind_adj ~ pH,  conf.level = 0.95)
+  # pairwise_wilcox_test(r_ind_adj ~ pH,  conf.level = 0.95) %>%
+  adjust_pvalue() %>%
+  add_significance()
+
+df_stats %>%
+  ungroup() %>%
+  # group_by(hpf) %>%
+  # tukey_hsd(r_ind_adj ~ pH) %>%
+  pairwise_t_test(r_ind_adj ~ pH) %>%
+  # pairwise_wilcox_test(r_ind_adj ~ pH,  conf.level = 0.95) %>%
   adjust_pvalue() %>%
   add_significance()
 
@@ -182,8 +193,8 @@ pbar <- DF %>%
   summarise(mean = mean(y), sd = sd(y), n = n()) %>%
   dplyr::mutate(pH = dplyr::recode(pH, !!!recode_to_x)) %>%
   mutate(ymin = mean-sd, ymax = mean+sd, p.adj.signif = c("", "ns", "ns")) %>%
-  # mutate(facet = "D) Total oxygen consumed") %>%
-  mutate(facet = "D) Consumo total de O2") %>%
+  mutate(facet = "D) Total oxygen consumed") %>%
+  # mutate(facet = "D) Consumo total de O2") %>%
   ggplot(aes(x = pH, y = mean,  ymin = ymin, ymax = ymax)) +
   facet_grid(~ facet) +
   geom_col(position = position_dodge(0.6), color = 'black', fill = 'grey89') +
@@ -247,13 +258,13 @@ stats <- .stats %>%
 plotdf %>%
   ggplot(aes(x = pH, y = r_ind_adj, group = hpf)) +
   facet_wrap(~ hpf) +
-  geom_jitter(aes(color = pH, fill = pH), position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +
+  geom_jitter(aes(color = pH, fill = pH), position=position_jitter(w=0.1,h=0), size = 1, alpha = 1) +
   stat_summary(fun.data = fun.data.trend, colour = "black", linewidth = 0.7, size = 0.5, alpha = 0.7) +
   stat_summary(fun = mean, geom = "line", colour = "black", alpha = 0.7) +
   theme_bw(base_family = "GillSans", base_size = 14) +
-  labs(y = ylabs, x = "") +
-  scale_color_manual("", values = c("#4575b4", "#d73027")) +
-  scale_fill_manual("", values = c("#4575b4", "#d73027")) +
+  labs(y = ylabs, x = "Assay") +
+  scale_color_manual("", values = pHpalette) + # c("#4575b4", "#d73027")
+  scale_fill_manual("", values = pHpalette) + # c("#4575b4", "#d73027")
   # scale_y_continuous(breaks = seq(0, 0.11, by = 0.02), limits = c(0,0.11))
   scale_y_continuous("",breaks = breaks, limits = lim) -> pright
 
@@ -302,5 +313,5 @@ pleft1 | pright
 
 P <- pleft1 + plot_spacer() + pright + patchwork::plot_layout(widths = c(0.8,-0.15, 1.2))
 
-ggsave(P, filename = 'RESPIRATION_RATES_FACET_ES.png', 
+ggsave(P, filename = 'RESPIRATION_RATES_FACET_EN.png', 
   path = path_out, width = 6, height = 3, device = png, dpi = 300)
