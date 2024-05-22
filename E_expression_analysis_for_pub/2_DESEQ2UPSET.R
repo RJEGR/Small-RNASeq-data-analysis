@@ -38,6 +38,8 @@ recode_fc <- structure(c("Up","Down"), names = c(1,-1))
 RES.P <- RES %>% filter( padj < 0.05 & abs(log2FoldChange) > 1) # abs(log2FoldChange) > 2 &
 
 RES.P %>% distinct(Name)
+RES.P %>% distinct(MirGeneDB_ID)
+RES.P %>% distinct(MajorRNA)
 
 RES.P <- RES.P %>%
   mutate(star = ifelse(padj <.001, "***", 
@@ -105,6 +107,19 @@ upplot <- upplot + theme(legend.position = "top",
 
 # ggsave(upplot, filename = 'DESEQ2VOLCANO_CONTRAST_C_D.png', path = wd, width = 5, height = 3, device = png, dpi = 300)
 
+# or by hist
+
+RES.P %>% 
+  filter(CONTRAST_DE %in% WHICH_CONTRAST) %>%
+  mutate(SIGN = sign(log2FoldChange)) %>%
+  dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
+  dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_to)) %>%
+  # select(Name, SIGN, CONTRAST_DE) %>% distinct(Name, SIGN, CONTRAST_DE) %>%
+  mutate(logFC = log2FoldChange*-1) %>%
+  ggplot(aes(logFC)) + 
+  # facet_grid(SIGN ~.) + stat_ecdf(aes(color = CONTRAST_DE)) 
+  geom_histogram(aes(fill = CONTRAST_DE, color = CONTRAST_DE), alpha=0.5, position="identity")
+
 recode_fc <- structure(c("24 hpf","110 hpf"), names = c(1,-1))
 
 recode_to <-  structure(c("pH 8.0", "pH 7.6"), names = WHICH_CONTRAST)
@@ -116,9 +131,18 @@ UPSETDF <- RES.P %>%
   mutate(SIGN = sign(log2FoldChange)) %>%
   dplyr::mutate(SIGN = dplyr::recode_factor(SIGN, !!!recode_fc)) %>%
   dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_to)) %>%
-  group_by(Name, SIGN) %>%
-  summarise(across(CONTRAST_DE, .fns = list), n = n())
+  select(Name, SIGN, CONTRAST_DE) %>% distinct(Name, SIGN, CONTRAST_DE)
 
+UPSETDF %>% count(CONTRAST_DE)
+UPSETDF %>% count(SIGN)
+
+
+UPSETDF <- UPSETDF %>%
+  group_by(Name, SIGN) %>%
+  summarise(across(CONTRAST_DE, .fns = list), n = n()) %>% arrange(desc(n))
+
+
+UPSETDF %>% filter(n > 2) %>% unnest(CONTRAST_DE)
 # UPSETDF <- UPSETDF %>%
 #   ungroup() %>%
 #   left_join(distinct(RES.P, Name, Family)) %>%
@@ -127,6 +151,7 @@ UPSETDF <- RES.P %>%
 library(ggupset)
 
 UPSETDF %>%
+  filter(n <= 2) %>%
   mutate(facet = "C) Intersected") %>%
   ggplot(aes(x = CONTRAST_DE, fill = SIGN)) +
   geom_bar(position = position_dodge(width = 1), color = "black", linewidth = 0.2) +
@@ -162,7 +187,7 @@ p2 <- p2 + facet_grid(cols = vars(facet), scales = "free") +
 
 # ggsave(p2, filename = 'DESEQ2UPSET_CONTRAST_C_D.png', path = wd, width = 5, height = 3.5, device = png, dpi = 300)
 
-psave <- upplot + p2 + plot_layout(width = c(6, 3)) 
+psave <- upplot + p2 + plot_layout(width = c(6, 2.5)) 
 
 path_out <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024"
 
