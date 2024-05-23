@@ -105,7 +105,29 @@ upplot <- upplot + theme(legend.position = "top",
   # axis.text.y = element_text(angle = 0, size = 5),
   axis.text.x = element_text(angle = 0))
 
-# ggsave(upplot, filename = 'DESEQ2VOLCANO_CONTRAST_C_D.png', path = wd, width = 5, height = 3, device = png, dpi = 300)
+recode_f <- structure(c("24 hpf","110 hpf"), names = c("CONTRAST_A","CONTRAST_B"))
+
+RES_CC %>% 
+  filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+  dplyr::mutate(SIGN = sign(logFC)) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_f)) %>%
+  # filter(cc != "NS") %>%
+  ggplot(aes(x = logFC, y = -log10(padj))) +
+  facet_grid(~ CONTRAST) +
+  # geom_rect(
+  #   aes(xmin=-5, xmax = -1, ymin = 1, ymax = Inf), fill = '#DADADA') +
+  # geom_rect(
+  #   aes(xmin=1, xmax = 5, ymin = 1, ymax = Inf), fill = '#D4DBC2') +
+  geom_point(aes(color = cc), alpha = 3/5) +
+  scale_color_manual(name = "", values = colors_fc, labels = scales::parse_format()) +
+  labs(x= expression(Log[2] ~ "Fold Change"), 
+    y = expression(-Log[10] ~ "padj")) +
+  theme_bw(base_family = "GillSans", base_size = 10) +
+  geom_abline(slope = 0, intercept = -log10(0.05), linetype="dashed", alpha=0.5) +
+  geom_vline(xintercept = 1, linetype="dashed", alpha=0.5) +
+  geom_vline(xintercept = -1, linetype="dashed", alpha=0.5) +
+  annotate("text", x = -3, y = 5, label = "pH 7.6", family = "GillSans") +
+  annotate("text", x = 3, y = 5, label = "pH 8.0", family = "GillSans") 
 
 # or by hist
 
@@ -133,6 +155,10 @@ UPSETDF <- RES.P %>%
   dplyr::mutate(CONTRAST_DE = dplyr::recode_factor(CONTRAST_DE, !!!recode_to)) %>%
   select(Name, SIGN, CONTRAST_DE) %>% distinct(Name, SIGN, CONTRAST_DE)
 
+
+UPSETDF %>%
+  group_by(SIGN,CONTRAST_DE) %>% count() %>% view()
+
 UPSETDF %>% count(CONTRAST_DE)
 UPSETDF %>% count(SIGN)
 
@@ -141,8 +167,14 @@ UPSETDF <- UPSETDF %>%
   group_by(Name, SIGN) %>%
   summarise(across(CONTRAST_DE, .fns = list), n = n()) %>% arrange(desc(n))
 
+UPSETDF <- RES.P %>%
+  group_by(Name) %>%
+  summarise(across(CONTRAST_DE, .fns = list), n = n()) %>% arrange(desc(n))
 
-UPSETDF %>% filter(n > 2) %>% unnest(CONTRAST_DE)
+
+UPSETDF %>% filter(n > 2) %>% unnest(CONTRAST_DE) 
+
+
 # UPSETDF <- UPSETDF %>%
 #   ungroup() %>%
 #   left_join(distinct(RES.P, Name, Family)) %>%
@@ -237,9 +269,12 @@ RES_CC %>%
     strip.background.y = element_blank(),
     axis.text.x = element_text(angle = 0)) +
   ggrepel::geom_text_repel(data = SUBSET_RES, aes(label = Name),
-    size = 3, family = "GillSans", max.overlaps = 100)
+    size = 3, family = "GillSans", max.overlaps = 100) +
+  geom_point(data = SUBSET_RES, color = "red")
 
 # 
+
+view(SUBSET_RES)
 
 
 pdens <- RES_CC %>%
@@ -279,3 +314,17 @@ pdens +
     aes(ymin=1, ymax = 30, xmin = 1, xmax = Inf), fill = '#DADADA', alpha = 0.02) +
   ggrepel::geom_text_repel(data = SUBSET_RES, aes(label = Name),
     size = 5, family = "GillSans", max.overlaps = 100)
+
+# lineplot
+
+ggplot(aes(x = pH, y = r_ind_adj, group = hpf)) +
+  facet_wrap(~ hpf) +
+  geom_jitter(aes(color = pH, fill = pH), position=position_jitter(w=0.1,h=0), size = 1, alpha = 1) +
+  stat_summary(fun.data = fun.data.trend, colour = "black", linewidth = 0.7, size = 0.5, alpha = 0.7) +
+  stat_summary(fun = mean, geom = "line", colour = "black", alpha = 0.7) +
+  theme_bw(base_family = "GillSans", base_size = 14) +
+  labs(y = ylabs, x = "Assay") +
+  scale_color_manual("", values = pHpalette) + # c("#4575b4", "#d73027")
+  scale_fill_manual("", values = pHpalette) + # c("#4575b4", "#d73027")
+  # scale_y_continuous(breaks = seq(0, 0.11, by = 0.02), limits = c(0,0.11))
+  scale_y_continuous("",breaks = breaks, limits = lim)
