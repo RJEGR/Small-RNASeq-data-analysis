@@ -11,129 +11,76 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 library(tidyverse)
 
-wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+# wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+# 
 
-dds <- read_rds(paste0(wd, "/DDS_DESEQ2.rds"))
+wd <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/res"
+
+
+dds <- read_rds(paste0(wd, "/SEQUENCES_MERGED_DDS_DESEQ2.rds"))
 
 # RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")) %>% filter( padj < 0.05) 
 
 
-RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05  & abs(log2FoldChange) > 1) %>%
+RES.P <- read_tsv(list.files(path = wd, pattern = "DESEQ_RES.tsv", full.names = T)) %>% 
+  filter( padj < 0.05  & abs(log2FoldChange) > 1) %>%
   mutate(star = ifelse(padj <.001, "***", 
     ifelse(padj <.01, "**",
       ifelse(padj <.05, "*", "")))) 
 
 RES.P %>% dplyr::count(CONTRAST)
 
-RES.P %>% select(Family, log2FoldChange, CONTRAST) %>% 
-  group_by(Family, CONTRAST) %>% 
-  filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
-  summarise(log2FoldChange = sum(log2FoldChange)) %>%
-  view()
+.colData <- as_tibble(SummarizedExperiment::colData(dds)) # %>% dplyr::select(contains(c("LIBRARY_ID","hpf", "pH")))
 
 
-# OMIT
-# Only mirs upexpressed under low pH
+# WHICH MIRS REGARDING ACIDIFICATION
+WHICH_CONT <- c("CONTRAST_A", "CONTRAST_B")
 
-RES.P <- RES.P %>% filter(log2FoldChange < 0)
+query.genes <- RES.P %>% filter(CONTRAST %in% WHICH_CONT) %>% pull(MajorRNA)
 
-RES.P %>% dplyr::count(CONTRAST)
+sort.genes <- RES.P %>% filter(CONTRAST %in% WHICH_CONT) %>% pull(Name)
+  # group_by(CONTRAST) %>% arrange(log2FoldChange) %>% pull(Name)
 
-# read_tsv(paste0(wd, "SRNA2MIRGENEDB.tsv"))
+cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[query.genes,]
 
-CONTRAST <- as_tibble(SummarizedExperiment::colData(dds)) %>% dplyr::select(starts_with("CONTRAST")) %>% names()
+# heatmap(cnts)
 
-recode_to <- structure(c("24 HPF", "110 HPF", "Ctrl pH", "Low pH"), names = CONTRAST)
+z_scores <- function(x) {(x-mean(x))/sd(x)}
 
-out <- list()
+heatmap(cnts <- apply(cnts, 1, z_scores))
 
-for (j in 1:length(CONTRAST)) {
-  
-  i <- j
-  
-  cat("\nRunning ",CONTRAST[i], "\n")
-  
-  intgroup <- CONTRAST[i]
-  
-  .colData <- as_tibble(SummarizedExperiment::colData(dds)) %>% 
-    dplyr::select(contains(c("LIBRARY_ID",intgroup))) %>% drop_na(any_of(intgroup))
-  
-  which_group <- RES.P %>% filter(CONTRAST == intgroup)
-  
-  query.genes <- which_group %>% distinct(Name) %>% pull()
-  
-  cat("\nUsing ",length(query.genes), " DE genes\n")
-  
-  # DESeq2 performs an internal normalization where geometric mean is calculated for each gene across all samples.
-  # i.e. median of ratios (https://doi.org/10.1186/gb-2010-11-10-r106)
-  # Details: https://hbctraining.github.io/DGE_workshop/lessons/02_DGE_count_normalization.html
-  
-  cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[query.genes,]
-  
-  # cnts <- DESeq2::varianceStabilizingTransformation(round(cnts))
-  
-  
-  DF <- cnts %>% as_tibble(rownames = "Name") %>% 
-    pivot_longer(-Name, names_to = "LIBRARY_ID", values_to = "count")
-  
-  DF <- RES.P %>% distinct(Name, Family) %>% 
-    right_join(DF, by = "Name") %>% 
-    left_join(.colData, by = "LIBRARY_ID") %>%
-    drop_na(any_of(intgroup)) %>%
-    mutate(CONTRAST = intgroup)
-  
-  names(DF)[names(DF) %in% intgroup] <- "Design"
-  
-  out[[i]] <-  DF
 
-}
+DF <- t(cnts) %>% as_tibble(rownames = "MajorRNA") %>% 
+  pivot_longer(-MajorRNA, names_to = "LIBRARY_ID", values_to = "count")
 
-do.call(rbind, out) -> DF
+DF <- RES.P %>% distinct(Name, MajorRNA) %>% 
+  right_join(DF, by = "MajorRNA") %>% 
+  left_join(.colData, by = "LIBRARY_ID") %>%
+  mutate(Name = factor(Name, levels = unique(sort.genes)))
+  # drop_na(any_of(intgroup)) %>%
+  # mutate(CONTRAST = intgroup)
 
-DF %>% distinct(Name, CONTRAST) %>% dplyr::count(CONTRAST)
-
-# CONTRAST A AND B) ====
-
-intgroup <- CONTRAST[1:2]
-
-which_group <- RES.P %>% filter(CONTRAST %in% intgroup)
-
-which_group <- which_group %>%
-  arrange(log2FoldChange) %>%
-  group_by(Family) %>% 
-  sample_n(1)
-
-LOGFC_LABELLER <- which_group  %>% 
-  arrange(CONTRAST) %>%
-  mutate(log2FoldChange = paste0(Family, " (",log2FoldChange,") ", star)) %>%
-  dplyr::select(Family, log2FoldChange) %>%
-  pull(log2FoldChange, Family)
-
-# downg <- which_group %>% filter(log2FoldChange < 0) %>% pull(Name)
-
-str(LOGFC_LABELLER)
+# names(DF)[names(DF) %in% intgroup] <- "Design"
 
 fun.data.trend <- "mean_se" # "mean_cl_boot", "mean_sdl"
 
-recode_to_AB <- structure(c("pH 8.0", "pH 7.6"), names = c("Control", "Low"))
-
-ylab <- expression('Expresión'~ '(' *log[2]* ')')  
 
 DF %>%
-  filter(CONTRAST %in% intgroup) %>% 
-  arrange(count) %>% group_by(Family, LIBRARY_ID, Design, CONTRAST) %>% sample_n(1) %>%
-  dplyr::mutate(CONTRAST = dplyr::recode(CONTRAST, !!!recode_to)) %>%
-  dplyr::mutate(Design = dplyr::recode(Design, !!!recode_to_AB)) %>%
-  mutate(CONTRAST = factor(CONTRAST, levels = recode_to[1:2])) %>%
-  mutate(Design = factor(Design, levels = recode_to_AB)) %>%
+  # arrange(count) %>% 
+  # group_by(Family, LIBRARY_ID, Design, CONTRAST) %>% sample_n(1) %>%
+  # dplyr::mutate(CONTRAST = dplyr::recode(CONTRAST, !!!recode_to)) %>%
+  # dplyr::mutate(Design = dplyr::recode(Design, !!!recode_to_AB)) %>%
+  # mutate(CONTRAST = factor(CONTRAST, levels = recode_to[1:2])) %>%
+  # mutate(Design = factor(Design, levels = recode_to_AB)) %>%
   # mutate(Name = factor(Name, levels = unique(names(LOGFC_LABELLER)))) %>%
-  ggplot(aes(x = Design, y=log2(round(count)+1), group = Family)) +
+  ggplot(aes(x = as.factor(pH), y=count, group = as.factor(hpf), color = as.factor(hpf))) +
+  facet_wrap(~ Name) +
   # facet_wrap(CONTRAST ~ Family, labeller = labeller(Family = LOGFC_LABELLER), scales = "free_y") +
-  ggh4x::facet_nested_wrap(~ CONTRAST+Family, labeller = labeller(Family = LOGFC_LABELLER), scales = "free_y", nest_line = F) +
+  # ggh4x::facet_nested_wrap(~ CONTRAST+Family, labeller = labeller(Family = LOGFC_LABELLER), scales = "free_y", nest_line = F) +
   geom_jitter(position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +
-  stat_summary(fun.data = fun.data.trend, colour = "red", linewidth = 0.7, size = 0.7, alpha = 0.7) +
-  stat_summary(fun = mean, geom = "line", colour = "red") +
-  labs(y = ylab, x = "") +
+  stat_summary(fun.data = fun.data.trend, linewidth = 0.7, size = 0.7, alpha = 0.7) +
+  stat_summary(fun = mean, geom = "line") +
+  # labs(y = ylab, x = "") +
   theme_bw(base_family = "GillSans", base_size = 11) +
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
     panel.border = element_blank(),
@@ -147,220 +94,73 @@ DF %>%
     axis.text.x = element_text(angle = 0, size = 10)) -> p
 
 
+p
 # 
 ggsave(p, filename = 'DESEQ2UPEXPRESSED_MIRS_IN_REPONSE_TO_LOW_PH.png', path = wd, width = 7, height = 5, device = png, dpi = 300)
 
-# 2) CONTRAST C AND D) ====
+# exit
 
-intgroup <- CONTRAST[3:4]
 
-RES.P <- RES.P %>% filter(log2FoldChange <= -1)
 
-which_group <- RES.P %>% filter(CONTRAST %in% intgroup)
+h <- heatmap(t(cnts), col = cm.colors(12), keep.dendro = T)
 
-which_unique <- which_group %>%
-  group_by(Name) %>%
-  summarise(
-    across(CONTRAST, .fns = list), 
-    n = n(),
-    .groups = "drop_last") %>% filter(n == 1) %>% pull(Name)
+hc_samples <- as.hclust(h$Colv)
+plot(hc_samples)
+hc_order <- hc_samples$labels[h$colInd]
 
-which_group <- which_group %>% filter(Name %in% which_unique)
+hc_mirs <- as.hclust(h$Rowv)
+plot(hc_mirs)
+order_mirs <- hc_mirs$labels[h$rowInd]
 
-intgroup <- CONTRAST[4]
 
-LOGFC_LABELLER <- which_group  %>% 
-  filter(CONTRAST %in% intgroup) %>%
-  arrange(CONTRAST) %>%
-  mutate(log2FoldChange = paste0(Family, " (",log2FoldChange,")")) %>%
-  dplyr::select(Family, log2FoldChange) %>%
-  pull(log2FoldChange, Family)
+DATA <- t(cnts) %>% 
+  as_tibble(rownames = 'MajorRNA') %>%
+  pivot_longer(-MajorRNA, values_to = 'fill', names_to = "LIBRARY_ID") %>%
+  left_join(.colData, by = "LIBRARY_ID") %>%
+  mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = rev(hc_order))) %>%
+  mutate(MajorRNA = factor(LIBRARY_ID, levels = unique(order_mirs))) 
 
-str(LOGFC_LABELLER)
+library(ggh4x)
 
-fun.data.trend <- "mean_se" # "mean_cl_boot", "mean_sdl"
-
-recode_to_CD <- structure(c("110 HPF", "24 HPF"), names = c("Competent", "Control"))
-
-DF %>%
-  filter(CONTRAST %in% intgroup) %>% 
-  filter(Name %in% which_unique) %>%
-  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
-  dplyr::mutate(Design = dplyr::recode_factor(Design, !!!recode_to_CD)) %>%
-  mutate(Name = factor(Name, levels = unique(names(LOGFC_LABELLER)))) %>%
-  ggplot(aes(x = Design, y=log2(round(count)+1), group = Family)) +
-  # facet_wrap(CONTRAST ~ Family, labeller = labeller(Family = LOGFC_LABELLER), scales = "free_y") +
-  ggh4x::facet_nested_wrap(~ CONTRAST+Family, labeller = labeller(Family = LOGFC_LABELLER), scales = "free_y", nest_line = F) +
-  geom_jitter(position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +
-  stat_summary(fun.data = fun.data.trend, colour = "red", linewidth = 0.7, size = 0.7, alpha = 0.7) +
-  stat_summary(fun = mean, geom = "line", colour = "red") +
-  labs(y = "Expression (Log2)", x = "") +
-  theme_bw(base_family = "GillSans", base_size = 11) +
-  theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
+DATA %>%
+  dplyr::mutate(pH = dplyr::recode_factor(pH, !!!c(`Low` = "pH 7.6",`Control` = "pH 8.0"))) %>%
+  dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!c(`24` = "24 hpf", `110` = "110 hpf"))) %>%
+  ggplot(aes(x = LIBRARY_ID, y = MajorRNA, fill = fill)) +  
+  geom_tile(linewidth = 0.2) +
+  # facet_grid(~ hpf+pH, scales = "free_x") +
+  ggsci::scale_fill_gsea(name = "", reverse = T) +
+  ggsci::scale_color_gsea(name = "", reverse = T) +
+  # scale_x_discrete(position = 'bottom') +
+  # ggh4x::scale_x_dendrogram(hclust = hc_samples, position = "top", labels = NULL) 
+  # guides(x.sec = guide_axis_manual(labels = hc_order, label_size = 5, label_family = "GillSans")) 
+  # ggh4x::scale_y_dendrogram(hclust = hc_mirs, position = "left", labels = NULL) +
+  # guides(y.sec = guide_axis_manual(labels = order_mirs, label_size = 5, label_family = "GillSans")) +
+  theme_bw(base_size = 7, base_family = "GillSans") +
+  labs(x = '', y = '') +
+  theme(
+    legend.position = "bottom",
+    # axis.text.x = element_blank(),
+    # axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 5),
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
     panel.border = element_blank(),
     plot.title = element_text(hjust = 0),
     plot.caption = element_text(hjust = 0),
     panel.grid.minor.y = element_blank(),
     panel.grid.major.y = element_blank(),
     panel.grid.minor.x = element_blank(),
-    # axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 0, size = 2.5),
-    axis.text.y = element_text(angle = 0, size = 7),
-    axis.text.x = element_text(angle = 90, size = 10)) -> p
+    panel.grid.major.x = element_blank()) -> P
 
+P <- P + ggh4x::facet_nested(~ hpf+pH, nest_line = T, scales = "free_x", space = "free_x") +
+  theme(strip.background = element_rect(fill = 'white', color = 'white')) 
 
-# 
-ggsave(p, filename = 'DESEQ2UPEXPRESSED_MIRS_IN_DEVELOPMENT_IN_REPONSE_TO_LOW_PH.png', path = wd, width = 5, height = 4.5, device = png, dpi = 300)
+P <- P + guides(
+  fill = guide_colorbar(barwidth = unit(1.5, "in"),
+    barheight = unit(0.05, "in"), label.position = "bottom",
+    alignd = 0.5,
+    ticks.colour = "black", ticks.linewidth = 0.5,
+    frame.colour = "black", frame.linewidth = 0.5,
+    label.theme = element_text(family = "GillSans", size = 7)))
 
-# UPGRADE ====
-# EXCLUSIVE FROM THE 2_DESEQ2BARPLOT.R
+P
 
-.UPSETDF <- read_rds(paste0(wd, "UPSETDF.rds"))
-
-EXCLUSIVE_MIRS <- .UPSETDF[[1]] %>% ungroup() %>%  
-  mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family))
-
-INTERSECTED_MIRS <- .UPSETDF[[2]]  %>% ungroup() %>%  
-  mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family))
-
-EXCLUSIVE_MIRS %>% 
-  # distinct(Family, SIGN, CONTRAST) %>% 
-  dplyr::count(CONTRAST, SIGN, sort = T) 
-
-INTERSECTED_MIRS %>% 
-  # distinct(Family, SIGN, CONTRAST) %>% 
-  dplyr::count(CONTRAST, SIGN, sort = T) 
-
-
-RES.P %>% 
-  # filter(Name %in% which_unique) %>% 
-  mutate(SIGN = sign(log2FoldChange)) %>%
-  distinct(Name, CONTRAST, SIGN) %>% 
-  dplyr::count(CONTRAST, SIGN, sort = T) %>% view()
-
-str(which_unique <- EXCLUSIVE_MIRS %>% 
-    filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
-    distinct(Name) %>% pull())
-
-
-str(which_unique <- RES.P %>% 
-    filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
-    distinct(Name) %>% pull())
-
-RES.P %>%
-  mutate(SIGN = sign(log2FoldChange)) %>%
-  distinct(Name, Family, CONTRAST, SIGN) %>%
-  mutate(Family = ifelse(Name %in% which_unique, paste0(Family, " *"), Family)) %>%
-  pivot_wider(names_from = CONTRAST, values_from = SIGN, values_fill = 0) %>% view()
-  # dplyr::count(CONTRAST, SIGN, sort = T)
-#   mutate(CONTRAST = ifelse(SIGN == -1 & CONTRAST %in% c("CONTRAST_C"), "110 HPF (Ctr)", CONTRAST)) %>%
-#   mutate(sampleB = ifelse(SIGN == -1 & CONTRAST %in% c("CONTRAST_D"), "110 HPF (Low)", sampleB)) %>%
-#   mutate(sampleB = ifelse(SIGN == -1 & CONTRAST %in% c("CONTRAST_A"), "pH 7.6", sampleB)) %>%
-#   mutate(sampleB = ifelse(SIGN ==  1 & CONTRAST %in% c("CONTRAST_A", "CONTRAST_B"), "pH 8.0", sampleB))
-# dplyr::count(CONTRAST, SIGN, sort = T)
-
-  
-# divide the counts by the size factors or normalization factors before
-barplot(cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[which_unique,])
-
-barplot(cnts <- DESeq2::varianceStabilizingTransformation(round(cnts)))
-
-# as z score
-
-cnts <- t(scale(t(cnts)))
-
-DF <- cnts %>% as_tibble(rownames = "Name") %>% 
-  pivot_longer(-Name, names_to = "LIBRARY_ID", values_to = "count")
-
-
-MTD <- as_tibble(SummarizedExperiment::colData(dds)) %>% dplyr::select(LIBRARY_ID, colName,hpf, pH)
-
-DF <- RES.P %>% distinct(Name, Family) %>% 
-  right_join(DF, by = "Name") %>% 
-  mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family)) %>%
-  group_by(LIBRARY_ID, Family) %>% 
-  summarise(count = sum(count)) %>%
-  left_join(MTD, by = "LIBRARY_ID")
-
-# SPLIT MIRS IN RESPONSE TO LOW-PH DURING 24 AND 110 HPF:
-
-# SORT_AB <- RES.P %>% 
-#   mutate(SIGN = sign(log2FoldChange)) %>%
-#   distinct(Name, Family, CONTRAST, SIGN) %>% 
-#   # mutate(Family = ifelse(Name %in% which_unique, paste0(Family, " *"), Family)) %>%
-#   mutate(Family = ifelse(!grepl("Cluster", Family), toupper(Family), Family)) %>%
-#   filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
-#   arrange(Family) %>%
-#   distinct(Family) %>% pull()
-
-
-unique(DF$Family)
-
-recode_to_hpf <- structure(c("24 HPF", "110 HPF"), names = c("24", "110"))
-
-recode_to_pH <- structure(c("pH 8.0", "pH 7.6"), names = c("Control", "Low"))
-
-
-scale_col_pH <- structure(c("#3B4992FF","#EE0000FF"), names = c("pH 8.0", "pH 7.6"))
-
-
-fun.data.trend <- "mean_se" # "mean_cl_boot", "mean_sdl"
-
-
-str(SORT_MIRS <- c("MIR-278","LET-7","MIR-133",
-  "Cluster_55760","Cluster_55776","MIR-2","MIR-315", "MIR-153", "BANTAM", "MIR-190", "MIR-2722", "MIR-1988", 
-  "MIR-92", "MIR-277B", "MIR-216"))
-
-
-
-DF %>%
-  ungroup() %>%
-  dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf, .ordered = T)) %>%
-  dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_pH)) %>%
-  mutate(Family = factor(Family, levels = SORT_MIRS)) %>%
-  # mutate(y = log2(round(count)+1)) %>%
-  mutate(y = count) %>%
-  ggplot(aes(x = hpf, y = y, color = pH, fill = pH, group = pH)) +
-  facet_wrap(~ Family, scales = "free_y") +
-  geom_jitter(position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +
-  stat_summary(fun.data = fun.data.trend, linewidth = 0.7, size = 0.7, alpha = 0.7) +
-  stat_summary(fun = mean, geom = "line") +
-  labs(y = "Read Count", x = "") +
-  scale_color_manual("", values = scale_col_pH) +
-  scale_fill_manual("", values =  scale_col_pH) +
-  theme_bw(base_family = "GillSans", base_size = 11) +
-  theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
-    legend.position = "top",
-    panel.border = element_blank(),
-    plot.title = element_text(hjust = 0),
-    plot.caption = element_text(hjust = 0),
-    panel.grid.minor.y = element_blank(),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.y = element_text(angle = 0, size = 7),
-    axis.text.x = element_text(angle = 90, size = 10)) -> p
-
-ggsave(p, filename = 'DESEQ2LINEPLOT_ONLY_DEGS.png', path = wd, width = 5, height = 5, device = png, dpi = 300)
-
-
-DF %>%
-  dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to_hpf)) %>%
-  dplyr::mutate(pH = dplyr::recode_factor(pH, !!!recode_to_pH)) %>%
-  group_by(hpf, pH, Family) %>% summarise(mean = mean(count), sd = sd(count)) %>% view()
-
-# out <- list()
-
-# 
-# for (i in query.genes) {
-#   
-#   Name <- i
-#   
-#   # which(res$transcript_id == gene)
-#   
-#   df <- plotCounts(dds, gene=Name, intgroup = intgroup, returnData=TRUE, normalized = T, transform = F)
-#   
-#   df <- data.frame(df, Name)  # %>% as_tibble(rownames = "LIBRARY_ID") 
-#   
-#   out[[i]] <-  df
-# }
-
-# head(DF <- do.call(rbind, out))
