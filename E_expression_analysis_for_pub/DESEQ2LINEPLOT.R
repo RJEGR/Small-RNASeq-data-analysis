@@ -14,7 +14,7 @@ library(tidyverse)
 # wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 # 
 
-wd <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/res"
+wd <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
 
 dds <- read_rds(paste0(wd, "/SEQUENCES_MERGED_DDS_DESEQ2.rds"))
