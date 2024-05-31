@@ -157,6 +157,7 @@ do.call(rbind, out) -> RES
 
 RES <- RES %>% dplyr::rename("MajorRNA" = "Name")
 
+
 # deal w/ duplication ids due to random seed sequences and 5p/3p label
 
 dup_majorRNA <- read_tsv(paste0(path, "SRNA2MIRGENEDB.tsv")) %>% 
@@ -179,7 +180,7 @@ RES <- RES %>%
 
 
 
-view(RES)
+# view(RES)
 
 # RECODE 7 MIRS FAMILY FROM MIRBASE/MOLLUSC DB (FROM 4_MIR_PAIRWISEALIGNMENT.R)
 
@@ -201,7 +202,9 @@ RES <- RES %>%
   mutate(MirGeneDB_ID = ifelse(is.na(MirGeneDB_ID), MajorRNA, MirGeneDB_ID)) %>%
   dplyr::mutate(MirGeneDB_ID = dplyr::recode(MirGeneDB_ID, !!!recode_mir))
 
-RES <- RES %>% mutate(Name = ifelse(grepl("^MIR", MirGeneDB_ID), MirGeneDB_ID, Name))
+RES <- RES %>% dplyr::mutate(MirGeneDB_ID = ifelse(!grepl("^[U|A|C|G]", MirGeneDB_ID), MirGeneDB_ID, Name))
+
+# RES <- RES %>% mutate(Name = ifelse(grepl("^MIR", MirGeneDB_ID), MirGeneDB_ID, Name))
 
 write_tsv(RES, file = file.path(path_out, "SEQUENCES_MERGED_DESEQ_RES.tsv"))
 
