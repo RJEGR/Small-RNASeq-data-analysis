@@ -1,5 +1,12 @@
 
 # UPGRADE VERSION OF 3_DESEQ2TOPGO.R
+# 2) TEST RUN TOPGO ANALYSIS FOR MAJORRNA MODE (NOT YET)
+# 3) TEST RUN TOPGO ANALYSIS USING CONTRAST MODE (RUN)
+# 4) REDOING THIS FOR SEMANTIC SEARCH (RUN FOR EACH majorRNA)
+# 5) WRAP THE CODE USING APPLY
+
+# 6) SEPARATE FIGURE BASED ON CONTRAST C (CONTRAST BIOLOGICAL PROCESS DEPENDENT ON THE TIME (HPF))
+# 7) SEPARATE FIGURE BASED ON CONTRAST A/B (CONTRAST BIOLOGICAL PROCESS DEPENDENT ON THE ACIDIFICATION STRESS)
 
 rm(list = ls())
 
@@ -9,39 +16,304 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 library(tidyverse)
 
-wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
-RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05 & abs(log2FoldChange) > 1)
-
-RES.P %>% dplyr::count(CONTRAST)
+# wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
-print(.SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
+orgdb <- "org.Ce.eg.db"
 
-URL <- "https://raw.githubusercontent.com/RJEGR/Small-RNASeq-data-analysis/master/FUNCTIONS.R"
+semdata <- read_rds(paste0(wd, orgdb, ".rds"))
 
-source(URL)
+wd <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
-SRNA2GO <- .SRNA2GO %>%
-  filter(predicted == "BOTH") %>%
-  mutate(query = strsplit(query, ";")) %>%
-  unnest(query) %>% 
-  distinct(query, GO.ID) %>%
-  group_by(query) %>%
+# SEQUENCES_MERGED_DESEQ_RES.tsv
+
+f <- list.files(path = wd, pattern = "DESEQ_RES.tsv", full.names = T)
+
+RES.P <- read_tsv(f) %>% 
+  filter( padj < 0.05  & abs(log2FoldChange) > 1)
+
+
+# RES.P <- read_tsv(paste0(wd, "DESEQ_RES.tsv")) %>% filter( padj < 0.05 & abs(log2FoldChange) > 1)
+
+RES.P %>% dplyr::count(CONTRAST)
+
+# wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
+
+# print(.SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
+
+pattern <- "SEQUENCES_MERGED_MIRNA_TARGET_DB.tsv"
+
+print(SRNA2GO <- read_tsv(list.files(path = wd, pattern = pattern, full.names = T)))
+
+SRNA2GO <- SRNA2GO %>% drop_na(GO.ID)
+
+# use MajorRNA to doing the test (working)
+
+MajorRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$MajorRNA)
+
+MajorRNA2GO <- lapply(MajorRNA2GO, unlist)
+
+str(lapply(MajorRNA2GO, length))
+
+# keep query genes
+WHICH_CONTRAST <- c("CONTRAST_A", "CONTRAST_B")
+
+query.p <- RES.P %>% filter(CONTRAST %in% WHICH_CONTRAST) %>% pull(log2FoldChange, name = MajorRNA)
+
+keep <- names(MajorRNA2GO) %in% names(query.p)
+
+gene2GO <- MajorRNA2GO[keep]
+
+OUT <- lapply(gene2GO, function(x) SEMANTIC_SEARCH(x, semdata = semdata))
+
+print(data <- dplyr::bind_rows(OUT, .id = "MajorRNA") %>% as_tibble())
+
+data <- RES.P %>% 
+  filter(CONTRAST %in% WHICH_CONTRAST) %>% 
+  distinct(MajorRNA, MirGeneDB_ID) %>%
+  right_join(data, by = "MajorRNA")
+
+data <- data %>% 
+  group_by(MirGeneDB_ID, parentTerm) %>%
+  # summarise(size = sum(size)) %>%
+  mutate(fraq_size = size+1 / max(size+1))
+
+
+data %>% 
+  group_by(MirGeneDB_ID, parentTerm) %>% dplyr::count() %>% view()
+
+# data %>% group_by(MajorRNA) %>% count(parentTerm, sort = T)
+
+
+write_tsv(data, file = paste0(wd, "DESEQ2REVIGO_UNDER_ACIDIF.tsv"))
+
+which_dup <- data %>% distinct(DE ,parentTerm) %>% dplyr::count(parentTerm) %>% filter(n == 2) %>% pull(parentTerm)
+
+recode_to <- structure(c("24 hpf", "110 hpf", "110 hpf"),names = c("24 HPF", "110 HPF", "-110 HPF"))
+
+data %>%
+  # filter(!parentTerm %in% which_dup) %>%
+  group_by(DE ,parentTerm) %>%
+  summarise(size = sum(size)) %>%
+  mutate(size = size / max(size)) %>%
+  filter(size > 0) %>%
+  ungroup() %>%
+  mutate(size = ifelse(DE %in% "-110 HPF", -size, size)) %>%
+  dplyr::mutate(DE = dplyr::recode_factor(DE, !!!recode_to)) %>%
+  # mutate(DE = factor(DE, levels = c("24 HPF", "110 HPF"))) %>%
+  mutate(parentTerm = fct_reorder2(parentTerm, DE, size, .desc = F)) %>%
+  ggplot(aes(y = parentTerm, x = size, fill = DE, color = DE)) + # 
+  geom_vline(xintercept = 0, linetype="dashed", alpha=0.5) +
+  geom_segment(aes(x = size, xend = 0, yend = parentTerm), size = 3) +
+  ggh4x::facet_nested(DE~ ., nest_line = F, scales = "free_y", space = "free_y") +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  labs(x = "", y = "") +
+  scale_color_manual("", values = c("#DADADA", "#D4DBC2")) +
+  scale_fill_manual("", values =  c("#DADADA", "#D4DBC2")) +
+  theme(legend.position = "top",
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_line(linetype = "dashed", linewidth = 0.5),
+    axis.text.y = element_text(angle = 0, size = 10),
+    axis.text.x = element_text(size = 10)) -> p
+
+
+
+# 
+# Use CONTRAST to create the Contrast2GO
+
+# SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$MajorRNA)
+# SRNA2GO <- lapply(SRNA2GO, unlist)
+
+CONTRAST2GO <- SRNA2GO %>% group_by(MajorRNA) %>%
+  group_by(MajorRNA) %>%
   summarise(
     across(GO.ID, .fns = paste_go), 
-    .groups = "drop_last")
+    .groups = "drop_last") %>%
+  right_join(RES.P, by = "MajorRNA") %>%
+  mutate(dir = ifelse(sign(log2FoldChange) == -1, "__sampleB","__sampleA"), 
+    CONTRAST = paste0(CONTRAST, dir)) %>%
+  dplyr::select(MajorRNA, log2FoldChange, padj, CONTRAST, GO.ID)
 
-SRNA2GO <- SRNA2GO %>% 
-  separate(query, into = c("query", "arm"), sep = "[.]") %>%
-  filter(arm == "mature")
 
-.SRNA2GO <- SRNA2GO
 
-SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$query)
+LOOP <- CONTRAST2GO %>% distinct(CONTRAST) %>% pull()
 
-SRNA2GO <- lapply(SRNA2GO, unlist)
+allRes <- list()
+
+for (i in LOOP) {
+  
+  cat("\nUsing ",i, " group...\n")
+  
+  genes2GO <- CONTRAST2GO %>% 
+    filter(CONTRAST %in% i) %>%
+    group_by(MajorRNA) %>% sample_n(1) 
+  
+  p <- genes2GO %>% pull(log2FoldChange, name = MajorRNA)
+  
+  q <- names(p)
+  
+  # genes2GO <- CONTRAST2GO # To increase de universe of data
+  
+  genes2GO <- split(strsplit(genes2GO$GO.ID, ";") , genes2GO$MajorRNA)
+  genes2GO <- lapply(genes2GO, unlist)
+  
+  n <- lapply(genes2GO[names(genes2GO) %in% q], length)[[1]]
+  
+  cat("\nUsing ",n, " GO terms\n")
+  
+  cat("\nIn group ",i, "\n")
+  
+  df <- GOenrichment(p, q, genes2GO, Nodes = 10, onto = "BP") # mapping = NULL
+  
+  allRes[[i]] <- data.frame(df, CONTRAST = i)
+}
+
+DF1 <- do.call(rbind, allRes) %>% as_tibble()
+
+DF1 %>%
+  mutate(classicKS = as.double(classicKS), elimKS = as.double(elimKS)) %>%
+  mutate(size = Annotated / max(Annotated) * 4) %>% 
+  ggplot() + geom_point(aes(classicKS, elimKS, size = size))
+
+DF1 %>% count(CONTRAST)
+
+recode_cont <- 
+  c("CONTRAST_A__sampleB",
+  "CONTRAST_B__sampleA",
+  "CONTRAST_B__sampleB",
+  "CONTRAST_C__sampleA",
+  "CONTRAST_C__sampleB",
+  "CONTRAST_D__sampleA",
+  "CONTRAST_D__sampleB")
+
+recode_cont <- structure(c("24 hpf:pH 7.6",
+  "110 hpf:pH 8.0",
+  "110 hpf:pH 7.6",
+  "24 hpf:pH 8.0",
+  "110 hpf:pH 8.0",
+  "24 hpf:pH 7.6",
+  "110 hpf:pH 7.6"), 
+  names = recode_cont)
+
+
+recode_hpf <- structure(c("A) 24 hpf", "B) 110 hpf"),names = c("24 hpf", "110 hpf"))
+
+# SEPARATE FIGURE BASED ON CONTRAST C (CONTRAST BIOLOGICAL PROCESS DEPENDENT ON THE TIME (HPF))
+
+DF1 %>% 
+  filter(grepl("CONTRAST_C|CONTRAST_D", CONTRAST)) %>%
+  mutate(.CONTRAST = CONTRAST) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_cont, .ordered = T)) %>%
+  separate(CONTRAST, into = c("Time", "pH"), sep = ":") %>%
+  dplyr::mutate(Time = dplyr::recode_factor(Time, !!!recode_hpf, .ordered = T)) %>%
+  group_by(Time) %>%
+  arrange(desc(Annotated)) %>%
+  mutate(Label = Term, row_number = row_number(Label)) %>%
+  mutate(Label = factor(paste(Label, row_number, sep = "__"), 
+    levels = rev(paste(Label, row_number, sep = "__")))) %>%
+  ggplot(aes(y = Label, x = Annotated, color = p.adj.ks)) + # fill = col, color = col)
+  scale_y_discrete(labels = function(x) gsub("__.+$", "", x)) +
+  geom_segment(aes(x = Annotated, xend = 0, yend = Label), linewidth = 4) +
+  ggh4x::facet_nested(Time ~., nest_line = F, scales = "free_y", space = "free_y") +
+  # scale_color_manual("", values = scale_col) +
+  # scale_fill_manual("", values =  scale_col) +
+  theme_bw(base_family = "GillSans", base_size = 12) +
+  labs(x = "", y = "") +
+  theme(legend.position = "top",
+    strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_line(linetype = "dashed", linewidth = 0.5),
+    axis.text.y = element_text(angle = 0, size = 5),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, size = 10))
+
+# SEPARATE FIGURE BASED ON CONTRAST A/B (CONTRAST BIOLOGICAL PROCESS DEPENDENT ON THE ACIDIFICATION STRESS)
+
+DF1 %>% 
+  filter(grepl("CONTRAST_A|CONTRAST_B", CONTRAST)) %>%
+  mutate(.CONTRAST = CONTRAST) %>%
+  dplyr::mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_cont, .ordered = T)) %>%
+  separate(CONTRAST, into = c("Time", "pH"), sep = ":") %>%
+  dplyr::mutate(Time = dplyr::recode_factor(Time, !!!recode_hpf, .ordered = T)) %>%
+  group_by(Time) %>%
+  arrange(desc(Annotated)) %>%
+  mutate(Label = Term, row_number = row_number(Label)) %>%
+  mutate(Label = factor(paste(Label, row_number, sep = "__"), 
+    levels = rev(paste(Label, row_number, sep = "__")))) %>%
+  ggplot(aes(y = Label, x = Annotated, color = p.adj.ks)) + # fill = col, color = col)
+  scale_y_discrete(labels = function(x) gsub("__.+$", "", x)) +
+  geom_segment(aes(x = Annotated, xend = 0, yend = Label), linewidth = 4) +
+  ggh4x::facet_nested(Time ~., nest_line = F, scales = "free_y", space = "free_y") 
+
+  
+  # exit
+
+# CONTRAST2GO <- split(strsplit(CONTRAST2GO$GO.ID, ";") , CONTRAST2GO$CONTRAST)
+# CONTRAST2GO <- lapply(CONTRAST2GO, unlist)
+# lapply(CONTRAST2GO, length)
+
+OUT <- lapply(CONTRAST2GO, function(x) GOenrichment(x, Nodes = 10, onto = "BP"))
+
+print(data <- dplyr::bind_rows(OUT, .id = "DE") %>% as_tibble())
+
+WCONTRAST <- "CONTRAST_A"
+
+query.names <- RES.P %>% filter(CONTRAST %in% WCONTRAST) %>% 
+  # filter(log2FoldChange < 0) %>%
+  distinct(MajorRNA) %>% pull()
+
+names_under_OA_24 <- query.names
+
+.SRNA2GO <- split(strsplit(SRNA2GO$GO.ID, ";") , SRNA2GO$MajorRNA)
+.SRNA2GO <- lapply(.SRNA2GO, unlist)
+
+str(query.names <- query.names[query.names %in% names(.SRNA2GO)])
+
+cat("\nUsing ",length(query.names), " QUERY Names...\n")
+
+
+
+query.p <- RES.P %>% 
+  group_by(MajorRNA) %>% sample_n(1) %>% 
+  pull(pvalue, name = MajorRNA)
+
+query.p <- query.p[match(query.names, names(query.p))]
+
+identical(names(query.p), query.names)
+
+allRes <- list()
+
+for (i in 1:length(query.names)) {
+  
+  q <- query.names[i]
+  
+  cat("\nUsing ",q, " Names...\n")
+  
+  n <- lapply(SRNA2GO[names(SRNA2GO) %in% q], length)[[1]]
+  
+  cat("\nUsing ",n, " GO terms\n")
+  
+  p <- query.p[i]
+  
+  df <- GOenrichment(p, q, SRNA2GO, Nodes = 10, onto = "BP") # mapping = NULL
+  
+  allRes[[i]] <- data.frame(df, Name = q)
+}
+
+DF1 <- do.call(rbind, allRes) %>% as_tibble() %>% mutate(facet = WCONTRAST)
 
 
 # IF MAPPING 
@@ -58,14 +330,18 @@ WHICH_DB <- "org.Ce.eg.db"
 
 # write_rds(MAPPING, paste0(wd, WHICH_DB, ".rds"))
 
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
+
 MAPPING <- read_rds(paste0(wd, WHICH_DB, ".rds"))
 
 # 24 HPF UP EXPRESSED BY OA ====
+
+
 WCONTRAST <- "CONTRAST_A"
 
 query.names <- RES.P %>% filter(CONTRAST %in% WCONTRAST) %>% 
   filter(log2FoldChange < 0) %>%
-  distinct(Name) %>% pull()
+  distinct(MajorRNA) %>% pull()
 
 names_under_OA_24 <- query.names
 
@@ -74,8 +350,8 @@ str(query.names <- query.names[query.names %in% names(SRNA2GO)])
 cat("\nUsing ",length(query.names), " QUERY Names...\n")
 
 query.p <- RES.P %>% 
-  group_by(Name) %>% sample_n(1) %>% 
-  pull(pvalue, name = Name)
+  group_by(MajorRNA) %>% sample_n(1) %>% 
+  pull(pvalue, name = MajorRNA)
 
 query.p <- query.p[match(query.names, names(query.p))]
 
