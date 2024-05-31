@@ -31,7 +31,16 @@ barplot(cnts <- DESeq2::varianceStabilizingTransformation(round(cnts)))
 
 z_scores <- function(x) {(x-mean(x))/sd(x)}
 
-heatmap(M <- apply(cnts, 1, z_scores))
+c1 <- cnts[,grepl("HR24", colnames(cnts))]
+c2 <- cnts[,!grepl("HR24", colnames(cnts))]
+
+M1 <- apply(c1, 1, z_scores)
+M2 <- apply(c2, 1, z_scores)
+
+
+dim(M <- rbind(M1, M2))
+
+# heatmap(M <- apply(cnts, 1, z_scores))
 
 h <- heatmap(t(M), col = cm.colors(12), keep.dendro = T)
 
@@ -53,7 +62,7 @@ DATA <- M %>%
   mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = rev(hc_order)))
 
 
-labels <- RES.P %>% select(MajorRNA, Name)
+labels <- RES.P %>% select(MajorRNA, MirGeneDB_ID)
   # arrange(desc(Name)) %>%
   # group_by(Name) %>%
   # mutate(Label = Name, row_number = row_number(Label)) %>%
@@ -61,7 +70,7 @@ labels <- RES.P %>% select(MajorRNA, Name)
   #   levels = rev(paste(Label, row_number, sep = "__"))))
 
 
-labels <- structure(labels$Name, names = labels$MajorRNA)
+labels <- structure(labels$MirGeneDB_ID, names = labels$MajorRNA)
 
 labels <- labels[match(order_mirs, names(labels))]
 
@@ -70,8 +79,6 @@ identical(order_mirs, names(labels))
 order_mirs <- labels
 
 # order_mirs <- paste0(hc_order, " (", module_size, ")")
-
-
 
 
 lo = floor(min(DATA$fill))
@@ -84,7 +91,7 @@ DATA %>%
   dplyr::mutate(pH = dplyr::recode_factor(pH, !!!c(`Control` = "pH 8.0", `Low` = "pH 7.6"))) %>%
   dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!c(`24` = "24 hpf", `110` = "110 hpf"))) %>%
   ggplot(aes(x = LIBRARY_ID, y = MajorRNA, fill = fill)) +  
-  geom_tile(color = 'white', size = 0.7, width = 1) +
+  geom_tile(color = 'white', linewidth = 0.7, width = 1) +
   # facet_grid(~ hpf+pH, scales = "free_x") +
   scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
     na.value = "white", midpoint = mid, limit = c(lo, up),
