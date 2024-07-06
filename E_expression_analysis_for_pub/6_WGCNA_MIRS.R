@@ -1,5 +1,5 @@
 # WGCNA FOR ONLY MIRS
-# 
+# this version use the majorRNA sequences summarization
 
 # wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 # read_tsv(paste0(wd, "DESEQ2SRNATARGET.tsv"))
@@ -13,12 +13,20 @@ rm(list = ls());
 
 if(!is.null(dev.list())) dev.off()
 
-path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+path <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
-head(COUNT <- read_rds(paste0(path, "COUNT.rds"))) # ONLY MIRS
+f <- file.path(path, "IDENTICAL_SEQUENCES_MERGED_COUNT.rds")
 
-DB <- read_tsv(paste0(path, "DESEQ_RES.tsv")) %>% distinct(Name, Family)
+datExpr <- read_rds(f)
 
+datExpr <- as(datExpr, "matrix")
+
+# path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+# 
+# head(COUNT <- read_rds(paste0(path, "COUNT.rds"))) # ONLY MIRS
+
+# DB <- read_tsv(paste0(path, "DESEQ_RES.tsv")) %>% distinct(Name, Family)
+# 
 # MIRGENEDB <- read_tsv(paste0(path, "SRNA2MIRGENEDB.tsv")) %>% distinct(Name, Family, arm)
 # MIRGENEDB <- MIRGENEDB %>% mutate(Fam = Family) %>% tidyr::unite("MIR", c("Fam", "arm"), sep = "-") 
 # DB <- DB %>% left_join(MIRGENEDB)
@@ -26,20 +34,20 @@ DB <- read_tsv(paste0(path, "DESEQ_RES.tsv")) %>% distinct(Name, Family)
 
 # COLLAPSE BY FAM
 
-DB %>% dplyr::count(Name, sort = T)
-
-COUNT <- COUNT %>% as_tibble(rownames = "Name") %>%
-  right_join(DB %>% distinct(Name, Family), by = "Name") %>%
-  group_by(Family) %>%
-  summarise_at(vars(colnames(COUNT)), sum) 
-
-which_cols <- COUNT %>% dplyr::select_if(is.double) %>% colnames()
-
-datExpr <- COUNT %>% dplyr::select(all_of(which_cols))
-
+# DB %>% dplyr::count(Name, sort = T)
+# 
+# COUNT <- COUNT %>% as_tibble(rownames = "Name") %>%
+#   right_join(DB %>% distinct(Name, Family), by = "Name") %>%
+#   group_by(Family) %>%
+#   summarise_at(vars(colnames(COUNT)), sum) 
+# 
+# which_cols <- COUNT %>% dplyr::select_if(is.double) %>% colnames()
+# 
+# datExpr <- COUNT %>% dplyr::select(all_of(which_cols))
+# 
 datExpr <- as(datExpr, "matrix")
-
-rownames(datExpr) <- COUNT$Family
+# 
+# rownames(datExpr) <- COUNT$Family
 
 # SPLIT IN NORMAL AND TREATMENT SEA WATER??
 # THEN,
@@ -99,7 +107,9 @@ soft_values <- round(soft_values, digits = 2)
 
 hist(soft_values)
 
-power_pct <- quantile(soft_values, probs = 0.95)
+# power_pct <- quantile(soft_values, probs = 0.95)
+
+power_pct <- soft_values[which.max(soft_values)]
 
 softPower <- sft$fitIndices[,1][which(soft_values >= power_pct)]
 
@@ -160,8 +170,7 @@ plot(geneTree, xlab="", sub="",
   main= "Gene Clustering on TOM-based dissimilarity", labels= FALSE, hang=0.04)
 
 #This sets the minimum number of genes to cluster into a module
-
-minClusterSize <- 5
+minClusterSize <- softPower
 
 dynamicMods <- cutreeDynamic(dendro= geneTree, 
   distM = dissTOM,
@@ -231,19 +240,20 @@ TOMplot(plotTOM, dendro = geneTree, Colors = moduleColors)
 
 # LABEL MIRS?
 
-RES.P <- read_tsv(paste0(path, "DESEQ_RES.tsv")) %>% filter( padj < 0.05 & abs(log2FoldChange) > 1)
+RES.P <- read_tsv(paste0(path, "SEQUENCES_MERGED_DESEQ_RES.tsv")) %>% 
+  filter( padj < 0.05 & abs(log2FoldChange) > 1)
 
 query.names_1 <- RES.P %>% filter(CONTRAST %in% "CONTRAST_A") %>% 
   filter(log2FoldChange < 0) %>%
-  distinct(Family) %>% pull()
+  distinct(MajorRNA) %>% pull()
 
 query.names_2_up <- RES.P %>% filter(CONTRAST %in% "CONTRAST_B") %>% 
   filter(log2FoldChange < 0) %>%
-  distinct(Family) %>% pull()
+  distinct(MajorRNA) %>% pull()
 
 query.names_2_down <- RES.P %>% filter(CONTRAST %in% "CONTRAST_B") %>% 
   filter(log2FoldChange > 0) %>%
-  distinct(Family) %>% pull()
+  distinct(MajorRNA) %>% pull()
 
 reads <- colSums(datExpr)
 
@@ -265,6 +275,8 @@ data.frame(reads, moduleColors) %>%
 
 # INSTEAD OF BINARY USE DATA FROM RESPIROMETRY AND MORPHOLOGY
 
+path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+# 
 datTraits <- read_tsv(paste0(path, "/WGCNA_datTraits.tsv"), )
 
 which_cols <- colnames(datTraits)[!grepl(c("^HR"), colnames(datTraits))]  
@@ -362,7 +374,9 @@ df1 %>%
   # facet_grid(~ facet, scales = 'free_x',space = "free_x")
 
 # recode_to <- structure(c("Development", "Growth", "Calcification", "Respiration", "pH 7.6", "pH 8.0", "pH 7.6", "pH 8.0"), names = colnames(datTraits))
-recode_to <- structure(c("Desarrollo", "Crecimiento", "Calcificación", "Respiración", "pH 7.6", "pH 8.0", "pH 7.6", "pH 8.0"), names = colnames(datTraits))
+
+recode_to <- c("Desarrollo", "Crecimiento", "Calcificación", "Respiración")
+recode_to <- structure(recode_to,names = colnames(datTraits))
 
   
 df1 %>%
@@ -436,9 +450,9 @@ ggsave(psave, filename = 'WGCNA_MIRS2HEATMAP_2.png', path = path, width = 10, he
 
 # network ====
 
-module_members_1 <- c("grey", "black", "yellow", "pink", "turquoise")
+# module_members_1 <- c("grey", "black", "yellow", "pink", "turquoise")
 
-module_members_2 <- c("brown", "red", "green", "blue")
+# module_members_2 <- c("brown", "red", "green", "blue")
 
 library(igraph)
 library(tidygraph)

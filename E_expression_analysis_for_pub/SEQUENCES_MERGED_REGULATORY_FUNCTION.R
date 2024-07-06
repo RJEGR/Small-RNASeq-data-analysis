@@ -4,6 +4,7 @@
 # bind MAjorRNA column to DB using Cluster_ Name from Results.txt
 # LOAD Upgraded Names from SEQUENCES_MERGED
 # Bind target db (description, gene_id, etc.) to SEQUENCES_MERGED
+# Calculate revigo or topgo for every gene_id (ex. LOC124150425)
 
 rm(list = ls())
 
@@ -61,6 +62,7 @@ TARGETDB <- DESEQRES %>% right_join(TARGETDB, by = "MajorRNA")
 TARGETDB %>% count(Name)
 
 write_tsv(TARGETDB, paste0(path_out, "SEQUENCES_MERGED_MIRNA_TARGET_DB.tsv"))
+
 
 # 2)
 
@@ -202,6 +204,7 @@ write_tsv(COUNT, paste0(path_out, "REFBASED_MODE_COUNT.tsv"))
 # heatmap(COUNT %>% 
 #   dplyr::select(contains(c("SRR"))) %>%
 #   as("matrix"))
+library(rstatix)
 
 cor.mat <- COUNT %>% 
   # mutate_at(vars(contains(c("SRR"))), z_scores) %>%
@@ -292,4 +295,137 @@ df %>%
   facet_wrap(~ rowname)
 
 view(df)
+
+# network -----
+
+WHICH_CONT <- c("CONTRAST_A") #  "CONTRAST_B"
+
+
+DEG <- RES.P %>% filter(CONTRAST %in% WHICH_CONT) %>% distinct(MajorRNA, MirGeneDB_ID)
+
+Net <- MIRNA2TARGET %>%
+  mutate(MajorRNA = strsplit(MajorRNA, ";")) %>%
+  unnest(MajorRNA) %>% filter(target_exp > 0) %>%
+  right_join(DEG, by = "MajorRNA") %>%
+  dplyr::select(MirGeneDB_ID, gene_id)
+
+
+Nodes <- data.frame(Node = unique(c(Net$MirGeneDB_ID,Net$gene_id))) %>% 
+  mutate_if(is.character, as.factor) 
+
+library(ggraph)
+library(igraph)
+library(tidygraph)
+
+g <- tidygraph::tbl_graph(nodes = Nodes, edges = Net, directed = F)
+
+g <- g %>%
+  activate("nodes") %>%
+  mutate(degree = centrality_degree(),
+    betweenness = betweenness(.),
+    pageRank = page_rank(.)$vector) %>%
+  mutate(weight = (degree - min(degree))/(max(degree) - min(degree)))
+  # mutate(weight = weight * 2 + 1) 
+
+
+layout = create_layout(g, layout = 'igraph', algorithm = 'kk')
+
+# ggraph(layout) +
+#   ggforce::geom_mark_hull(
+#     aes(x, y, group = as.factor(membership)), #  fill = as.factor(membership)
+#     color = NA, fill = "grey76",
+#     concavity = 4,
+#     con.size = 0.3,
+#     con.linetype = 2,
+#     expand = unit(2, "mm"),
+#     alpha = 0.25)  +
+#   guides(fill = FALSE)
+
+# layout = create_layout(g, layout = 'graphopt')
+
+ggraph(layout) +
+  geom_edge_arc(
+    strength = 0.1,
+    start_cap = circle(1.5, 'mm'),
+    end_cap = circle(1.5, 'mm'),
+    arrow = arrow(
+      angle = 90,
+      length = unit(0.05, "inches"),
+      ends = "last",
+      type = "open")) +
+  geom_node_point() + # aes(size = weight)
+  geom_node_text(aes(label = Node), repel = T, size = 1.5) +
+  coord_fixed() +
+  theme_graph(base_family = "GillSans")
+
+
+ggraph(g, layout = 'linear') + 
+  geom_edge_arc( strength = 1) +
+  geom_node_point() 
+  # geom_node_text(aes(label = Node), repel = F, size = 1.5) 
+
+ggraph(g, layout = 'linear', circular = TRUE) + 
+  geom_edge_arc() + 
+  coord_fixed() +
+  geom_node_text(aes(label = Node), repel = F, size = 1.5) 
+
+library(circlize)
+
+dev.off()  
+
+circos.clear()
+
+
+Net %>% count(gene_id,sort = T)
+
+Net %>%
+  filter(gene_id == "LOC124137998") %>%
+  chordDiagramFromDataFrame(directional = TRUE, 
+    # col = colmat, 
+    # grid.col = grid.col,
+    link.sort = T,
+    # annotationTrack = "grid", 
+    big.gap = 10, small.gap = 1,
+    preAllocateTracks = list(track.height = 0.1),
+    link.target.prop = FALSE)
+
+# run revigo OR topgo for every gene_id -----
+
+JOINDB <- TARGETDB %>% 
+  # mutate(GOID = ifelse(is.na(GO.ID), description, GO.ID)) %>%
+  dplyr::distinct(gene_id, GO.ID) %>%
+  drop_na(GO.ID)
+
+# Filter if target is expressed
+
+JOINDB <- MIRNA2TARGET %>% 
+  filter(target_exp>0) %>% 
+  dplyr::distinct(gene_id) %>% # Only 129 gene_ids (targets) are commonly expressed
+  left_join(JOINDB, by = "gene_id") %>%
+  drop_na(GO.ID)  # BUT ONLY 71 gene_ids are used
+  
+
+JOINDB <- split(strsplit(JOINDB$GO.ID, ";") , JOINDB$gene_id)
+
+JOINDB <- lapply(JOINDB, unlist)
+  
+keep <- lapply(JOINDB, length) > 2
+
+JOINDB <- JOINDB[keep]
+
+str(semdata@geneAnno$GO)
+
+
+
+orgdb <- "org.Ce.eg.db"
+
+semdata <- read_rds(paste0(wd, orgdb, ".rds"))
+
+
+# No terms were found in orgdb for BP
+# Check that the organism and ontology match the ones provided by orgdb
+
+OUT <- lapply(JOINDB, function(x) SEMANTIC_SEARCH(x, semdata = semdata))
+
+print(data <- dplyr::bind_rows(OUT, .id = "MajorRNA") %>% as_tibble())
 

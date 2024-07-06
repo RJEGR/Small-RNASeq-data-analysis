@@ -442,6 +442,15 @@ SEMANTIC_SEARCH <- function(x, orgdb = "org.Ce.eg.db", semdata = semdata) {
   
   x <- sort(x)
   
+  keep <- x %in% semdata@geneAnno$GO
+  
+  cat(sum(keep))
+  
+  x <- x[keep]
+  
+  # if(sum(keep) == 0)
+  # omit
+  
   SimMatrix <- calculateSimMatrix(x, 
     orgdb = orgdb,
     ont="BP", 
