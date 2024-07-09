@@ -79,10 +79,10 @@ utr <- sapply(strsplit(x, " "), `[`, 1)
 
 RNAHYBRID <- RNAHYBRID %>%
   mutate(query = sapply(strsplit(query, "::"), `[`, 1) ) %>%
-  select(target, query) %>%
-  filter(target %in% utr) %>% # <- keep only 3'utr
-  mutate(predicted = "RNAHYBRID") %>%
-  filter(grepl(".mature", query))
+  dplyr::select(target, query) %>%
+  dplyr::filter(target %in% utr) %>% # <- keep only 3'utr
+  dplyr::mutate(predicted = "RNAHYBRID") %>%
+  dplyr::filter(grepl(".mature", query))
 
 
 # BIND TO RNAHybrid, UPGRADE VERSION OF RESIDUAL 17 MIRS
@@ -99,22 +99,23 @@ f <- list.files(path = wd, pattern = pattern, full.names = T)
 
 RNAHYBRID <- read_tsv(f, col_names = F) %>% 
   dplyr::rename("target"="X1", "query"="X2" ,"pval" = "X4") %>%
-  filter(pval < 0.05) %>%
-  select(target, query) %>%
-  filter(target %in% utr) %>% # <- keep only 3'utr
-  mutate(predicted = "RNAHYBRID", query = paste0(query, ".mature")) %>%
+  dplyr::filter(pval < 0.05) %>%
+  dplyr::select(target, query) %>%
+  dplyr::filter(target %in% utr) %>% # <- keep only 3'utr
+  dplyr::mutate(predicted = "RNAHYBRID", query = paste0(query, ".mature")) %>%
   rbind(RNAHYBRID, .)
 
 nrow(RNAHYBRID %>% distinct(query) %>% filter(grepl(".mature", query))) # MUST BE 147
 
 # 2.3)
 
-TARGETSCAN <- TARGETSCAN %>% select(a_Gene_ID, miRNA_family_ID) %>%
-  mutate(miRNA_family_ID = sapply(strsplit(miRNA_family_ID, "::"), `[`, 1) ) %>%
-  separate(a_Gene_ID, into = c("target", "gene_id"), sep = ";") %>%
+TARGETSCAN <- TARGETSCAN %>% 
+  dplyr::select(a_Gene_ID, miRNA_family_ID) %>%
+  dplyr::mutate(miRNA_family_ID = sapply(strsplit(miRNA_family_ID, "::"), `[`, 1) ) %>%
+  tidyr::separate(a_Gene_ID, into = c("target", "gene_id"), sep = ";") %>%
   dplyr::rename("query" = "miRNA_family_ID") %>%
-  select(target, query) %>%
-  mutate(predicted = "TARGETSCAN")
+  dplyr::select(target, query) %>%
+  dplyr::mutate(predicted = "TARGETSCAN")
 
 TARGETSCAN <- TARGETSCAN %>% filter(grepl(".mature", query))
 
@@ -151,16 +152,16 @@ out <- rbind(RNAHYBRID, TARGETSCAN) %>%
     n_rnas = n(),
     .groups = "drop_last")
 
-out %>% count(predicted)
+out %>% dplyr::count(predicted)
 
 out %>% distinct(target)
 
 
-nrow(out) # 6372 different 3' utrs predicted to be target by srna
+nrow(out) # 6370 different 3' utrs predicted to be target by srna
 
 # ES NECESESARIO CARGARA LAS ANOTACIONES  A NIVEL GENOMA Y TRANSCRIPTOMA:
 
-nrow(out <- out %>% left_join(utr_source) %>% arrange(desc(n_rnas)))
+nrow(out <- out %>% left_join(utr_source, by = "target") %>% arrange(desc(n_rnas)))
 
 # out <- out %>% select(target, query, n_rnas, predicted)
 

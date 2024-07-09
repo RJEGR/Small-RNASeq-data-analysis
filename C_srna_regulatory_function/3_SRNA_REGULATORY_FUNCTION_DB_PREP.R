@@ -77,7 +77,7 @@ TRANS2GO <- data.frame(transcript_id = rep(names(MAP[keep]),
     n = n(),
     .groups = "drop_last")
 
-transcript_features <- transcript_features %>% right_join(TRANS2GO)  
+transcript_features <- transcript_features %>% right_join(TRANS2GO, by = "transcript_id")  
   
 go_features <- transcript_features %>% dplyr::select(gene_id, GO.ID, n) %>% 
   group_by(gene_id) %>%
@@ -113,6 +113,8 @@ SRNA2GO <- out %>%
 write_tsv(out, file = paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv"))
 
 write_tsv(SRNA2GO, file = paste0(wd, "SRNA2GO.tsv"))
+
+# exit
 
 # GO TO DATAVIZ ====
 

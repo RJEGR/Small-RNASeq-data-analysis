@@ -19,14 +19,20 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 # AFTER RUN 3_DESEQ2TOPGO.R
 # LOAD DESEQ_RES_P WHICH INCLUDE GENE_ID TARGETED BY BOTH, RNAHYBRID AND TARGETSCAN:
 
-print(RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")))
+# print(RES.P <- read_tsv(paste0(wd, "DESEQ_RES_P.tsv")))
 
-# nrow(out <- read_rds(paste0(wd, "SRNA_FUNCTION_PREDICTED.rds")))
+# wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
-str(query.ids <- RES.P %>% 
-    mutate(gene_id = strsplit(gene_id, ";")) %>%
-    unnest(gene_id) %>%
-    distinct(gene_id) %>% pull()) # 8465
+print(out <- read_rds(paste0(wd, "SRNA_FUNCTION_PREDICTED.rds")))
+
+out <- out %>% filter(predicted == "BOTH")
+
+str(query.ids <- out %>% distinct(gene_id) %>% pull())
+  
+# str(query.ids <- RES.P %>% 
+#     mutate(gene_id = strsplit(gene_id, ";")) %>%
+#     unnest(gene_id) %>%
+#     distinct(gene_id) %>% pull()) 
 
 # str(query.ids <- paste(query.ids, collapse = "|"))
 
@@ -50,11 +56,14 @@ f <- list.files(path = wd, pattern = GTF, full.names = T)
 
 GTF <- rtracklayer::import(f)
 
-print(GTF2DF <- GTF %>% as_tibble() %>% distinct(gene_id, transcript_id, ref_gene_id) %>% filter(!is.na(ref_gene_id))) # A tibble: 70,001 × 3
+print(GTF2DF <- GTF %>% 
+    as_tibble() %>% 
+    distinct(gene_id, transcript_id, ref_gene_id) %>% 
+    filter(!is.na(ref_gene_id))) # A tibble: 70,001 × 3
 
 # nrow(GTF2DF <- GTF2DF %>% filter(ref_gene_id %in% query.ids)) # 17532
 
-GTF2DF %>% count(ref_gene_id, sort = T)
+GTF2DF %>% dplyr::count(ref_gene_id, sort = T)
 
 # TRANSCRIPT ARE UNIQUE IDENTIFIER:
 # gene_id ID AND ref_gene_id CLUSTERS TRANSCRIPT IDENTIFERS (SAME INFO)
@@ -64,8 +73,15 @@ GTF2DF %>% count(ref_gene_id, sort = T)
 str(query2.ids <- GTF2DF %>% distinct(ref_gene_id) %>% pull() %>% sort()) # 8465
 
 # SANITY CHECK
+length(query.ids) # 168 predicted targets
 
-any(sort(query.ids) ==  query2.ids) # TRUE
+any(sort(query.ids) %in%  query2.ids) # TRUE
+
+sum(sort(query.ids) %in%  query2.ids) # 155 expressed  of  168 predicted targets
+
+write_rds(out %>% filter(gene_id %in% query2.ids), 
+  file = paste0(wd, "SRNA_FUNCTION_PREDICTED_EXPRESSED.rds"))
+
 
 # 3) USING TRANSCRITPOME DATA ====
 # WHICH ID RETRIVE BACK BETTER DETAILS?
@@ -96,31 +112,75 @@ COUNT <- GTF2DF %>%
   right_join(.COUNT) %>%
   rename("assembled_id" = "gene_id", "gene_id" = "ref_gene_id")
 
+which_cols <- COUNT %>% dplyr::select(dplyr::starts_with("SRR")) %>% names()
+
+# optional, change transcript(ie. isoform ) to gene mode
+
+COUNT <- COUNT %>%
+  group_by(gene_id) %>%
+  summarise_at(vars(all_of(which_cols)), sum) 
+
+# filter out Mantle samples?
+keep <- .colData %>% filter(!Tissue %in% "Mantle") %>% pull(LIBRARY_ID)
+
+keep <- c("gene_id",which_cols[which_cols %in% keep])
+
+COUNT <- COUNT %>% dplyr::select(dplyr::starts_with(keep))
+
 # View(COUNT)
 
-DB <- RES.P %>% 
-  mutate(gene_id = strsplit(gene_id, ";")) %>%
-  unnest(gene_id) %>% 
-  distinct(Name, gene_id) %>%
+DB <- out %>%
+  mutate(query = strsplit(query, ";")) %>%
+  unnest(query) %>%
   group_by(gene_id) %>%
   summarise(
-    across(Name, .fns = list), n_srnas = n(), .groups = "drop_last") %>%
+    across(query, .fns = list), n_srnas = n(), .groups = "drop_last") %>%
   arrange(desc(n_srnas))
+
+# DB <- RES.P %>%
+#   mutate(gene_id = strsplit(gene_id, ";")) %>%
+#   unnest(gene_id) %>%
+#   distinct(Name, gene_id) %>%
+#   group_by(gene_id) %>%
+#   summarise(
+#     across(Name, .fns = list), n_srnas = n(), .groups = "drop_last") %>%
+#   arrange(desc(n_srnas))
 
 print(DB <- DB %>% left_join(COUNT))
 
-
+DB <- DB %>% drop_na()
 # DB %>% unnest(Name) %>% view()
 
 # View(DB)
 
 head(COUNT <- DB %>% dplyr::select(starts_with("SRR")) %>% as(., "matrix"))
 
+sum(keep <- rowSums(COUNT) > 1)
+
+dim(COUNT <- COUNT[keep,])
+
+COUNT[is.na(COUNT)] <- 0 # add pseudo-count
+
+rownames(COUNT) <- DB$gene_id[keep]
+
+colSums(COUNT)
+
+COUNT <- DESeq2::varianceStabilizingTransformation(round(COUNT))
+# 
+# rowSums(COUNT)[1]
+# 
+# COUNT[1,]
+# 
+# z_scores(COUNT[1,])
+
+z_scores <- function(x) {(x-mean(x))/sd(x)}
+
+COUNT <- apply(COUNT, 1, z_scores)
+
+COUNT <- t(COUNT)
+
+# COUNT <- log2(COUNT+1)
 COUNT[is.na(COUNT)] <- 0
-
-rownames(COUNT) <- DB$gene_id
-
-COUNT <- log2(COUNT+1)
 
 heatmap(COUNT)
 
@@ -146,22 +206,31 @@ pattern <- "Day Post-Fertilization Sample|Days Post-Fertilization Sample|Days Po
 recode_to <- structure(gsub(pattern, "DPF", recode_to ), names = recode_to)
 
 
-DB_LONG <- DB %>% 
+DB_LONG <- COUNT %>% as_tibble(rownames = "gene_id") %>%
   pivot_longer(all_of(which_cols),names_to = "LIBRARY_ID") %>%
   # filter(value > 0) %>%
-  mutate(value = ifelse(value == 0, NA, value)) %>%
+  # mutate(value = ifelse(value == 0, NA, value)) %>%
   left_join(.colData) %>%
   dplyr::mutate(Isolated = dplyr::recode_factor(Isolated, !!!recode_to))
   # group_by(Isolated, gene_id) %>%
   # summarise(value = sum(value))
   # mutate(Isolated = factor(Isolated, levels = facet_level))
 
+
+lo = floor(min(DB_LONG$value))
+up = ceiling(max(DB_LONG$value))
+mid = (lo + up)/2
+
+
 library(ggh4x)
 
 DB_LONG %>%
-  ggplot(aes(x = LIBRARY_ID, y = gene_id, fill = log2(value+1))) + 
+  # mutate(value = ifelse(value == 0, NA, value)) %>%
+  ggplot(aes(x = LIBRARY_ID, y = gene_id, fill = value)) + 
   geom_tile(color = 'white', linewidth = 0.2) +
-  scale_fill_viridis_c(option = "B", name = "Log2", direction = -1, na.value = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+    na.value = "white", midpoint = mid, limit = c(lo, up),
+    name = NULL) +
   ggh4x::facet_nested( ~ Isolated, nest_line = F, scales = "free", space = "free") +
   # scale_x_discrete(position = 'top') +
   # ggh4x::scale_x_dendrogram(hclust = hc_samples, position = 'top') +
@@ -209,6 +278,7 @@ library(patchwork)
 
 p <- pright + plot_spacer() + pleft + plot_layout(widths = c(7, -1.5 , 3.5)) 
 
+p
 ggsave(p, filename = "DESEQ2HEATMAP_TRANSCRIPTOME.png", path = wd, width = 5, height = 10, device = png, dpi = 300)
 
 
