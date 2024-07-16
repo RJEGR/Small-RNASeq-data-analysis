@@ -92,6 +92,9 @@ sum(sort(unique(out$gene_id)) %in% sort(unique(go_features$gene_id))) # 3142 (58
 
 out <- go_features %>% right_join(out, by = "gene_id")
 
+# out %>% filter(is.na(description))
+
+write_tsv(out, file = paste0(wd, "SRNA_REGULATORY_FUNCTION_LONG_DB.tsv"))
 
 
 # view(out)

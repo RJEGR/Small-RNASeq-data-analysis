@@ -133,10 +133,18 @@ split_pfam <- function(x, hit = "Pfam"){
 }
 
 split_kegg <- function (x, hit = "Kegg")  {
-  library(data.table)
-  y <- x[!is.na(get(hit)), .(get(hit), gene_id, transcript_id, 
-    prot_id)]
-  z <- strsplit(y$V1, "`")
+  # library(data.table)
+  
+  # y <- x[!is.na(get(hit)), .(get(hit), gene_id, transcript_id, prot_id)]
+  
+  which_vars <- c(hit, "gene_id", "transcript_id", "prot_id")
+  
+  y <- x %>% select_at(vars(all_of(which_vars))) %>% drop_na(any_of(hit))
+  
+  z <- y %>% pull(hit)
+  
+  z <- strsplit(z, "`")
+  
   n <- sapply(z, length)
   z <- strsplit(unlist(z), "\\^")
   x1 <- data.frame(gene = rep(y$gene_id, n), 
@@ -144,7 +152,8 @@ split_kegg <- function (x, hit = "Kegg")  {
     protein = rep(gsub(".*\\|", "", y$prot_id), n), 
     Kegg = sapply(z, "[", 1), stringsAsFactors = FALSE)
   message(nrow(x1), " ", hit, " annotations")
-  data.table(x1)
+  
+  as_tibble(x1)
 }
 
 get_eggnog <- function (x, ids, by = "transcript_id")  {
@@ -161,7 +170,9 @@ get_eggnog <- function (x, ids, by = "transcript_id")  {
   else {
     x1 <- x %>% filter(gene_id %in% ids)
     
-    y <- unique(x1[!is.na(eggnog), .(gene_id, eggnog)])
+    # y <- unique(x1[!is.na(eggnog), .(gene_id, eggnog)])
+    
+    eggnog <- x1 %>% drop_na(eggnog) %>% distinct(eggnog) %>% pull(eggnog)
     
   }
   

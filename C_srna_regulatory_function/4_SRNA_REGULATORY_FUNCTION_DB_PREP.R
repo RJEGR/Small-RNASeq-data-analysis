@@ -16,6 +16,8 @@ library(tidyverse)
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
+path_out <- wd
+
 # AFTER RUN 3_DESEQ2TOPGO.R
 # LOAD DESEQ_RES_P WHICH INCLUDE GENE_ID TARGETED BY BOTH, RNAHYBRID AND TARGETSCAN:
 
@@ -23,7 +25,9 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 # wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
-print(out <- read_rds(paste0(wd, "SRNA_FUNCTION_PREDICTED.rds")))
+print(out <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_LONG_DB.tsv")))
+
+# print(out <- read_rds(paste0(wd, "SRNA_FUNCTION_PREDICTED.rds")))
 
 out <- out %>% filter(predicted == "BOTH")
 
@@ -79,8 +83,8 @@ any(sort(query.ids) %in%  query2.ids) # TRUE
 
 sum(sort(query.ids) %in%  query2.ids) # 155 expressed  of  168 predicted targets
 
-write_rds(out %>% filter(gene_id %in% query2.ids), 
-  file = paste0(wd, "SRNA_FUNCTION_PREDICTED_EXPRESSED.rds"))
+# write_rds(out %>% filter(gene_id %in% query2.ids), 
+  # file = paste0(wd, "SRNA_FUNCTION_PREDICTED_EXPRESSED.rds"))
 
 
 # 3) USING TRANSCRITPOME DATA ====
@@ -121,15 +125,36 @@ COUNT <- COUNT %>%
   summarise_at(vars(all_of(which_cols)), sum) 
 
 # filter out Mantle samples?
-keep <- .colData %>% filter(!Tissue %in% "Mantle") %>% pull(LIBRARY_ID)
+# keep <- .colData %>% filter(!Tissue %in% "Mantle") %>% pull(LIBRARY_ID)
 
-keep <- c("gene_id",which_cols[which_cols %in% keep])
+# keep <- c("gene_id",which_cols[which_cols %in% keep])
 
-COUNT <- COUNT %>% dplyr::select(dplyr::starts_with(keep))
+# COUNT <- COUNT %>% dplyr::select(dplyr::starts_with(keep))
 
 # View(COUNT)
 
+keep <- COUNT %>% dplyr::select(starts_with("SRR")) %>% rowSums()
+
+length(keep)
+
+sum(keep > 1)
+
+dim(COUNT <- COUNT[keep > 1,])
+
+out <- out %>% mutate(gene_coords = paste0(seqnames, "_", gene_coords)) %>%
+  mutate(target_coords = target) %>%
+  select(gene_id, description, GO.ID, gene_coords, target_coords, query)
+
+
+ 
+  
+
+write_rds(out %>% left_join(COUNT), 
+    file = paste0(path_out, "SRNA_FUNCTION_PREDICTED_LONG_EXPRESSED.rds"))
+
+
 DB <- out %>%
+  filter(gene_id %in% COUNT$gene_id) %>%
   mutate(query = strsplit(query, ";")) %>%
   unnest(query) %>%
   group_by(gene_id) %>%
@@ -312,7 +337,7 @@ bind_srnas <- function(x) {
 MIR_EXPRESSION <- TARGET %>% 
   group_by(Name) %>%
   summarise(across(target, .fns = bind_srnas), .groups = "drop_last") %>%
-  right_join(rowSums(MIR_COUNT) %>% as_tibble(rownames = 'Name')) %>% view()
+  right_join(rowSums(MIR_COUNT) %>% as_tibble(rownames = 'Name')) %>% # view()
   mutate(target = strsplit(target, ";")) %>%
   unnest(target) %>%
   group_by(target) %>%

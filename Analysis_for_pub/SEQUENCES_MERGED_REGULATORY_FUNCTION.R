@@ -41,7 +41,7 @@ TARGETDB %>% count(gene_id)
 TARGETDB %>% drop_na(GO.ID) %>% count(gene_id)
 TARGETDB %>% count(gene_id)
 
-wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/Outputs/"
 
 TARGETDB <- read_tsv(paste0(wd, "Results.txt")) %>%
   select(Name, MajorRNA) %>%
@@ -65,8 +65,10 @@ write_tsv(TARGETDB, paste0(path_out, "SEQUENCES_MERGED_MIRNA_TARGET_DB.tsv"))
 
 
 # 2)
-
+# CA and CB, shows the diffExp miRs in each time of dev.
 WHICH_CONT <- c("CONTRAST_A", "CONTRAST_B")
+# CC and CD, shows the differentia
+# WHICH_CONT <- c("CONTRAST_C", "CONTRAST_D")
 
 # Use description to 
 
@@ -197,14 +199,20 @@ COUNT <- GTF2DF %>%
   rename("assembly_id" = "gene_id", "gene_id" = "ref_gene_id") %>%
   filter(gene_id %in% query.targets)
 
-nrow(COUNT) # 155 from the 168 targets usually are expressed during larval dev.
+str(keep_expressed <- COUNT %>% dplyr::select(starts_with("SRR")) %>% rowSums())
 
-write_tsv(COUNT, paste0(path_out, "REFBASED_MODE_COUNT.tsv"))
+
+
+nrow(COUNT[keep_expressed > 1,]) # 142 from the 168 targets usually are expressed during larval dev.
+
+write_tsv(COUNT[keep_expressed > 1,], paste0(path_out, "REFBASED_MODE_COUNT.tsv"))
 
 # heatmap(COUNT %>% 
 #   dplyr::select(contains(c("SRR"))) %>%
 #   as("matrix"))
 library(rstatix)
+
+COUNT <- COUNT[keep_expressed > 1,]
 
 cor.mat <- COUNT %>% 
   # mutate_at(vars(contains(c("SRR"))), z_scores) %>%
@@ -227,7 +235,7 @@ cor.mat %>%
 
 MIRNA2TARGET %>%
   drop_na(target_exp) %>%
-  filter(target_exp > 0) %>%
+  filter(target_exp > 1) %>%
   arrange(desc(n_mirs)) %>%
   # mutate(target_exp = log10(target_exp), mir_exp = log10(mir_exp)) %>% # or mir_exp = log10(mir_exp/n_mirs)
   mutate(target_exp = log2(target_exp), mir_exp = log2(mir_exp/n_mirs)) %>%
@@ -236,7 +244,7 @@ MIRNA2TARGET %>%
   ggplot(aes(target_exp, ratio)) + geom_point(alpha = 0.5, aes(size = n_mirs), shape = 21) +
   geom_smooth(method = "lm", linetype="dashed", size = 0.5, alpha=0.5,
     se = F, na.rm = TRUE) +
-  ggpubr::stat_cor(method = "spearman", cor.coef.name = "R", p.accuracy = 0.001) +
+  ggpubr::stat_cor(method = "spearman", cor.coef.name = "R", p.accuracy = 0.001, family = "GillSans") +
   theme_bw(base_size = 16, base_family = "GillSans") +
   labs(x = "Target expression (log2)", y = "microRNA fold-change")
 
