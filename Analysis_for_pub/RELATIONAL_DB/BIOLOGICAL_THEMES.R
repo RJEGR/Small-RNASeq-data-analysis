@@ -16,6 +16,7 @@ if(!is.null(dev.list())) dev.off()
 
 options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
+
 dir <- "~/Documents/MIRNA_HALIOTIS/ENSEMBLE/calcif/"
 
 f <- list.files(dir, pattern = ".outfmt6", full.names = T)
@@ -45,7 +46,7 @@ df <- do.call(rbind, lapply(f, read_outfmt6))
 df %>% ggplot(aes(identity, color = db)) + stat_ecdf()
 
 # merge to functional db
-
+# gene2tr -----
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/"
 
 gene2tr <- read_rds(paste0(wd, "genome_features.rds"))[[1]] %>% 
@@ -61,6 +62,16 @@ print(FUNCTIONAL_DB <- read_rds(paste0(wd,"SRNA_FUNCTION_PREDICTED_LONG_EXPRESSE
 df <- df %>% left_join(FUNCTIONAL_DB, by = "gene_id")
 
 df %>% dplyr::select(dplyr::starts_with("SRR")) %>% as("matrix") %>% heatmap(Colv = NA)
+
+# MajorRNA2Name -----
+
+wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+
+# bind to Loci mirna db
+
+print(.LOCATION_DB <- read_rds(paste0(wd, "RNA_LOCATION_MIR_DB.rds")))
+
+MajorRNA2Name <- .LOCATION_DB %>% distinct(MajorRNA, Name) %>%   dplyr::rename("query" = "Name")
 
 # EGGMAPPER
 # THIS OUTPUT IS DERIVED FROM ALL miRNA-mRNA TARGETS (~170 GENES) passed through eggnogmapper
@@ -89,6 +100,48 @@ f <- list.files(dir, pattern = "eggnog_mapper.emapper.annotations", full.names =
 # the eggnog_mapper.emapper.annotations file is the good one
 eggnog_db <- read_tsv(f[1], comment = "##")
 
+# Prior to EDA, bind data bases
+# Bind keyids data bases ----
+# 
+ 
+FUNCTIONAL_DB
+  # mutate(query = strsplit(query, ";")) %>%
+  # unnest(query) %>% 
+  # distinct(gene_id, query)
+
+# 1) bind transcript_id to gene_id and 
+# collapse the transcript_id
+DB <- gene2tr %>%
+  right_join(eggnog_db, by = c("transcript_id" = "#query" )) %>%
+  select(- transcript_id) %>% distinct()
+
+# 1.2) add kegg theme
+
+DB <- DB %>% left_join(NOG.col, by = c("COG_category" = "code"))
+
+DB <- DB %>% rename("COG_name" = "name")
+
+view(DB)
+
+DB %>% distinct(Preferred_name) %>% view() 
+
+# 2) bind miRNA info (ONLY TO SPLIT DIFFEXP THEMES)
+# Note: duplicate genes means different target location
+# duplicates=  many-to-many relationship 
+
+FUNCTIONAL_DB %>% distinct(gene_id, query) %>%
+  mutate(query = strsplit(query, ";")) %>%
+  unnest(query) %>% 
+  mutate(query = gsub(".mature$", "", query)) %>%
+  distinct() %>%
+  left_join(MajorRNA2Name) %>%
+  select(-query) 
+  # left_join(DB, by = "gene_id") %>% view()
+
+
+
+
+# EDA eggnog_mapper ----
 # n <- match(eggnog_db$COG_category, NOG.annotations$class)
 # y <- table(unlist(strsplit(NOG.annotations$class[n], "")))
 # NOG.annotations$description[n]
@@ -113,7 +166,7 @@ plotdf %>%
   geom_col() +
   coord_flip() +
   geom_text(aes(label = n), size = 3, hjust = -0.05, family = "GillSans") +
-  scale_fill_manual(values = col_palette)
+  scale_fill_manual(values = col_palette) 
 
 
 # merge to gene_id
@@ -123,11 +176,11 @@ eggnog2gene <- eggnog_db %>% distinct(`#query`, COG_category) %>%
   left_join(gene2tr, by = c("#query" = "transcript_id")) %>% 
   distinct(gene_id, name, COG_category) 
 
-eggnog2gene %>% 
-  count(gene_id, name, COG_category, sort = T) %>%  drop_na(name) %>% 
-  mutate(name = factor(name, levels = unique(name))) %>%
-  ggplot(aes(x = n, y = name)) +
-  ggridges::geom_density_ridges()
+# eggnog2gene %>% 
+#   count(gene_id, name, COG_category, sort = T) %>%  drop_na(name) %>% 
+#   mutate(name = factor(name, levels = unique(name))) %>%
+#   ggplot(aes(x = n, y = name)) +
+#   ggridges::geom_density_ridges()
 
 eggnog2gene %>% 
   count(name, COG_category, sort = T) %>%  drop_na(name) %>% 
@@ -149,6 +202,9 @@ distinct(FUNCTIONAL_DB, gene_id, query) %>%
 eggnog_db %>% distinct(`#query`, GOs) %>%
   left_join(gene2tr, by = c("#query" = "transcript_id")) %>% 
   distinct(gene_id, GOs)
+
+
+# Enrichment analysis
 
 # clusterprof
 
@@ -176,3 +232,4 @@ kk2 <- gseKEGG(geneList = geneList,
   pvalueCutoff = 0.05,
   pAdjustMethod = "none",
   keyType       = "kegg")
+
