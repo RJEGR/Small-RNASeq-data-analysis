@@ -118,7 +118,7 @@ COUNT <- GTF2DF %>%
 
 which_cols <- COUNT %>% dplyr::select(dplyr::starts_with("SRR")) %>% names()
 
-# optional, change transcript(ie. isoform ) to gene mode
+# optional, change transcript(ie. isoform ) to gene level
 
 COUNT <- COUNT %>%
   group_by(gene_id) %>%
@@ -133,7 +133,12 @@ COUNT <- COUNT %>%
 
 # View(COUNT)
 
-keep <- COUNT %>% dplyr::select(starts_with("SRR")) %>% rowSums()
+is_na <- function(x) ifelse(is.na(x), 0, x)
+
+
+keep <- COUNT %>% dplyr::select(starts_with("SRR")) %>% 
+  mutate(across(where(is.double), ~is_na(.))) %>%
+  rowSums()
 
 length(keep)
 
@@ -144,10 +149,6 @@ dim(COUNT <- COUNT[keep > 1,])
 out <- out %>% mutate(gene_coords = paste0(seqnames, "_", gene_coords)) %>%
   mutate(target_coords = target) %>%
   select(gene_id, description, GO.ID, gene_coords, target_coords, query)
-
-
- 
-  
 
 write_rds(out %>% left_join(COUNT), 
     file = paste0(path_out, "SRNA_FUNCTION_PREDICTED_LONG_EXPRESSED.rds"))
