@@ -53,6 +53,15 @@ wd <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 RES.P <- read_tsv(list.files(path = wd, pattern = "SEQUENCES_MERGED_DESEQ_RES.tsv", full.names = T)) %>% 
   filter( padj < 0.05  & abs(log2FoldChange) > 1)
 
+# 
+
+RES.P %>% filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = paste0(CONTRAST, ":", sign(log2FoldChange))) %>%
+  group_by(MajorRNA) %>%
+  summarise(across(CONTRAST, .fns = paste_col), n = n()) %>%
+  dplyr::rename("Group" = "CONTRAST") %>%
+  left_join(filter(RES.P, CONTRAST %in% c("CONTRAST_C")), by = "MajorRNA") %>% view()
+
 DESEQRES <- RES.P %>% distinct(MajorRNA, Name) # %>% rename("NewName" = "Name")
 
 TARGETDB <- DESEQRES %>% right_join(TARGETDB, by = "MajorRNA")
