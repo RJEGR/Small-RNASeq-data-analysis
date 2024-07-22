@@ -15,6 +15,8 @@
 # Filter miRNA:mRNA  list using XM_* ids from Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.cds.all.fa
 
 ```
+# Blast (diamond)
+https://github.com/bbuchfink/diamond_docs
 
 ```BASH
 fast=Haliotis_rufescens_gca023055435v1rs.xgHalRufe1.0.p.cds.all.fa
@@ -57,6 +59,23 @@ seqkit grep -f Combined_Gastropoda_Bivalvia.diamond.blastx.outfmt6.subject Combi
 
 
 exit
+
+```
+
+# STRING DB
+Due to low links per best hits (usually mollusk). I will use only [top organisms](https://string-db.org/cgi/about?footer_active_subpage=statistics) such as human (Model, 9606) and c. elegans (Model of larval development, 6239).
+
+
+```BASH
+wget https://stringdb-downloads.org/download/protein.sequences.v12.0.fa.gz
+
+gunzip protein.sequences.v12.0.fa.gz
+
+ref_db=protein.sequences.v12.0.fa
+
+diamond makedb --in $ref_db --db ${ref_db%.fa}
+
+srun diamond blastx -d ${ref_db%.fa} -q miRNA-mRNA.cds -p 20 -k 1 -e 1e-5 -o ${ref_db%.fa}.diamond.blastx.outfmt6 --outfmt 6 &
 
 ```
 
