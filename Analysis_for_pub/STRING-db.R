@@ -115,11 +115,12 @@ string_info <- function(x) {
   
 }
 
-lapply(taxons[ !taxons %in% sapply(strsplit(list.files(links_dir), "[.]"), `[`, 1)], string_info)
+info_dir <- file.path(dir, "protein_info_v12_dir")
+
+lapply(taxons[ !taxons %in% sapply(strsplit(list.files(info_dir), "[.]"), `[`, 1)], string_info)
 
 # lapply(taxons, string_info)
 
-info_dir <- file.path(dir, "protein_info_v12_dir")
 
 
 f <- list.files(file.path(dir, "protein_info_v12_dir"), pattern = "gz", full.names = T)
