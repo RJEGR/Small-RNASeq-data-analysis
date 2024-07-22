@@ -442,7 +442,7 @@ SEMANTIC_SEARCH <- function(x, orgdb = "org.Ce.eg.db", semdata = semdata) {
   
   x <- sort(x)
   
-  keep <- x %in% semdata@geneAnno$GO
+  keep <- x %in% sort(semdata@geneAnno$GO)
   
   cat(sum(keep))
   
