@@ -67,11 +67,15 @@ Due to low links per best hits (usually mollusk). I will use only [top organisms
 
 
 ```BASH
-wget https://stringdb-downloads.org/download/protein.sequences.v12.0.fa.gz
+# wget https://stringdb-downloads.org/download/protein.sequences.v12.0.fa.gz
+
+wget https://stringdb-downloads.org/download/protein.sequences.v12.0/6239.protein.sequences.v12.0.fa.gz .
+
+wget https://stringdb-downloads.org/download/protein.sequences.v12.0/9606.protein.sequences.v12.0.fa.gz
 
 gunzip protein.sequences.v12.0.fa.gz
 
-ref_db=protein.sequences.v12.0.fa
+ref_db=9606.protein.sequences.v12.0.fa
 
 diamond makedb --in $ref_db --db ${ref_db%.fa}
 
