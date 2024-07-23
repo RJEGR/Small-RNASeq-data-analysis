@@ -147,8 +147,75 @@ df <- df %>% distinct(gene_id, subject, preferred_name, taxon_id, official_name_
 
 write_tsv(df, file = file.path(dir, "gene2stringid_diamond_blastx.tsv"))
 
-# Lot of data per file
+# Lot of data per file when using best hit (all sequences source)
+# using only human (Model, 9606) and c. elegans (Model of larval development, 6239).
 
-# f <- list.files(file.path(dir, "protein_links_full_v12_dir"), pattern = "gz", full.names = T)
+graph <- read_rds(file.path(dir, "protein_links_full_v12.rds"))
 
-# links_df <- read_tsv(f[1], col_names = T) 
+f <- list.files(file.path(dir, "protein_links_full_v12_dir"), pattern = "gz", full.names = T)
+
+f <- f[grepl("9606|6239", basename(f))]
+
+links_df <- read_delim(f, col_names = T, delim = " ")
+
+query_nodes <- df %>% distinct(subject) %>% pull() %>% sort()
+
+links_df %>% filter(protein2 %in% Nodes) %>% distinct(protein2)
+
+Node1 <- links_df %>% distinct(protein1) %>% 
+  dplyr::rename("Node" = "protein1")
+
+Node2 <- links_df %>% distinct(protein2) %>% 
+  dplyr::rename("Node" = "protein2")
+
+Nodes <- rbind(Node1, Node2)
+
+Nodes <- Nodes %>% left_join(df, by = c("Node" = "subject"))
+
+library(igraph)
+library(tidygraph)
+library(ggraph)
+
+graph <- tidygraph::tbl_graph(nodes = Nodes, edges = links_df, directed = T)
+
+graph <- graph %>% activate("nodes") %>% filter(Node %in% query_nodes)
+
+write_rds(graph, file = file.path(dir, "protein_links_full_v12.rds"))
+
+which_targets <- c("RNF166", "CENPM", "CDK10","H2AZ2", "C1GALT1", "TFB1M","ABCG2","MAP11")
+
+graph <- graph %>% activate("nodes") %>% 
+  mutate(Col = ifelse(preferred_name %in% which_targets, "Target under OA", ""),
+         label = ifelse(preferred_name %in% which_targets, preferred_name, ""))
+  
+
+layout <- graph %>% activate("nodes") %>% 
+  filter(taxon_id == "9606") %>%
+  mutate(betweenness = betweenness(.), degree = centrality_degree(),
+        # membership = igraph::cluster_louvain(., igraph::E(g)$weight)$membership,
+        pageRank = page_rank(.)$vector) %>%
+  filter(degree > 0) %>%
+  create_layout( layout = 'kk')
+  # create_layout( layout = 'linear', circular = TRUE)
+
+# if linear
+# ggraph(layout) +
+#   geom_edge_arc(aes(alpha = after_stat(index)), strength = 0.2) + 
+#   geom_node_text(aes(label = preferred_name, angle = node_angle(x, y), hjust = x < 0, color = Col)) + 
+#   coord_fixed(xlim = c(-1.2, 1.2), ylim = c(-1.2, 1.2))
+
+ggraph(layout) +
+  geom_edge_link(aes(alpha = combined_score)) +
+  geom_node_point(aes(color = Col, size = degree)) +
+  geom_node_text(aes(label = preferred_name), repel = TRUE, family = "GillSans")
+  # facet_nodes(~ official_name_NCBI, scales = "free")
+
+
+# try
+gr <- create_notable('Meredith') %>%
+  mutate(class = sample(c('Class 1', 'Class 2', 'Class 3'), n(), replace = TRUE))
+
+ggraph(gr, 'linear', circular = TRUE) +
+  geom_edge_arc(aes(alpha = after_stat(index)), strength = 0.2) + 
+  geom_node_text(aes(label = class, angle = node_angle(x, y), hjust = x < 0)) + 
+  coord_fixed(xlim = c(-1.2, 1.2), ylim = c(-1.2, 1.2))
