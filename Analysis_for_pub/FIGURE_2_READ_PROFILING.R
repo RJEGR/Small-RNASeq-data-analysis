@@ -43,7 +43,7 @@ ylab <- "Sequences (Millions)"
 recode_to <- c(`24 HPF`= "B) 24 HPF", `110 HPF` = "C) 110 HPF")
 
 width_col <- 0.8
-base_t_text_size <- 8
+base_t_text_size <- 5
 
 out %>% 
   dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to)) %>%
@@ -55,22 +55,23 @@ out %>%
   geom_col(width = width_col, color = "black", linewidth = 0.2) +
   # geom_segment(aes(xend = Length, yend = 0,  color = rnatype), linewidth = 1) +
   facet_grid(hpf ~ ., scales = "free_y") +
-  scale_y_continuous(ylab, labels = scales::number_format(scale = 1/1000000, suffix = " M")) +
-  scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 1)) +
+  scale_y_continuous(ylab, labels = scales::number_format(scale = 1/1000000, suffix = "")) +
+  scale_x_continuous(xlab, breaks = seq(min(out$Length),max(out$Length), by = 4)) +
   see::scale_fill_pizza(reverse = T) +
   see::scale_color_pizza(reverse = T) -> bottom
 
-bottom <- bottom + theme_bw(base_family = "GillSans", base_size = base_t_text_size) +
+bottom <- bottom + theme_classic(base_family = "GillSans", base_size = base_t_text_size) +
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
     legend.position = 'none',
     panel.border = element_blank(),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
-    axis.text.x = element_text(size = 7))
+    # axis.line.x = element_blank(),
+    axis.text.x = element_text(size = base_t_text_size))
 
 # 2) top -----
 
-ylab <- "Freq. (%)"
+ylab <- "Frac. of reads"
 xlab <- ""
 
 
@@ -87,7 +88,7 @@ top <- out %>%
   see::scale_fill_pizza(reverse = T) + 
   see::scale_color_pizza(reverse = T) +
   guides(fill = guide_legend(title = "", label_size = 3)) +
-  theme_bw(base_family = "GillSans", base_size = base_t_text_size) +
+  theme_classic(base_family = "GillSans", base_size = base_t_text_size) +
   theme(strip.background = element_rect(fill = 'grey86', color = 'white'),
     legend.position = 'top',
     legend.key.width = unit(0.2, "cm"),
@@ -96,15 +97,16 @@ top <- out %>%
     panel.grid.minor = element_blank(),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
+    axis.line.x = element_blank(),
     panel.grid.major = element_blank())
 
 
 library(patchwork)
 
 
-ps <- top / plot_spacer() / bottom + plot_layout(heights = c(0.5, -0.2, 1))
+ps <- top / plot_spacer() / bottom + plot_layout(heights = c(0.5, -0.35, 1))
 
-ggsave(ps, filename = 'FIGURE_2.png', path = path_out, width = 4, height = 2.7, device = png, dpi = 300)
+ggsave(ps, filename = 'FIGURE_2.png', path = path_out, width = 2, height = 1.7, device = png, dpi = 300)
 
 
 
@@ -318,7 +320,7 @@ recode_to <- c(`HR248` = "A)", `HR1108`= "B)",`HR2476` = "C)", `HR11076` = "D)")
 
 out <- df %>% 
   pivot_longer(cols = all_of(which_names), names_to = "sample_id", values_to = "Reads") %>% 
-  left_join(mtd) %>%
+  left_join(MTD) %>%
   mutate(sample_group = substr(sample_id, 1,nchar(sample_id)-1)) %>%
   dplyr::mutate(sample_group = dplyr::recode_factor(sample_group, !!!recode_to)) %>%
   mutate(sample_group = factor(sample_group, levels = recode_to)) %>%
