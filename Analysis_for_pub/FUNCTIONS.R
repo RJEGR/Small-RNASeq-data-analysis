@@ -261,7 +261,7 @@ GOenrichment <- function(query.p, query.names, gene2GO, cons = T, onto = "BP", N
   
   # keep MAP of query genes
   
-  keep <- names(gene2GO) %in% names(query.p) 
+  keep <- names(gene2GO) %in% names(query.p)
   
   gene2GO <- gene2GO[keep]
   
@@ -277,8 +277,10 @@ GOenrichment <- function(query.p, query.names, gene2GO, cons = T, onto = "BP", N
       ontology = onto, 
       description = description,
       allGenes = query.p,
-      # geneSel = function(x) { x == 1 },
+      # geneSel:Function to specify which genes are interesting based on the gene scores. Ex.
       geneSel = function(x) x,
+      # The function below assumes that the provided argument is a named vector of p-values.
+      # geneSel = topDiffGenes,
       annot = annFUN.gene2GO,
       gene2GO = gene2GO)
   } else {
@@ -293,15 +295,15 @@ GOenrichment <- function(query.p, query.names, gene2GO, cons = T, onto = "BP", N
       gene2GO = gene2GO)
   }
   
-  topGOdata <- new("topGOdata", 
-    ontology = onto, 
-    description = description,
-    allGenes = query.p,
-    # geneSel = function(x) { x == 1 },
-    geneSel = function(x) x,
-    annot = annFUN.gene2GO,
-    # mapping = hsGO, # omit this flag
-    gene2GO = gene2GO)
+  # topGOdata <- new("topGOdata",
+  #   ontology = onto,
+  #   description = description,
+  #   allGenes = query.p,
+  #   # geneSel = function(x) { x == 1 },
+  #   geneSel = function(x) x,
+  #   annot = annFUN.gene2GO,
+  #   # mapping = hsGO, # omit this flag
+  #   gene2GO = gene2GO)
   
   # run TopGO results 
   
@@ -464,4 +466,25 @@ SEMANTIC_SEARCH <- function(x, orgdb = "org.Ce.eg.db", semdata = semdata) {
   # data <- cbind(as.data.frame(y$points), data[match(rownames(y$points), data$go),])
   
   return(data)
+}
+
+# 
+
+GroupDensityDF <- function (object, whichGO, ranks = FALSE, rm.one = TRUE) 
+{
+  groupMembers <- genesInTerm(object, whichGO)[[1]]
+  allS <- geneScore(object, use.names = TRUE)
+  if (rm.one) 
+    allS <- allS[allS < 0.99]
+  xlab <- "Gene' score"
+  if (ranks) {
+    allS <- rank(allS, ties.method = "random")
+    xlab <- "Gene's rank"
+  }
+  group <- as.integer(names(allS) %in% groupMembers)
+  xx <- data.frame(score = allS, group = factor(group, labels = paste(c("complementary", 
+    whichGO), "  (", table(group), ")", sep = "")))
+  # return(densityplot(~score | group, data = xx, layout = c(1, 2), xlab = xlab))
+  
+  return(xx)
 }
