@@ -21,6 +21,8 @@ dir <- "~/Documents/MIRNA_HALIOTIS/ENSEMBLE/calcif/"
 
 f <- list.files(dir, pattern = ".outfmt6", full.names = T)
 
+# selecting only biomineralization
+f <- f[grepl("Combined_Gastropoda|shell_matrix", f)]
 
 library(tidyverse)
 
@@ -41,9 +43,9 @@ read_outfmt6 <- function(f) {
   
 }
 
-df <- do.call(rbind, lapply(f, read_outfmt6))
+SMP_DB <- do.call(rbind, lapply(f, read_outfmt6))
 
-df %>% ggplot(aes(identity, color = db)) + stat_ecdf()
+# df %>% ggplot(aes(identity, color = db)) + stat_ecdf()
 
 # merge to functional db
 # gene2tr -----
@@ -52,16 +54,15 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/"
 gene2tr <- read_rds(paste0(wd, "genome_features.rds"))[[1]] %>% 
   distinct(gene_id, transcript_id)
 
-df <- df %>% distinct(transcript_id, subject) %>% left_join(gene2tr)
+SMP_DB <- SMP_DB %>% distinct(transcript_id, subject) %>% left_join(gene2tr)
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
-
-
+# 
 print(FUNCTIONAL_DB <- read_rds(paste0(wd,"SRNA_FUNCTION_PREDICTED_LONG_EXPRESSED.rds")))
-
-df <- df %>% left_join(FUNCTIONAL_DB, by = "gene_id")
-
-df %>% dplyr::select(dplyr::starts_with("SRR")) %>% as("matrix") %>% heatmap(Colv = NA)
+# 
+# df <- df %>% left_join(FUNCTIONAL_DB, by = "gene_id")
+# 
+# df %>% dplyr::select(dplyr::starts_with("SRR")) %>% as("matrix") %>% heatmap(Colv = NA)
 
 # MajorRNA2Name -----
 
@@ -73,7 +74,7 @@ print(.LOCATION_DB <- read_rds(paste0(wd, "RNA_LOCATION_MIR_DB.rds")))
 
 MajorRNA2Name <- .LOCATION_DB %>% distinct(MajorRNA, Name) %>%   dplyr::rename("query" = "Name")
 
-# EGGMAPPER
+# EGGMAPPER -----
 # THIS OUTPUT IS DERIVED FROM ALL miRNA-mRNA TARGETS (~170 GENES) passed through eggnogmapper
 # 
 # f <- "/Users/cigom/Documents/GitHub/Small-RNASeq-data-analysis/NOG.annotations.tsv"
@@ -98,7 +99,7 @@ dir <- "~/Documents/MIRNA_HALIOTIS/ENSEMBLE/calcif/"
 f <- list.files(dir, pattern = "eggnog_mapper.emapper.annotations", full.names = T)
 
 # the eggnog_mapper.emapper.annotations file is the good one
-eggnog_db <- read_tsv(f[1], comment = "##")
+eggnog_db <- read_tsv(f, comment = "##")
 
 # Prior to EDA, bind data bases
 # Bind keyids data bases ----
