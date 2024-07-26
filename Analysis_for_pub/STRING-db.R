@@ -44,7 +44,6 @@ f <- list.files(dir, pattern = "STRING_DB_species.v12.0.txt", full.names = T)
 
 taxon_df <- read_tsv(f) %>% mutate(taxon_id = as.character(`#taxon_id`))
 
-
 df <- df %>% 
   mutate(taxon_id = sapply(strsplit(subject, "[.]"), `[`, 1)) %>% 
   left_join(taxon_df) 
@@ -85,13 +84,10 @@ string_links <- function(x) {
 
 links_dir <- file.path(dir, "protein_links_full_v12_dir")
 
-# lapply(taxons[ !taxons %in% sapply(strsplit(list.files(links_dir), "[.]"), `[`, 1)], string_links)
+lapply(taxons[ !taxons %in% sapply(strsplit(list.files(links_dir), "[.]"), `[`, 1)], string_links)
 
 
 string_info <- function(x) {
-  
-  
-  # https://stringdb-downloads.org/download/protein.info.v12.0/225164.protein.info.v12.0.txt.gz
   
   out_dir <- file.path(dir, "protein_info_v12_dir")
   
@@ -121,10 +117,7 @@ lapply(taxons[ !taxons %in% sapply(strsplit(list.files(info_dir), "[.]"), `[`, 1
 
 # lapply(taxons, string_info)
 
-
-
 f <- list.files(file.path(dir, "protein_info_v12_dir"), pattern = "gz", full.names = T)
-
 
 protein_info_df <- read_tsv(f, col_names = T) 
 
