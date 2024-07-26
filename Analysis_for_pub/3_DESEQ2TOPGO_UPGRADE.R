@@ -756,3 +756,4 @@ psave <- p+p2 + plot_layout(widths = c(2, 8))
 
 ggsave(psave, filename = 'TARGETS_HEATMAP2BARPLOT_DEGS_EN.png', path = wd, width = 10, height = 3.5, device = png, dpi = 300)
 
+
