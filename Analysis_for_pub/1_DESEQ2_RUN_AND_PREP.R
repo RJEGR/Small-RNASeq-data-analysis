@@ -13,9 +13,12 @@ options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
 
 library(tidyverse)
 
-path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/Outputs/"
 
 count_f <- list.files(path = path, pattern = "Counts.txt", full.names = T)
+
+path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+
 
 DB_f <- list.files(path = path, pattern = "RNA_LOCATION_DB.tsv", full.names = T)
 
@@ -31,7 +34,7 @@ DB <- read_tsv(DB_f)
 
 str(query.ids <- DB %>% filter(SRNAtype == "miR") %>% distinct(Name) %>% pull())
 
-COUNTS <- read_tsv(count_f)
+print(COUNTS <- read_tsv(count_f))
 
 colNames <- gsub(".clean.newid.subset", "", names(COUNTS))
 

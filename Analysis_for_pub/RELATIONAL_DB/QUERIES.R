@@ -41,8 +41,11 @@ print(DB <- read_tsv(file.path(dir, "LONGER_RELATIONAL_DB.tsv")))
 
 dir <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
+WGCNA <- read_rds(paste0(dir, "WGCNA_MIRS.rds"))
+
 RES <- read_tsv(list.files(path = dir, 
-  pattern = "SEQUENCES_MERGED_DESEQ_RES.tsv", full.names = T)) 
+  pattern = "SEQUENCES_MERGED_DESEQ_RES.tsv", full.names = T)) %>%
+  left_join(WGCNA)
 
 RES.P <- RES %>% 
   filter( padj < 0.05  & abs(log2FoldChange) > 1)
@@ -165,9 +168,9 @@ QUERYDB <- RES.P %>% filter(CONTRAST == "CONTRAST_C") %>%
 
 # CAUTION: GENES ARE MULTI-TARGETS
 
-# DB %>% 
-#   distinct(gene_id, MajorRNA) %>%
-#   count(MajorRNA, sort = T)
+DB %>%
+  distinct(gene_id, MajorRNA) %>%
+  count(MajorRNA, sort = T)
 
 paste_col <- function(x) { 
   x <- x[!is.na(x)] 
@@ -182,6 +185,7 @@ paste_col <- function(x) {
 gene2GO <- DB %>% 
   right_join(QUERYDB, by = "MajorRNA") %>%
   distinct(gene_id, MajorRNA) 
+
 
 gene2GO <- GODB %>% 
   mutate(GOs = strsplit(GOs, ",")) %>%
@@ -202,9 +206,9 @@ runTopGO <- function(x, y, Nodes = 20, onto = "BP") {
   
   # gene2GO <- gene2GO %>% filter(CONTRAST == x)
   gene2GO <- split(strsplit(gene2GO$GOs, ";") , gene2GO$MajorRNA)
+  
   gene2GO <- lapply(gene2GO, unlist)
   
-
   keep <- names(gene2GO) %in% names(allMIRS)
   
   gene2GO <- gene2GO[keep]
@@ -225,38 +229,148 @@ runTopGO <- function(x, y, Nodes = 20, onto = "BP") {
     annot = annFUN.gene2GO,
     gene2GO = gene2GO)
   
+  # Boostraping
+  if(is.infinite(Nodes)) {
+    cat("Using boostraping")
+    
+    allRes <- list()
+    
+    for (i in c(20, 50, 75, 100, length(allMIRS))) {
+      
+      DF <- runtopGO(topGOdata, topNodes = i, conservative = T)
+      
+      allRes[[i]] <- data.frame(DF, Top = i)
+    }
+    
+    allRes <- do.call(rbind, allRes)
+
+  } else {
+    
+    cat("Using topNodes lim")
+
+    allRes <- runtopGO(topGOdata, topNodes = Nodes, conservative =T)
+    
+    allRes <- data.frame(allRes, Top = Nodes)
+  }
+ 
+  out <- data.frame(allRes, GROUP = x)
   
-  allRes <- runtopGO(topGOdata, topNodes = Nodes, conservative = T)
-  
-  allRes <- data.frame(allRes, GROUP = x)
+  return(out)
 }
 
 QUERYDB <- RES.P %>% 
-  mutate(dir = ifelse(sign(log2FoldChange) == -1, "-logFC","logFC"), 
-    CONTRAST = paste0(CONTRAST, dir))
+  mutate(dir = ifelse(sign(log2FoldChange) == -1, "-logFC","+logFC"), 
+    CONTRAST = paste0(CONTRAST, ":", dir))
 
 CONTRAST2GO <- QUERYDB %>% distinct(CONTRAST) %>% pull()
 
-OUT <- lapply(CONTRAST2GO, function(x) runTopGO(x, QUERYDB, Nodes = 50))
+OUT <- lapply(CONTRAST2GO, function(x) runTopGO(x, QUERYDB, Nodes = Inf))
 
-print(data <- dplyr::bind_rows(OUT, .id = "DE") %>% as_tibble())
+print(data <- dplyr::bind_rows(OUT) %>% as_tibble())
+# 
+# write_tsv(data, file = file.path(dir, "Boostrap_topGO.tsv"))
 
-hist(as.numeric(data$classicFisher))
+str(GO.IDS <- data %>% distinct(GO.ID) %>% pull() %>% sort())
+
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
+
+orgdb <- "org.Hs.eg.db" # "org.Ce.eg.db"
+
+# semdata <- GOSemSim::godata(orgdb, ont="BP")
+# write_rds(semdata, file = paste0(wd, orgdb, ".rds"))
+
+semdata <- read_rds(paste0(wd, orgdb, ".rds"))
+
+SEM <- SEMANTIC_SEARCH(GO.IDS, orgdb = orgdb, semdata = semdata)
+
+data <- data %>% left_join(SEM, by = c("GO.ID" = "go"))
+
+write_tsv(data, file = file.path(dir, "Boostrap_topGO.tsv"))
+
+
+recode_c <- c("CONTRAST_A:-logFC" = "24 hpf:pH 7.6",
+  "CONTRAST_B:+logFC" = "110 hpf:pH 8.0",
+  "CONTRAST_B:-logFC" = "110 hpf:pH 7.6",
+  "CONTRAST_C:+logFC" = "24 hpf:pH 8.0",
+  "CONTRAST_C:-logFC"= "110 hpf:pH 8.0",
+  "CONTRAST_D:+logFC"= "24 hpf:pH 7.6",
+  "CONTRAST_D:-logFC" = "110 hpf:pH 7.6")
+
+
+data <- data %>%
+  mutate(CONTRAST = dplyr::recode_factor(GROUP, !!!recode_c)) %>%
+  mutate(Top = ifelse(!Top %in% c(20, 50, 75, 100), "All", Top)) %>%
+  mutate(Top = factor(as.character(Top), levels = c(20, 50, 75, 100, "All"))) %>%
+  group_by(CONTRAST, Top) %>%
+  mutate(Ratio = size / max(size)) %>%
+  filter(Ratio > 0) %>%
+  separate(CONTRAST, into = c("f1", "f2"), sep = ":")
+
+write_tsv(data, file = file.path(dir, "Boostrap_topGO.tsv"))
+
+
+data %>% ungroup() %>% count(f1, f2)
+
+p <- data %>%
+  mutate(classicKS = as.double(classicKS), 
+    elimKS = as.double(elimKS)) %>%
+  ggplot(aes(x = Top, y = parentTerm, fill = -log10(classicKS))) +
+  geom_tile(color = 'white', linewidth = 0.2) +
+  facet_grid(~ f1+f2, switch = "y", scales = "free_y") +
+  theme_bw(base_family = "GillSans", base_size = 10) +
+  # guides(fill = "none") +
+  labs(y = "Biological process", x = "Top Enrichment") +
+  scale_fill_viridis_c("Size", option = "inferno", direction = -1)
+
+p
+
+p <- data %>%  
+  # filter(as.numeric(classicKS) < 0.05) %>%
+  group_by(parentTerm, f1, f2) %>% 
+  # count()
+  summarise(Ratio = size/sum(size)) %>% 
+  ggplot(aes(x = f2, y = parentTerm, fill = Ratio)) +
+  geom_tile(color = 'white', linewidth = 0.2) +
+  facet_grid(~ f1, switch = "y", scales = "free_y") +
+  theme_bw(base_family = "GillSans", base_size = 10) +
+  # guides(fill = "none") +
+  labs(y = "Biological process", x = "") +
+  scale_fill_viridis_c("Enrichment ratio", option = "inferno", direction = -1)
+
+p +
+  theme(legend.position = "top",
+    # axis.text.y.left = element_blank(),
+    axis.ticks.y.left = element_blank(),
+    strip.background.x = element_rect(fill = 'grey89', color = 'white'),
+    strip.text.y.left = element_text(angle = 0, size = 10, hjust = 1),
+    strip.background.y = element_rect(fill = 'white', color = 'white'),
+    panel.border = element_blank(),
+    plot.title = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.text.y = element_text(angle = 0, size = 10),
+    axis.text.x = element_text(angle = 90, size = 10)) 
+
 
 # Next we want to analyse the distribution of the genes annotated to a GO term of interest. In an enrichment analysis one expects that the genes annotated to a signicantly enriched GO term have higher scores than the average gene' score of the gene universe
 
-goID <- allRes[20, "GO.ID"]
+# goID <- allRes[20, "GO.ID"]
 
-showGroupDensity(topGOdata, goID, ranks = TRUE)
+# showGroupDensity(topGOdata, goID, ranks = TRUE)
 
 # df <- GroupDensityDF(topGOdata, goID, ranks = TRUE)
 
-geneScore(topGOdata, use.names = TRUE)
+# geneScore(topGOdata, use.names = TRUE)
 
 # genesInTerm(topGOdata, goID)[[1]] 
 #
 data %>%
-  mutate(classicKS = as.double(classicKS), elimKS = as.double(elimKS)) %>%
-  ggplot(aes(x = as.factor(`Rank.in.classicFisher`), y = -log10(elimKS))) + 
-  facet_grid(GROUP ~.) +
-  geom_path(group = 1)
+  mutate(classicKS = as.double(classicKS), 
+         elimKS = as.double(elimKS)) %>%
+  ggplot(aes(x = as.factor(`Rank.in.classicFisher`), y = -log(elimKS))) + 
+  geom_boxplot()
+  # facet_grid(GROUP ~.) +
+  # geom_path(group = 1)

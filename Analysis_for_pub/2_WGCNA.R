@@ -123,7 +123,7 @@ adjacency <- adjacency(datExpr,
   type = "unsigned")
 
 
-TOM <- TOMsimilarity(adjacency, TOMType = "signed") # specify network type
+TOM <- TOMsimilarity(adjacency, TOMType = "unsigned") # specify network type
 
 
 dissTOM = 1 - TOM
@@ -198,10 +198,16 @@ nm <- table(moduleColors)
 cat('Number of mudules obtained\n :', length(nm))
 
 print(nm)
+MEDissThres
 
-write_rds(as_tibble(moduleColors, rownames = "Family") %>% 
-    dplyr::rename("WGCNA" = "value"), 
-  file = paste0(path, "WGCNA_MIRS.rds"))
+WGCNA <- as_tibble(moduleColors, rownames = "MajorRNA") %>% 
+  dplyr::rename("WGCNA" = "value")
+
+WGCNA <- read_tsv(list.files(path = path, 
+  pattern = "SEQUENCES_MERGED_DESEQ_RES.tsv", full.names = T)) %>%
+  left_join(WGCNA)
+
+write_rds(WGCNA, file = paste0(path, "SEQUENCES_MERGED_DESEQ_RES_WGCNA.rds"))
 
 # exit
 
