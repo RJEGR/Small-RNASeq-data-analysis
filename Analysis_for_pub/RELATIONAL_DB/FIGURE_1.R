@@ -47,7 +47,7 @@ ylab <- "Reads (Millions)"
 recode_to <- c(`24 HPF`= "24 hpf", `110 HPF` = "110 hpf")
 
 width_col <- 0.8
-base_t_text_size <- 2.7
+base_t_text_size <- 7
 
 out %>% 
   dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to)) %>%
@@ -238,9 +238,9 @@ pl <- DF %>%
   geom_col(aes(x = "x", y = n, fill = DBsource), 
     width = width_col, linewidth = 0.2) +
   # facet_grid( DBsource ~., scales = "free", space = "free") +
-  labs(x = "", y = "Number of microRNAs", fill = "") +
+  labs(x = "", y = "", fill = "") +
   scale_fill_manual(values = c("grey89", "black")) +
-  theme_bw(base_family = "GillSans", base_size = 5) +
+  theme_classic(base_family = "GillSans", base_size = 5) +
   theme(
     strip.background = element_blank(),
     strip.text = element_blank(),
@@ -251,14 +251,14 @@ pl <- DF %>%
     panel.grid.minor = element_blank(),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    axis.text.y = element_text(size = 5),
-    # axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank(),
+    # axis.text.y = element_text(size = 5),
+    axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank(),
     panel.grid.major = element_blank())
 
-pl <- pl + annotate("text", x = 1, y = 20, size = 2.5,
-  label = "Novel", angle = 90, color = "white", family = "GillSans", fontface="bold") +
-  annotate("text", x = 1, y = 70, size = 2.5,
-    label = "Known", angle = 90, color = "black",
+pl <- pl + annotate("text", x = 1, y = 20, size = 2,
+  label = "Novel (47)", angle = 90, color = "white", family = "GillSans", fontface="bold") +
+  annotate("text", x = 1, y = 70, size = 2,
+    label = "Known (70)", angle = 90, color = "black",
     family = "GillSans", fontface="bold")
 
 # Precisison values 3) -----
@@ -266,13 +266,13 @@ pl <- pl + annotate("text", x = 1, y = 20, size = 2.5,
 # CALL FOR VARIANT AND PRECISION IDENTIFICATION:
 
 pd <- .KnownRNAsDB %>%
-  mutate(x = ifelse(is.na(KnownRNAs), "Novel", "Known")) %>%
+  mutate(x = ifelse(is.na(KnownRNAs), "Novel (47)", "Known (70)")) %>%
   mutate(PRECISION = (UniqueReads+MajorRNAReads)/Reads) %>%
   # mutate(PRECISION = MajorRNAReads/Reads) %>%
   ggplot(aes(y = x, x = PRECISION, fill = stat(x))) +
   # facet_grid(x ~ ., scales = "free_y", space = "free", switch = "y") +
   facet_wrap(~ x, nrow = 2, scales = "free_y") +
-  labs(y = "", x = "Read Precision") +
+  labs(y = "", x = "microRNA Precision") +
   scale_fill_viridis_c(option = "C") +
   # xlim(0,1) +
   ggridges::geom_density_ridges_gradient(
@@ -301,13 +301,12 @@ p1 <- pl +  plot_spacer() + pr + plot_layout(widths = c(0.3, -0.1, 1))
 
 ps <- pd +  plot_spacer() + p1 + plot_layout(widths = c(0.2, -0.05, 0.9))
 
-
-
-
 ggsave(ps, filename = 'FIGURE_1_PANEL_B.png', path = path_out, 
-  width = 5, height = 2.5, device = png, dpi = 300)
+  width = 4.5, height = 2.5, device = png, dpi = 300)
 
-f1 <- bottom +  plot_spacer() + ps + plot_layout(widths = c(7, -0.5, 10))
+ps <- pd +  plot_spacer() + pr + plot_layout(widths = c(0.2, -0.035, 0.7))
+
+f1 <- bottom +  plot_spacer() + ps + plot_layout(widths = c(3, -0.3, 8))
 
 ggsave(f1, filename = 'FIGURE_1.png', path = path_out, 
-  width = 5, height = 2.5, device = png, dpi = 300)
+  width = 5.2, height = 2.5, device = png, dpi = 300)

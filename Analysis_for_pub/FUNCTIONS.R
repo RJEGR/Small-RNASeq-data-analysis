@@ -1,14 +1,14 @@
 
 # Evaluate: https://github.com/RJEGR/Cancer_sete_T_assembly/blob/main/functions.R
 
-split_blast <- function (x, hit = "BLASTP") {
+split_blast <- function (x, hit = "BLASTP_hit", prefix = "sprot_Top_") {
   
   # Upgraded function form trinotateR package:
   
   require(tidyverse)
   
   
-  hit <- paste("sprot_Top_", hit, "_hit", sep = "")
+  hit <- paste(prefix, hit, sep = "")
   
   which_vars <- c(hit, "gene_id", "transcript_id", "prot_id")
   

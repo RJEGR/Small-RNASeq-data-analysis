@@ -76,7 +76,7 @@ LOCATION_DB <- .LOCATION_DB %>%
 
 # 0 calculate distance between loci mirs ----
 
-GenomicRanges::GRanges(LOCATION_DB)
+# GenomicRanges::GRanges(LOCATION_DB)
 
 # 1) VIEW IF INTRAGENIC ARE CO-REGULATING HOST GENE =====
 

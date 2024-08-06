@@ -5,6 +5,7 @@
 # 3) LOAD STRING AND PARSE
 # 4) LOAD miRNA:mRNA  TARGET DB 
 # 4) JOIN DB
+# LOAD DEGS COLS
 
 library(tidyverse)
 
@@ -13,6 +14,8 @@ rm(list = ls())
 if(!is.null(dev.list())) dev.off()
 
 options(stringsAsFactors = FALSE, readr.show_col_types = FALSE)
+
+out_dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
 # 0
 dir <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/"
@@ -195,9 +198,32 @@ nrow(DB %>% distinct(gene_id))
 
 DB %>% distinct(gene_id, MajorRNA)
 
-out_dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
+# LOAD MICRORNA DEGS -----
+
+dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
+
+DEGSDB <- read_rds(list.files(path = dir, 
+  pattern = "SEQUENCES_MERGED_DESEQ_RES_WGCNA.rds", full.names = T)) %>%
+  filter( padj < 0.05  & abs(log2FoldChange) > 1)
+
+RNA2ID <- DEGSDB %>% distinct(MajorRNA, MirGeneDB_ID) %>%
+  dplyr::rename("MajorRNAID" = "MirGeneDB_ID")
+
+DB <- DEGSDB %>%
+  mutate(Contrast = ifelse(sign(log2FoldChange) == -1, sampleB, sampleA)) %>%
+  mutate(Contrast = paste0(CONTRAST,"_",Contrast)) %>%
+  group_by(MajorRNA) %>%
+  summarise(across(Contrast, .fns = paste_col)) %>%
+  left_join(RNA2ID) %>%
+  right_join(DB) 
+  
+  
 write_tsv(DB, file = file.path(out_dir, "LONGER_RELATIONAL_DB.tsv"))
+
+# esquisser::esquisser(DB)
+
+
 
 # EXIT ----
 

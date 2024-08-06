@@ -19,7 +19,7 @@ library(tidyverse)
 
 recode_to <- c(`U` = "Uniquely ", `P`= "Multimapper (mmap)",`R` = "Random mmap", `H` = "Highly mmap (>=50 hits) ", `N` = "Unmapped")
 
-wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out//"
+wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/Outputs//"
 
 path_out <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
@@ -58,9 +58,9 @@ alignment_details %>%
   group_by(mapping_type, read_length) %>% 
   summarise(n = sum(count)) %>%
   group_by(read_length) %>% 
-  pivot_wider(names_from = mapping_type, values_from = n ) %>% view()
-  mutate(frac = n/sum(n)) %>% 
-  dplyr::mutate(read_length = factor(read_length, levels = read_lengthL)) 
+  pivot_wider(names_from = mapping_type, values_from = n ) %>% #view()
+  # mutate(frac = n/sum(n)) %>% 
+  dplyr::mutate(read_length = factor(read_length, levels = read_lengthL)) %>%
   ggplot(aes(x = read_length, y = frac, fill = mapping_type)) +
   geom_col(width = 0.8) + # position="dodge"
   # geom_segment(aes(xend = read_length, yend = 0,  color = mapping_type), linewidth = 1) +

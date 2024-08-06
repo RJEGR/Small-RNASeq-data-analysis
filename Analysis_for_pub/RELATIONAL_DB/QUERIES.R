@@ -10,6 +10,16 @@
 # 4.1) JOIN LONGER_RELATIONAL_DB TO DEGS
 # 4.2) RUN TOP GO ENRICHMENT
 
+# ----
+# Define biological-phentypic themes
+# Calcification <---
+# Development
+# Growth
+# RM (Respiratory Metabolism)
+# Group transcriptome to these themes
+# Idealy, using only miRNA:mRNA transcripts (~ 170 transcripts)
+# Additionally, blast miRNA:mRNA transcripts to biomineralization-genes database
+
 library(tidyverse)
 
 rm(list = ls());
@@ -45,17 +55,28 @@ WGCNA <- read_rds(paste0(dir, "WGCNA_MIRS.rds"))
 
 RES <- read_tsv(list.files(path = dir, 
   pattern = "SEQUENCES_MERGED_DESEQ_RES.tsv", full.names = T)) %>%
-  left_join(WGCNA)
+  left_join(WGCNA) %>%
+  mutate(Contrast = ifelse(sign(log2FoldChange) == -1, sampleB, sampleA)) %>%
+  mutate(Contrast = paste0(CONTRAST,"_",Contrast))
 
 RES.P <- RES %>% 
   filter( padj < 0.05  & abs(log2FoldChange) > 1)
 
 RES.P %>% 
-  count(CONTRAST) %>% arrange(CONTRAST)
+  count(Contrast) %>% arrange(Contrast)
+
+
+  # facet_wrap(~ CONTRAST)
+
+# "CONTRAST_A_Low"="pH 7.6:24 hpf",
+
+# "CONTRAST_B_Control"   "CONTRAST_B_Low"      
+# [4] "CONTRAST_C_Competent" "CONTRAST_C_Control"   "CONTRAST_D_Competent"
+# [7] "CONTRAST_D_Control"
 
 DEGS <- RES.P %>% 
   filter(CONTRAST == "CONTRAST_C") %>%
-  mutate(HPF = ifelse(sign(log2FoldChange) == -1, "24 hpf", "110 hpf")) %>%
+  mutate(HPF = ifelse(sign(log2FoldChange) == -1, "110 hpf", "24 hpf")) %>%
   distinct(MajorRNA, HPF, CONTRAST)
 
 DEGS %>% count(HPF, CONTRAST)
@@ -64,8 +85,8 @@ DEGS %>% count(HPF, CONTRAST)
 # 76 MIRS DEGS IN OA
 
 DEGS_D <- RES.P %>% 
-  filter(CONTRAST == "CONTRAST_D") %>%
-  mutate(HPF = ifelse(sign(log2FoldChange) == -1, "24 hpf", "110 hpf")) %>%
+  filter(CONTRAST == "CONTRAST_D") %>% 
+  mutate(HPF = ifelse(sign(log2FoldChange) == -1, "110 hpf", "24 hpf")) %>%
   distinct(MajorRNA, HPF, CONTRAST)
 
 # DEGS %>% ggplot(aes(log2FoldChange, fill = HPF)) + geom_histogram()
@@ -88,28 +109,6 @@ sum(DEGS_D$MajorRNA %in% DEGS$MajorRNA)
 recode_to <- structure(c("pH 8.0","pH 7.6"), names = c("CONTRAST_C", "CONTRAST_D"))
 
 
-# DEGS_D %>% 
-#   # anti_join(DEGS, by = "MajorRNA") %>%
-#   left_join(DB) %>% 
-#   drop_na(COG_name) %>%
-#   distinct(MajorRNA, HPF, CONTRAST, COG_name) %>% 
-#   count(COG_name, HPF, CONTRAST, sort = T) %>%
-#   rbind(plotdf) %>%
-#   # group_by(COG_name, CONTRAST) %>% mutate(frac = n / sum(n)) %>%
-#   mutate(COG_name = factor(COG_name, levels = rev(order_n))) %>%
-#   mutate(HPF = factor(HPF, levels = c("24 hpf","110 hpf"))) %>%
-#   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
-#   ggplot(aes(y = COG_name, x = n, fill = CONTRAST)) + 
-#   labs(y = "COG", x = "Number of microRNAs") +
-#   facet_grid(~ HPF) +
-#   geom_col(position = position_dodge()) +
-#   scale_fill_grey() +
-#   guides(fill=guide_legend(title = "", nrow = 1)) +
-#   theme_bw(base_size = 12, base_family = "GillSans") +
-#   theme(legend.position = "top", 
-#     strip.background = element_rect(fill = 'grey89', color = 'white'),
-#     axis.line.x = element_blank(),
-#     axis.line.y = element_blank()) 
 
 plotdf <- DEGS_D %>% 
   # anti_join(DEGS, by = "MajorRNA") %>%
@@ -121,25 +120,37 @@ plotdf <- DEGS_D %>%
   group_by(COG_name, CONTRAST) %>% mutate(frac = n / sum(n)) %>%
   mutate(COG_name = factor(COG_name, levels = order_n)) %>%
   mutate(HPF = factor(HPF, levels = c("24 hpf","110 hpf"))) %>%
-  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to))
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to)))
 
-data_text <- plotdf %>% group_by(COG_name, CONTRAST) %>% summarise(n = sum(n)) %>%
-  mutate(n = paste0("(", n, ")"))
+data_text <- plotdf %>% 
+  group_by(COG_name, CONTRAST) %>% 
+  summarise(n = sum(n)) %>%
+  mutate(n = paste0("(", n, ")")) %>%
+  mutate(CONTRAST = factor(CONTRAST, levels = rev(recode_to)))
+
+scale_col <- c("#cd201f", "#FFFC00","#00b489","#31759b")
+
 
 plotdf %>%
   ggplot() + 
   labs(y = "NOGS", x = "Enrichment ratio (miRNA target set)") +
-  facet_grid(COG_name~ ., scales = "free_y", space = "free_y", switch = "y") + 
-  geom_col(aes(y = CONTRAST, x = frac, fill = HPF))  +
+  facet_grid(COG_name~ ., scales = "free_y", space = "free_y", switch = "y") +
+  # facet_grid(COG_name~ HPF, scales = "free_y", space = "free_y", switch = "y") +
+  geom_col(position = position_stack(reverse = T),
+    aes(y = CONTRAST, x = frac, fill = HPF))  +
+  geom_text(aes(y = CONTRAST, x = frac, label=CONTRAST), x = 0.01, hjust=0, size = 2.5, family = "GillSans") +
   # scale_y_discrete(position = "right") +
-  scale_fill_grey() +
+  # scale_fill_grey() +
+  scale_fill_manual(values = c("grey89", "gray20")) +
   guides(fill=guide_legend(title = "", nrow = 1)) +
   theme_classic(base_size = 12, base_family = "GillSans") +
   theme(legend.position = "top", 
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank(),
     strip.background = element_rect(fill = 'grey95', color = 'white'),
-    axis.line.x = element_blank(),
+    axis.line.x = element_blank(), axis.text.y = element_blank(),
     # axis.line.y = element_blank(),
-    axis.text.y = element_text(size = 7, hjust = 1),
+    # axis.text.y = element_text(size = 7, hjust = 1),
     strip.text.y.left = element_text(angle = 0, hjust = 1),
     strip.placement = "outside") +
   geom_text(data = data_text, 
@@ -151,6 +162,35 @@ plotdf %>%
 
 ggsave(p, filename = 'NOGS.png', path = dir, width = 8, height = 8, device = png, dpi = 300)
 
+
+# OR CONSIDERING LOG2FC -----
+
+
+pdens <- RES.P %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
+  left_join(DB, by = "MajorRNA") %>% drop_na(COG_name) %>%
+  mutate(COG_name = factor(COG_name, levels = order_n)) %>%
+  # !Note: here invert log2FoldChange for sort  24 and 110 hpf in the plot
+  ggplot(aes(y = COG_name, x = log2FoldChange, fill = CONTRAST)) + 
+  geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+  ggridges::geom_density_ridges(
+    alpha = 0.4, 
+    jittered_points = T,
+    position = ggridges::position_points_jitter(width = 0.5, height = 0),
+    point_shape = '|', point_size = 1, point_alpha = 1, alpha = 0.2) +
+  scale_fill_manual(values = c("gray", "black")) +
+  guides(fill=guide_legend(title = "", nrow = 1)) +
+  annotate("text", x = -10, y = 20, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 10, y = 20, label = "110 hpf", family = "GillSans") 
+
+pdens <- pdens +
+  theme_classic(base_size = 12, base_family = "GillSans") +
+  theme(legend.position = "top",
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm"))
+
+ggsave(pdens, filename = 'NOGS_dens.png', path = dir, width = 5.6, height = 8, device = png, dpi = 300)
 
 # TOP GO ENRICHMENT ----
 dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
@@ -164,7 +204,7 @@ GODB <- GODB %>% drop_na(GOs) %>% filter(GOs != "-") %>%
 # QUERY ONLY MIRS CONSERVED IN Ctrl
 
 QUERYDB <- RES.P %>% filter(CONTRAST == "CONTRAST_C") %>%
-  mutate(HPF = ifelse(sign(log2FoldChange) == -1, "24 hpf", "110 hpf"))
+  mutate(HPF = ifelse(sign(log2FoldChange) == -1, "110 hpf", "24 hpf"))
 
 # CAUTION: GENES ARE MULTI-TARGETS
 

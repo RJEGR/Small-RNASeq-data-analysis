@@ -142,48 +142,74 @@ write_tsv(df, file = file.path(dir, "gene2stringid_diamond_blastx.tsv"))
 
 # Lot of data per file when using best hit (all sequences source)
 # using only human (Model, 9606) and c. elegans (Model of larval development, 6239).
+dir <- "~/Documents/MIRNA_HALIOTIS/ENSEMBLE/calcif/"
 
 graph <- read_rds(file.path(dir, "protein_links_full_v12.rds"))
 
 f <- list.files(file.path(dir, "protein_links_full_v12_dir"), pattern = "gz", full.names = T)
 
-f <- f[grepl("9606|6239", basename(f))]
+f <- f[grepl("9606", basename(f))] # |6239
 
 links_df <- read_delim(f, col_names = T, delim = " ")
 
 query_nodes <- df %>% distinct(subject) %>% pull() %>% sort()
 
-links_df %>% filter(protein2 %in% Nodes) %>% distinct(protein2)
+str(protein1 <- links_df %>% pull(protein1) %>% sort())
+str(protein2 <- links_df %>% pull(protein2) %>% sort())
 
-Node1 <- links_df %>% distinct(protein1) %>% 
+sum(protein1 <- protein1 %in% query_nodes)
+sum(protein2 <- protein2 %in% query_nodes)
+
+identical(protein1, protein2)
+
+links_df_ <- links_df[protein1,]
+
+# to hard to run
+# nodes_list <- paste(query_nodes, collapse = "|")
+# links_ <- c("protein1", "protein2")
+# links_df_ <- links_df %>% filter_at(vars(all_of(links_)), any_vars(grepl(nodes_list, .)))
+
+Node1 <- links_df_ %>% distinct(protein1) %>% 
   dplyr::rename("Node" = "protein1")
 
-Node2 <- links_df %>% distinct(protein2) %>% 
+Node2 <- links_df_ %>% distinct(protein2) %>% 
   dplyr::rename("Node" = "protein2")
 
-Nodes <- rbind(Node1, Node2)
+nrow(Nodes <- rbind(Node1, Node2))
 
 Nodes <- Nodes %>% left_join(df, by = c("Node" = "subject"))
+
+# subset for viz
+which_targets <- c("RNF166", "CENPM", "CDK10","H2AZ2", "C1GALT1", "TFB1M","ABCG2","MAP11")
+
+visNetwork::visNetwork(nodes = Nodes, edges = links_df_)
 
 library(igraph)
 library(tidygraph)
 library(ggraph)
 
-graph <- tidygraph::tbl_graph(nodes = Nodes, edges = links_df, directed = T)
+graph <- tidygraph::tbl_graph(nodes = Nodes, edges = links_df_, directed = T)
 
-graph <- graph %>% activate("nodes") %>% filter(Node %in% query_nodes)
+# graph <- graph %>% activate("nodes") %>% filter(Node %in% query_nodes)
 
-write_rds(graph, file = file.path(dir, "protein_links_full_v12.rds"))
+write_rds(list(graph, df, links_df_), file = file.path(dir, "protein_links_full_v12.rds"))
 
-which_targets <- c("RNF166", "CENPM", "CDK10","H2AZ2", "C1GALT1", "TFB1M","ABCG2","MAP11")
 
 graph <- graph %>% activate("nodes") %>% 
   mutate(Col = ifelse(preferred_name %in% which_targets, "Target under OA", ""),
          label = ifelse(preferred_name %in% which_targets, preferred_name, ""))
   
+centrality_df <- graph %>% activate("nodes") %>% 
+  mutate(betweenness = betweenness(.), degree = centrality_degree(),
+    # membership = igraph::cluster_louvain(., igraph::E(g)$weight)$membership,
+    pageRank = page_rank(.)$vector) %>% as_tibble() %>% 
+  select(Node, preferred_name, degree, betweenness, pageRank) %>% 
+  arrange(degree) 
+
+centrality_df <- centrality_df %>% filter(degree > 0) 
 
 layout <- graph %>% activate("nodes") %>% 
-  filter(taxon_id == "9606") %>%
+  # filter(taxon_id == "9606") %>%
   mutate(betweenness = betweenness(.), degree = centrality_degree(),
         # membership = igraph::cluster_louvain(., igraph::E(g)$weight)$membership,
         pageRank = page_rank(.)$vector) %>%
