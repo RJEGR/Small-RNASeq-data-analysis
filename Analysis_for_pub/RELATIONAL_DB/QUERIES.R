@@ -53,26 +53,17 @@ dir <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
 WGCNA <- read_rds(paste0(dir, "WGCNA_MIRS.rds"))
 
+# or load SEQUENCES_MERGED_DESEQ_RES_WGCNA.rds
+
 RES <- read_tsv(list.files(path = dir, 
   pattern = "SEQUENCES_MERGED_DESEQ_RES.tsv", full.names = T)) %>%
   left_join(WGCNA) %>%
   mutate(Contrast = ifelse(sign(log2FoldChange) == -1, sampleB, sampleA)) %>%
   mutate(Contrast = paste0(CONTRAST,"_",Contrast))
 
-RES.P <- RES %>% 
-  filter( padj < 0.05  & abs(log2FoldChange) > 1)
+RES.P <- RES %>% filter( padj < 0.05  & abs(log2FoldChange) > 1)
 
-RES.P %>% 
-  count(Contrast) %>% arrange(Contrast)
-
-
-  # facet_wrap(~ CONTRAST)
-
-# "CONTRAST_A_Low"="pH 7.6:24 hpf",
-
-# "CONTRAST_B_Control"   "CONTRAST_B_Low"      
-# [4] "CONTRAST_C_Competent" "CONTRAST_C_Control"   "CONTRAST_D_Competent"
-# [7] "CONTRAST_D_Control"
+# RES.P %>% count(Contrast) %>% arrange(Contrast)
 
 DEGS <- RES.P %>% 
   filter(CONTRAST == "CONTRAST_C") %>%
@@ -101,13 +92,13 @@ plotdf <- DEGS %>%
   distinct(MajorRNA, HPF, CONTRAST, COG_name) %>% 
   count(COG_name, HPF, CONTRAST, sort = T)
 
+sum(plotdf$n)
 
 order_n <- plotdf %>% group_by(COG_name) %>% tally(n, sort = T) %>% pull(COG_name)
 
-sum(DEGS_D$MajorRNA %in% DEGS$MajorRNA)
+# sum(DEGS_D$MajorRNA %in% DEGS$MajorRNA)
 
 recode_to <- structure(c("pH 8.0","pH 7.6"), names = c("CONTRAST_C", "CONTRAST_D"))
-
 
 
 plotdf <- DEGS_D %>% 
@@ -126,9 +117,45 @@ data_text <- plotdf %>%
   group_by(COG_name, CONTRAST) %>% 
   summarise(n = sum(n)) %>%
   mutate(n = paste0("(", n, ")")) %>%
-  mutate(CONTRAST = factor(CONTRAST, levels = rev(recode_to)))
+  mutate(CONTRAST = factor(CONTRAST, levels = rev(recode_to))) %>%
+  mutate(log2FoldChange = -10)
 
-scale_col <- c("#cd201f", "#FFFC00","#00b489","#31759b")
+
+# Find brach of interactions -----
+
+rbind(DEGS, DEGS_D) %>%
+  left_join(DB) %>% 
+  drop_na(COG_name) %>% 
+  distinct(MajorRNA, COG_name) %>%
+  mutate(n = 1) %>%
+  pivot_wider(names_from = COG_name, values_from = n, values_fill = 0) %>%
+  data.frame() -> m
+
+
+rownames(m) <- m$MajorRNA
+
+m$MajorRNA <- NULL
+
+yhc <- stats::hclust(dist(t(m), method = "binary"), method="ward.D2")
+
+xhc <- stats::hclust(dist(m, method = "binary"), method="ward.D2")
+
+
+library(ggh4x)
+
+rbind(DEGS, DEGS_D) %>%
+  left_join(DB) %>% 
+  drop_na(COG_name) %>% 
+  distinct(MajorRNA, HPF, CONTRAST, COG_name) %>%
+  # mutate(COG_name = gsub("[[:blank:]]|,", ".",COG_name)) %>%
+  mutate(COG_name = factor(COG_name, levels = order_n)) %>%
+  ggplot(aes(fill = 1, y = COG_name, x = MajorRNA)) +
+  geom_tile(color = 'white', size = 0.7, width = 1) +
+  # ggh4x::scale_y_dendrogram(hclust = yhc) +
+  ggh4x::scale_x_dendrogram(hclust = xhc, label = NULL)
+
+  
+# scale_col <- c("#cd201f", "#FFFC00","#00b489","#31759b")
 
 
 plotdf %>%
@@ -160,37 +187,100 @@ plotdf %>%
 
 # p
 
-ggsave(p, filename = 'NOGS.png', path = dir, width = 8, height = 8, device = png, dpi = 300)
+# ggsave(p, filename = 'NOGS.png', path = dir, width = 8, height = 8, device = png, dpi = 300)
 
 
 # OR CONSIDERING LOG2FC -----
+
+# (optional) 1st How to diffentiated the mirs?
+# lets to upset first
+
+query <- RES.P %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
+  group_by(MajorRNA) %>%
+  summarise(across(CONTRAST, .fns = list), n = n()) %>% arrange(desc(n)) %>%
+  filter(n == 1) %>% distinct(MajorRNA) %>% pull()
 
 
 pdens <- RES.P %>% 
   filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
-  left_join(DB, by = "MajorRNA") %>% drop_na(COG_name) %>%
+  left_join(DB, by = "MajorRNA") %>% 
+  drop_na(COG_name) %>%
+  # if filter the intersected
+  filter(MajorRNA %in% query) %>%
+  # mutate(COG_name = ifelse(is.na(COG_name), "Unknown", COG_name)) %>%
   mutate(COG_name = factor(COG_name, levels = order_n)) %>%
   # !Note: here invert log2FoldChange for sort  24 and 110 hpf in the plot
-  ggplot(aes(y = COG_name, x = log2FoldChange, fill = CONTRAST)) + 
+  mutate(log2FoldChange = log2FoldChange*-1) %>%
+  # drop_na(SMPID) %>%
+  ggplot(aes(y = COG_name, x = log2FoldChange, fill = CONTRAST, color = CONTRAST)) + 
   geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+  # geom_point() +
   ggridges::geom_density_ridges(
-    alpha = 0.4, 
+    alpha = 0.5, 
     jittered_points = T,
     position = ggridges::position_points_jitter(width = 0.5, height = 0),
     point_shape = '|', point_size = 1, point_alpha = 1, alpha = 0.2) +
-  scale_fill_manual(values = c("gray", "black")) +
-  guides(fill=guide_legend(title = "", nrow = 1)) +
-  annotate("text", x = -10, y = 20, label = "24 hpf", family = "GillSans") +
-  annotate("text", x = 10, y = 20, label = "110 hpf", family = "GillSans") 
+  scale_fill_manual(values = c("black", "gray")) +
+  scale_color_manual(values = c("black", "gray")) +
+  guides(fill=guide_legend(title = "", nrow = 1), color = "none") +
+  annotate("text", x = -9, y = 20, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 9, y = 20, label = "110 hpf", family = "GillSans") +
+  annotate("text", x = 0, y = 21, label = "") 
 
 pdens <- pdens +
-  theme_classic(base_size = 12, base_family = "GillSans") +
+  labs(y = "Nested Orthologous Gene Group (NOGS)") +
+  theme_bw(base_size = 12, base_family = "GillSans") +
   theme(legend.position = "top",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
     legend.key.width = unit(0.2, "cm"),
     legend.key.height = unit(0.12, "cm"))
 
-ggsave(pdens, filename = 'NOGS_dens.png', path = dir, width = 5.6, height = 8, device = png, dpi = 300)
+pdens<- pdens + 
+  facet_grid(~ CONTRAST) +
+  geom_text(data = data_text,
+    aes(y = COG_name, x = -14, group = CONTRAST, label = n), 
+    size = 2.5, hjust = -0.1, vjust = 0, 
+    family = "GillSans", position = position_dodge(width = 1))
+
+ggsave(pdens, filename = 'NOGS_dens_facet.png', path = dir, width = 5.6, height = 8, device = png, dpi = 300)
+
+
+RES.P %>% 
+  filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!c("CONTRAST_B" = "110 hpf"))) %>%
+  left_join(DB, by = "MajorRNA") %>% 
+  drop_na(COG_name) %>%
+  # mutate(COG_name = ifelse(is.na(COG_name), "Unknown", COG_name)) %>%
+  mutate(COG_name = factor(COG_name, levels = order_n)) %>%
+  # drop_na(SMPID) %>%
+  ggplot(aes(y = COG_name, x = log2FoldChange, fill = CONTRAST, color = CONTRAST)) + 
+  geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+  geom_point() +
+  facet_grid(~ CONTRAST) +
+  scale_fill_manual(values = c("black", "gray")) +
+  scale_color_manual(values = c("black", "gray")) +
+  ggrepel::geom_text_repel(aes(label = MirGeneDB_ID), 
+    size = 2.5, hjust = -0.1, vjust = 0, 
+    family = "GillSans", position = position_dodge(width = 1), max.overlaps = 50)
+
+# by wgcna module ----
+
+RES.P %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
+  left_join(DB, by = "MajorRNA") %>% 
+  drop_na(COG_name) %>%
+  distinct(WGCNA, COG_name, MajorRNA) %>%
+  count(WGCNA, COG_name) %>%
+  mutate(COG_name = factor(COG_name, levels = order_n)) %>%
+  ggplot() +
+  geom_tile(aes(fill = n, y = COG_name, x = WGCNA),
+    color = 'white', size = 0.7, width = 1) +
+  theme(axis.text.x = element_text(angle = 45, size = 10, hjust = 1))
 
 # TOP GO ENRICHMENT ----
 dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"

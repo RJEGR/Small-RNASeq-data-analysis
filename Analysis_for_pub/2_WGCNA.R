@@ -259,53 +259,31 @@ data.frame(reads, moduleColors) %>%
 
 path <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 # 
-datTraits <- read_tsv(paste0(path, "/WGCNA_datTraits.tsv"), )
+datTraits <- read_tsv(paste0(path, "/WGCNA_datTraits.tsv"))
 
 which_cols <- colnames(datTraits)[!grepl(c("^HR"), colnames(datTraits))]  
 
 datTraits <- datTraits %>% dplyr::select_at(which_cols)
 
+datTraits <- datTraits %>% select(-Group) %>% distinct()
+
 row_names <- datTraits$Row
 
 identical(rownames(datExpr),row_names)
 
-keep <- grepl(c("HR11076|HR2476"), row_names)
+# keep <- grepl(c("HR11076|HR2476"), row_names)
 
-
-datTraits <- datTraits %>% filter(Row %in% row_names[keep])
+# datTraits <- datTraits %>% filter(Row %in% row_names[keep])
 
 datTraits$Row <- NULL
 
 datTraits <- as(datTraits, "matrix")
 
-rownames(datTraits) <- row_names[keep]
+# rownames(datTraits) <- row_names[keep]
 
-# rownames(datTraits) <- row_names
+rownames(datTraits) <- row_names
 
-
-# OR Prep binary datTraits
-
-# datTraits <- gsub(".clean.newid.subset", "", rownames(datExpr))
-# 
-# HR11076 <- grepl('HR11076', datTraits)
-# 
-# HR1108 <- grepl('HR1108', datTraits)
-# 
-# HR2476 <- grepl('HR2476', datTraits)
-# 
-# HR248 <- grepl('HR248', datTraits)
-# 
-# datTraits <- data.frame(HR11076, HR1108, HR2476, HR248)
-# 
-# datTraits <- 1*datTraits
-
-# rownames(datTraits) <- rownames(datExpr)
-
-# Recalculate MEs with color labels
-
-# MEs0 = moduleEigengenes(datExpr[,keep], moduleColors)$eigengenes
-
-MEs0 = moduleEigengenes(datExpr[keep,], moduleColors)$eigengenes
+MEs0 = moduleEigengenes(datExpr, moduleColors)$eigengenes
 
 MEs = orderMEs(MEs0)
 
@@ -331,43 +309,17 @@ df1 %>%
     ifelse(corPvalueStudent <.01, "**",
       ifelse(corPvalueStudent <.05, "*", "")))) -> df1
 
-
-df1 %>%
-  mutate(moduleTraitCor = round(moduleTraitCor, 2)) %>%
-  mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), moduleTraitCor)) %>%
-  # mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), '')) %>%
-  ggplot(aes(y = module, x = name, fill = moduleTraitCor)) +
-  geom_tile(color = 'white', size = 0.7, width = 1) +
-  # geom_raster() +
-  geom_text(aes(label = star),  vjust = 0.5, hjust = 0.5, size= 4, family =  "GillSans") +
-  ggsci::scale_fill_gsea(name = "", reverse = T, na.value = "white") +
-  # scale_fill_viridis_c(name = "Membership", na.value = "white") +
-  ggh4x::scale_y_dendrogram(hclust = hclust) +
-  labs(x = '', y = 'Module') +
-  guides(fill = guide_colorbar(barwidth = unit(3.5, "in"),
-    barheight = unit(0.1, "in"), label.position = "top",
-    alignd = 0.5,
-    ticks.colour = "black", ticks.linewidth = 0.5,
-    frame.colour = "black", frame.linewidth = 0.5,
-    label.theme = element_text(size = 10))) +
-  theme_classic(base_size = 12, base_family = "GillSans") +
-  theme(legend.position = "top",
-    strip.background = element_rect(fill = 'grey89', color = 'white')) 
-# facet_grid(~ facet, scales = 'free_x',space = "free_x")
-
-# recode_to <- structure(c("Development", "Growth", "Calcification", "Respiration", "pH 7.6", "pH 8.0", "pH 7.6", "pH 8.0"), names = colnames(datTraits))
-
 recode_to <- c("Desarrollo", "Crecimiento", "Calcificación", "Respiración")
 recode_to <- structure(recode_to,names = colnames(datTraits))
 
+lo = floor(min(df1$moduleTraitCor))
+up = ceiling(max(df1$moduleTraitCor))
+mid = (lo + up)/2
+
 
 df1 %>%
-  mutate(facet = "") %>%
-  mutate(facet = ifelse(!grepl("^HR", name), 'A) Evaluación', facet)) %>%
-  mutate(facet = ifelse(grepl("^HR24", name), 'B) 24 HPF', facet)) %>% 
-  mutate(facet = ifelse(grepl("^HR110", name), 'C) 110 HPF', facet)) %>% 
-  mutate(facet = factor(facet, levels = c('A) Evaluación', 'B) 24 HPF', 'C) 110 HPF'))) %>%
-  mutate(name = recode_factor(name, !!!recode_to, .ordered = T)) %>%
+  mutate(facet = "Trait correlation") %>%
+  # mutate(name = recode_factor(name, !!!recode_to, .ordered = T)) %>%
   # mutate(name = factor(name, levels = )) %>%
   mutate(moduleTraitCor = round(moduleTraitCor, 2)) %>%
   mutate(star = ifelse(star != '', paste0(moduleTraitCor, '(', star,')'), moduleTraitCor)) %>%
@@ -375,21 +327,26 @@ df1 %>%
   ggplot(aes(y = module, x = name, fill = moduleTraitCor)) +
   geom_tile(color = 'white', size = 0.7, width = 1) +
   # geom_raster() +
-  geom_text(aes(label = star),  vjust = 0.5, hjust = 0.5, size= 4, family =  "GillSans") +
-  ggsci::scale_fill_gsea(name = "", reverse = T, na.value = "white") +
+  geom_text(aes(label = star),  vjust = 0.5, hjust = 0.5, size= 2.5, family =  "GillSans") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+    na.value = "white", midpoint = mid, limit = c(lo, up),
+    name = NULL) +
   # scale_fill_viridis_c(name = "Membership", na.value = "white") +
   ggh4x::scale_y_dendrogram(hclust = hclust) +
-  labs(x = '', y = 'Module') +
-  guides(fill = guide_colorbar(barwidth = unit(3.5, "in"),
-    barheight = unit(0.1, "in"), label.position = "top",
+  scale_x_discrete(position = "top") +
+  labs(x = '', y = 'microRNA co-expression module') +
+  guides(fill = guide_colorbar(barwidth = unit(2, "in"),
+    barheight = unit(0.1, "in"), label.position = "bottom",
     alignd = 0.5,
-    ticks.colour = "black", ticks.linewidth = 0.5,
-    frame.colour = "black", frame.linewidth = 0.5,
-    label.theme = element_text(size = 10))) +
-  theme_classic(base_size = 12, base_family = "GillSans") +
-  theme(legend.position = "top",
-    strip.background = element_rect(fill = 'grey89', color = 'white')) +
-  facet_grid(~ facet, scales = 'free_x',space = "free_x") -> p1
+    ticks.colour = "black", ticks.linewidth = 0.35,
+    frame.colour = "black", frame.linewidth = 0.35,
+    label.theme = element_text(size = 8, family = "GillSans"))) +
+  theme_classic(base_size = 8, base_family = "GillSans") +
+  theme(legend.position = "bottom",
+    strip.background = element_rect(fill = 'white', color = 'white'),
+    strip.text = element_text(color = "black",hjust = 1),
+    strip.placement = "outside") +
+  facet_grid(~ facet, scales = 'free_x',space = "free_x",switch = "x") -> p1
 
 p1 <- p1 + theme(
   axis.line.x = element_blank(),
@@ -399,6 +356,12 @@ p1 <- p1 + theme(
 
 p1 <- p1 + theme(panel.spacing.x = unit(-0.5, "mm"))
 
+# p1
+path_out <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
+
+ggsave(p1, filename = 'WGCNA.png', path = path_out, width = 3.5, height = 3.5, device = png, dpi = 400)
+
+
 # BARPLOT
 
 
@@ -406,7 +369,7 @@ p2 <- stats %>%
   mutate(module = factor(module, levels = hclust$labels[hclust$order])) %>%
   ggplot(aes(y = module)) + #  fill = DE, color = DE
   scale_x_continuous("Número de miRs") +
-  geom_col(aes(x = n), width = 0.95, position = position_stack(reverse = TRUE)) +
+  geom_col(aes(x = n, fill = DE), width = 0.95, position = position_stack(reverse = TRUE)) +
   # geom_col(aes(x = reads_frac), width = 0.95, fill = "grey")
   # scale_fill_manual(name = '', values = c("#303960", "#647687", "#E7DFD5")) + # grey90
   theme_classic(base_size = 14, base_family = "GillSans") +

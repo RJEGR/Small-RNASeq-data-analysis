@@ -306,3 +306,86 @@ ggraph(graph, 'stress') +
   # geom_node_point() + 
   geom_edge_link() + 
   coord_fixed()
+
+
+# Find relation between target net and stringnet -------
+m1 <- DB %>%
+  distinct(MajorRNA, STRINGID) %>%
+  drop_na(STRINGID) %>%
+  # filter(STRINGID %in% hc2$labels) %>%
+  mutate(n = 1) %>%
+  pivot_wider(names_from = MajorRNA, values_from = n, values_fill = 0) %>%
+  data.frame() 
+
+rownames(m1) <- m1$STRINGID
+
+m1$STRINGID <- NULL
+
+g <- stringg
+
+nodes <- g %>% activate("nodes") %>% as_tibble()
+edges <- g %>% activate("edges") %>% as_tibble()
+
+edges$from <- nodes[edges$from,]$preferred_name
+edges$to <- nodes[edges$to,]$preferred_name
+
+m2 <- edges %>% 
+  drop_na() %>%
+  select(from, to) %>%
+  mutate(n = 1) %>%
+  pivot_wider(names_from = from, values_from = n, values_fill = 0) %>%
+  data.frame() 
+
+rownames(m2) <- m2$to
+
+m2$to <- NULL
+
+
+# filter matrix
+
+dim(m1)
+dim(m2)
+
+sum(keep <- rownames(m1) %in% rownames(m2))
+
+m1 <- m1[keep,]
+
+sum(keep <- rownames(m2) %in% rownames(m1))
+
+m2 <- m2[keep,]
+
+
+hc1 <- stats::hclust(dist(m1, method = "binary"), method="ward.D2")
+
+hc2 <- stats::hclust(dist(m2, method = "binary"), method="ward.D2")
+
+# Create two dendrograms
+dend1 <- as.dendrogram (hc1)
+dend2 <- as.dendrogram (hc2)
+
+# Align and plot two dendrograms side by side
+dendlist("targetnet" = dend1, "stringnet" = dend2) %>%
+  untangle(method = "random") %>% # Find the best alignment layout
+  tanglegram(
+    sort = T,
+    highlight_distinct_edges = F,
+    highlight_branches_col = F,
+    highlight_branches_lwd = F,
+    common_subtrees_color_lines = F,
+    common_subtrees_color_branches = T) # %>% 
+  # plot(sub = paste("entanglement =", round(entanglement(.), 2)))
+
+
+cor_bakers_gamma(dend1, dend2)
+
+
+dendlist(dend1, dend2) %>%
+  untangle(method = "random", R = 20) %>%
+  entanglement() # Alignment quality
+
+# Create a list to hold dendrograms
+dend_list <- dendlist(dend1, dend2)
+
+cors <- cor.dendlist(dend_list, method = "common_nodes")
+# Print correlation matrix
+round(cors, 2)
