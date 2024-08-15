@@ -146,43 +146,56 @@ library(ggh4x)
 
 col <- WGCNA %>% distinct(WGCNA) %>% pull(WGCNA, name = WGCNA)
 
+# P
+# group by unique and shared process
 
-P <- rbind(DEGS, DEGS_D) %>%
-  left_join(DB) %>% 
-  drop_na(COG_name) %>% 
-  distinct(MajorRNA, HPF, CONTRAST, COG_name) %>%
-  left_join(WGCNA) %>%
-  # mutate(COG_name = gsub("[[:blank:]]|,", ".",COG_name)) %>%
-  # distinct(COG_name, WGCNA)
-  # mutate(COG_name = factor(COG_name, levels = unique(COG_name)[yhc$order])) %>%
-  mutate(COG_name = factor(COG_name, levels = order_n)) %>%
-  mutate(MajorRNA = factor(MajorRNA, levels = unique(MajorRNA)[xhc$order])) %>%
-  ggplot(aes(fill = WGCNA, y = COG_name, x = MajorRNA)) +
-  geom_tile(color = 'white', size = 0.5, width = 0.7, height = 0.5, alpha = 0.7) +
-  scale_fill_manual("", values = col) +
-  labs(x = "microRNA co-expression module", y = "") +
-  # ggh4x::scale_y_dendrogram(hclust = yhc) +
-  # ggh4x::scale_x_dendrogram(hclust = xhc, label = NULL, position = "top") +
-  theme_classic(base_family = "GillSans", base_size = 10) +
-  theme(legend.position = 'none', 
-    axis.ticks.x = element_blank(),
-    axis.text.x = element_blank())
+# DEGS %>%
+# # rbind(DEGS, DEGS_D) %>%
+#   # group_by(MajorRNA, HPF) %>%
+#   # summarise(across(CONTRAST, .fns = which_contrast), n = n()) %>%
+#   left_join(WGCNA) %>%
+#   left_join(DB) %>% drop_na(COG_name) %>%
+#   distinct(HPF, CONTRAST, WGCNA, COG_name) %>%
+#   group_by(COG_name, WGCNA,CONTRAST) %>%
+#   summarise(across(HPF, .fns = which_contrast), n = n()) %>% #view()
+#   ungroup() %>%
+#   count(COG_name, WGCNA, HPF, CONTRAST) %>%
+#   mutate(COG_name = factor(COG_name, levels = order_n)) %>%
+#   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
+#   mutate(WGCNA = factor(WGCNA, levels = c("green","yellow","brown","red","blue","turquoise"))) %>%
+#   ggplot(aes(fill = WGCNA, y = COG_name, x = WGCNA, color = WGCNA)) +
+#   # facet_grid(~ CONTRAST+HPF, scales = "free", space = "free") +
+#   # geom_tile(color = 'white', size = 0.7, width = 1) +
+#   geom_point(aes(size = n)) 
+#   
+# rbind(DEGS, DEGS_D) %>%
+#   group_by(MajorRNA, HPF) %>%
+#   summarise(across(CONTRAST, .fns = which_contrast), n = n()) %>%
+#   left_join(DB) %>% drop_na(COG_name) %>%
+#   left_join(WGCNA) %>%
+#   ungroup() %>%
+#   count(COG_name, WGCNA, HPF, CONTRAST) %>%
+#   mutate(COG_name = factor(COG_name, levels = order_n)) %>%
+#   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
+#   mutate(WGCNA = factor(WGCNA, levels = c("green","yellow","brown","red","blue","turquoise"))) %>%
+#   group_by(CONTRAST, WGCNA) %>% mutate(Size = n/sum(n)) %>%
+#   ggplot(aes(fill = WGCNA, y = COG_name, x = WGCNA, color = WGCNA)) +
+#   facet_grid(HPF ~ CONTRAST, scales = "free", space = "free") +
+#   # geom_tile(color = 'white', size = 0.7, width = 1) +
+#   geom_point(aes(size = Size, alpha = Size)) +
+#   scale_color_manual("", values = col) +
+#   scale_fill_manual("", values = col) +
+#   theme_classic(base_family = "GillSans", base_size = 10) +
+#   theme(legend.position = 'none',
+#     axis.text.y = element_blank(),
+#     axis.line.y = element_blank(),
+#     axis.ticks.y = element_blank(),
+#     axis.ticks.x = element_blank(),
+#     axis.text.x = element_blank())
 
-P
 
-rbind(DEGS, DEGS_D) %>%
-  group_by(MajorRNA, HPF) %>%
-  summarise(across(CONTRAST, .fns = which_contrast), n = n()) %>%
-  left_join(DB) %>% drop_na(COG_name) %>%
-  left_join(WGCNA) %>%
-  ungroup() %>%
-  count(COG_name, WGCNA, HPF, CONTRAST) %>%
-  mutate(COG_name = factor(COG_name, levels = unique(COG_name)[yhc$order])) %>%
-  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
-  ggplot(aes(fill = WGCNA, y = COG_name, x = WGCNA)) +
-  facet_grid(~ CONTRAST+HPF, scales = "free", space = "free") +
-  geom_tile(color = 'white', size = 0.7, width = 1) +
-  scale_fill_manual("", values = col)
+
+
 # 
 # 
 # rbind(DEGS, DEGS_D) %>%
@@ -196,10 +209,6 @@ rbind(DEGS, DEGS_D) %>%
 #   geom_tile(color = 'white', size = 0.7, width = 1) +
 #   scale_fill_manual("", values = col)
 
-TOPDF <- rbind(DEGS, DEGS_D) %>%
-  distinct(MajorRNA) %>%
-  left_join(WGCNA) %>%
-  mutate(y = 1)
 
 which_contrast <- function(x) { 
   x <- x[!is.na(x)] 
@@ -213,22 +222,44 @@ which_contrast <- function(x) {
 
 
 TOPDF <- rbind(DEGS, DEGS_D) %>%
-  group_by(MajorRNA, HPF) %>%
-  summarise(across(CONTRAST, .fns = which_contrast), n = n()) %>% 
-  arrange(desc(n)) %>%
   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
-  # mutate(label = paste0(HPF, " (", CONTRAST, ")")) %>%
-  mutate(label = ifelse(CONTRAST == "pH 7.6", "*", "")) %>%
+  group_by(MajorRNA, HPF) %>%
+  summarise(across(CONTRAST, .fns = which_contrast)) %>%
+  # arrange(desc(n)) %>%
   mutate(shape = ifelse(CONTRAST == "pH 7.6", "pH 7.6", "")) %>%
   mutate(y = 1) 
 
 TOPDF %>% group_by(CONTRAST, HPF) %>% count()
 
+
+P <- TOPDF %>%
+  left_join(WGCNA) %>%
+  left_join(DB) %>% drop_na(COG_name) %>% 
+  distinct(MajorRNA, WGCNA, HPF, CONTRAST, COG_name, COG_category) %>% 
+  # ungroup() %>% count(WGCNA, HPF, CONTRAST, COG_name, COG_category)
+  # Filter by freq. of targeting
+  mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>%
+  ungroup() %>%
+  mutate(COG_name = factor(COG_name, levels = sort(decreasing = T, unique(COG_name)))) %>%
+  mutate(MajorRNA = factor(MajorRNA, levels = xhc$labels[xhc$order])) %>%
+  ggplot(aes(fill = WGCNA, y = COG_name, x = MajorRNA)) +
+  geom_tile(color = 'white', size = 0.5, width = 0.7, height = 0.5, alpha = 0.7) +
+  # geom_point(aes(shape = CONTRAST, color = WGCNA), alpha = 0.5) +
+  # scale_shape_manual(values = c(19, 8)) +
+  scale_fill_manual("", values = col) +
+  scale_color_manual("", values = col) +
+  labs(x = "microRNA co-expression module", y = "") +
+  theme_classic(base_family = "GillSans", base_size = 10) +
+  theme(legend.position = 'none', 
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank())
+
+P
 topplot <- TOPDF %>%
   mutate(HPF = factor(HPF)) %>%
   ggplot(aes(y = y, x = MajorRNA, color = HPF)) + # color = as.factor(hpf)
   # facet_grid(~ HPF, scales = "free", space = "free") +
-  # ggh4x::scale_x_dendrogram(hclust = xhc, position = 'top', labels = NULL) +
+  ggh4x::scale_x_dendrogram(hclust = xhc, position = 'top', labels = NULL) +
   # geom_point(shape = 15, size = 2) +
   geom_point(aes(shape = shape), size =0.7) +
   scale_shape_manual(values = c(19, 8)) +
@@ -255,7 +286,7 @@ library(patchwork)
 
 ps <- topplot/ plot_spacer() /P + plot_layout(heights = c(0.1, -0.1, 4))
 
-ps + facet_grid(~ HPF, scales = "free", space = "free")
+# ps + facet_grid(~ HPF, scales = "free", space = "free")
 
 ggsave(ps, filename = 'WGCNA2NOGS.png', path = dir, width = 10, height = 4, device = png, dpi = 300)
 
@@ -307,19 +338,23 @@ query <- RES.P %>%
   summarise(across(CONTRAST, .fns = list), n = n()) %>% arrange(desc(n)) %>%
   filter(n == 1) %>% distinct(MajorRNA) %>% pull()
 
+DB %>% mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>% distinct(COG_name) %>% arrange(COG_name)
 
 pdens <- RES.P %>% 
   filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
-  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
   left_join(DB, by = "MajorRNA") %>% 
   drop_na(COG_name) %>%
   # if filter the intersected
   # filter(MajorRNA %in% query) %>%
   # mutate(COG_name = ifelse(is.na(COG_name), "Unknown", COG_name)) %>%
-  mutate(COG_name = factor(COG_name, levels = order_n)) %>%
+  # mutate(COG_name = factor(COG_name, levels = order_n)) %>%
+  mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>%
+  mutate(COG_name = factor(COG_name, levels = sort(decreasing = T, unique(COG_name)))) %>%
   # mutate(COG_name = gsub(",","\n", COG_name)) %>%
   # !Note: here invert log2FoldChange for sort  24 and 110 hpf in the plot
   mutate(log2FoldChange = log2FoldChange*-1) %>%
+  filter(abs(log2FoldChange) > 2) %>%
   # drop_na(SMPID) %>%
   ggplot(aes(y = COG_name, x = log2FoldChange, fill = CONTRAST)) + 
   geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
@@ -333,9 +368,10 @@ pdens <- RES.P %>%
   # scale_color_manual(values = c("black", "gray")) +
   scale_color_manual(values = col) +
   guides(fill=guide_legend(title = "", nrow = 1), color = "none") +
-  annotate("text", x = -9, y = 20, label = "24 hpf", family = "GillSans") +
-  annotate("text", x = 9, y = 20, label = "110 hpf", family = "GillSans") +
-  annotate("text", x = 0, y = 21, label = "") 
+  annotate("text", x = -9, y = 21, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 9, y = 21, label = "110 hpf", family = "GillSans") +
+  annotate("text", x = 0, y = 22, label = "")  +
+  xlim(-20, 20) 
 
 pdens <- pdens +
   labs(y = "Nested Orthologous Gene Group (NOGS)") +
@@ -349,15 +385,45 @@ pdens <- pdens +
 pdens<- pdens + 
   facet_grid(~ CONTRAST) 
 
+
+
 # pdens +
 #   geom_text(data = data_text,
 #     aes(y = COG_name, x = -14, group = CONTRAST, label = n), 
 #     size = 2.5, hjust = -0.1, vjust = 0, 
 #     family = "GillSans", position = position_dodge(width = 1))
 
-ggsave(pdens, filename = 'NOGS_dens_facet.png', path = dir, width = 5.7, height = 8, device = png, dpi = 300)
+ggsave(pdens, filename = 'NOGS_dens_facet_padj.png', path = dir, width = 6, height = 8, device = png, dpi = 300)
 
-P +  plot_spacer() + pdens + plot_layout(widths = c(0.8, -0.05, 0.2))
+# P +  plot_spacer() + pdens + plot_layout(widths = c(0.8, -0.05, 0.2))
+
+# RES.P %>% 
+#   filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+#   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+#   mutate(log2FoldChange = log2FoldChange*-1) %>%
+#   ggplot(aes(y = CONTRAST, x = log2FoldChange, fill = CONTRAST)) + 
+#   geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+#   geom_point(aes(color = WGCNA), shape = 124, size = 1.5) +
+#   ggridges::geom_density_ridges(
+#     alpha = 0.5,
+#     jittered_points = F,
+#     position = ggridges::position_points_jitter(width = 0.5, height = 0),
+#     point_shape = '|', point_size = 1, point_alpha = 1, alpha = 0.2) +
+#   scale_fill_manual(values = c("black", "gray")) +
+#   # scale_color_manual(values = c("black", "gray")) +
+#   scale_color_manual(values = col) +
+#   guides(fill=guide_legend(title = "", nrow = 1), color = "none") +
+#   annotate("text", x = -9, y = 3, label = "24 hpf", family = "GillSans") +
+#   annotate("text", x = 9, y = 3, label = "110 hpf", family = "GillSans") +
+#   annotate("text", x = 0, y = 3, label = "")  +
+#   xlim(-20, 20) +
+#   theme_bw(base_size = 12, base_family = "GillSans") +
+#   theme(legend.position = "top",
+#     panel.grid.major = element_blank(),
+#     panel.grid.minor = element_blank(),
+#     legend.key.width = unit(0.2, "cm"),
+#     legend.key.height = unit(0.12, "cm"))+
+#   ggsave(filename = 'dens.png', path = dir, width = 3, height = 3, device = png, dpi = 300)
 
   
   
