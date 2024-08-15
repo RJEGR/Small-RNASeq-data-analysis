@@ -52,12 +52,52 @@ stringg <- read_rds(file.path(dir, "protein_links_full_v12.rds"))
 
 
 stringg <- stringg %>% activate("nodes") %>% 
-  mutate(betweenness = betweenness(.), degree = centrality_degree(),
-    pageRank = page_rank(.)$vector) %>%
-  filter(degree > 0)
+  # mutate(betweenness = betweenness(.), degree = centrality_degree(),
+    # pageRank = page_rank(.)$vector) %>%
+  filter(centrality_degree() > 0)
 
+stringg <- stringg %>% activate("nodes") %>% 
+  mutate(betweenness = betweenness(.), degree = centrality_degree(),
+    pageRank = page_rank(.)$vector) 
+  
 nodes <- stringg %>% activate("nodes") %>% as_tibble()
 edges <- stringg %>% activate("edges") %>% as_tibble()
+
+nodes %>% 
+  arrange(desc(degree)) %>%
+  mutate(preferred_name = factor(preferred_name, levels = unique(preferred_name))) %>%
+  ggplot(aes(x = preferred_name, y = degree)) + geom_point(shape = 13) + geom_step(group = 1) +
+  theme_classic(base_family = "GillSans", base_size = 10) +
+  theme(legend.position = 'none', 
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust = 1))
+
+DF <- DB %>% 
+  drop_na(STRINGID) %>% 
+  mutate(STRINGID = strsplit(STRINGID, ";")) %>%
+  unnest(STRINGID) %>% 
+  mutate(SMPID = ifelse(!is.na(SMPID), "(*) ", "")) %>% 
+  mutate(STRINGID_label = paste0(SMPID, STRINGID)) %>% 
+  distinct(MajorRNA, STRINGID_label, STRINGID) %>%
+  count(STRINGID_label, STRINGID) %>% rename("preferred_name" = "STRINGID", "microRNA_protein" = "n") %>% 
+  right_join(nodes, by = "preferred_name") %>%
+  rename("protein_protein" = "degree") %>%
+  arrange(desc(protein_protein)) %>%
+  mutate(preferred_name = factor(STRINGID_label, levels = unique(STRINGID_label))) %>%
+  select(preferred_name, protein_protein, microRNA_protein)
+
+DF %>% 
+  ggplot(aes(protein_protein, microRNA_protein)) + geom_text(aes(label = preferred_name))
+
+DF %>%
+  pivot_longer(-preferred_name, values_to = "dregree") %>%
+  ggplot(aes(x = preferred_name, y = dregree, color = name, group = name)) + 
+  geom_point(shape = 13) + geom_step() + 
+  theme_classic(base_family = "GillSans", base_size = 12) +
+  theme(legend.position = 'top', 
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10))
+
 
 DB <- DB %>% mutate(COG_name = ifelse(is.na(COG_name), description, COG_name))
 
