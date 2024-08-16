@@ -6,6 +6,10 @@
  # which use force-directed graph layout 
 
 
+rm(list = ls());
+
+if(!is.null(dev.list())) dev.off()
+
 dir <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 print(.KnownRNAsDB <- read_rds(paste0(dir, "RNA_LOCATION_MIR_DB.rds")))
@@ -15,7 +19,7 @@ KnownRNAsDB <- .KnownRNAsDB %>%
   dplyr::select(Name, KnownRNAs, MajorRNA) %>%
   unnest(KnownRNAs) %>%
   mutate(KnownRNAs = gsub("_[3-5]p$","", KnownRNAs)) %>%
-  mutate(KnownRNAs = ifelse(is.na(KnownRNAs), "Novel", "Known")) %>%
+  mutate(KnownRNAs = ifelse(is.na(KnownRNAs), "Novel (47)", "Known (70)")) %>%
   distinct(Name, KnownRNAs) 
 
 dir <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/Outputs/strucVis"
@@ -177,6 +181,7 @@ p <- out %>%
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     strip.placement = "inside",
+    axis.text.x = element_blank(),
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank()
   )
@@ -191,27 +196,26 @@ ps <- p +  plot_spacer() + pdens + plot_layout(widths = c(0.4, -0.045, 0.25))
 
 # ps
 
-ggsave(ps, filename = 'FIGURE_1_PANEL_SUP.png', path = path_out, 
+ggsave(ps, filename = 'FIGURE_1_PANEL_SUP1.png', path = path_out, 
   width = 3.5, height = 5, device = png, dpi = 500)
 
 
 top <- out %>% 
   filter(Freq > 0) %>%
-  # mutate(Freq = Freq/n_seqs) %>%
-  # select(pos, KnownRNAs, Freq, n_seqs)
   group_by(pos, KnownRNAs) %>%
   summarise(Freq = sum(Freq)) %>%
-  # mutate(Freq = ifelse(Freq > 0, Freq, NA)) %>%
+  mutate(facet = "Sequence length") %>%
   ggplot(aes(x = pos, y = Freq, color = KnownRNAs)) + 
+  facet_grid(~ facet) +
   labs(x = "Sequence length", y = "", color = "") +
     # geom_point(size = 0.5) +
-    geom_step() +
-  scale_x_continuous(position = "top", limits = c(0,100)) +
+  geom_step() +
+  scale_x_continuous(position = "bottom", limits = c(0,100)) +
   scale_color_grey() +
   theme_classic(base_family = "GillSans", base_size = 10) +
   theme(
+    strip.background = element_rect(fill = 'white', color = 'white'),
     strip.text = element_text(color = "black",hjust = 1),
-    strip.background = element_blank(),
     legend.position = 'top',
     legend.key.width = unit(0.2, "cm"),
     legend.key.height = unit(0.2, "cm"),
@@ -220,14 +224,14 @@ top <- out %>%
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
     axis.line.y = element_blank(),
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
+    # axis.text.x = element_blank(),
+    # axis.ticks.x = element_blank(),
     axis.line.x = element_blank(),
     panel.grid.major = element_blank())
 
 
 
-ps <- top /  plot_spacer() / p + plot_layout(heights = c(0.04, -0.03, 0.5))
+ps <- top /  plot_spacer() / p + plot_layout(heights = c(0.07, -0.055, 0.5))
 
 
 ggsave(ps, filename = 'FIGURE_1_PANEL_SUP.png', path = path_out, 
