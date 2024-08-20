@@ -47,11 +47,9 @@ gene2GO <- GODB %>%
   left_join(gene2GO) %>%
   distinct() %>%
   group_by(COG_name, gene_id) %>%
-  summarise(across(GOs, .fns = paste_col)) %>%
+  summarise(across(GOs, .fns = paste_col), n = n()) %>%
   drop_na(COG_name, GOs) %>% 
   ungroup()
-
-# split(strsplit(GODB$GOs, ";") , GODB$GROUP)
 
 runTopGO <- function(x, y, Nodes = 20, onto = "BP") {
   
@@ -63,7 +61,7 @@ runTopGO <- function(x, y, Nodes = 20, onto = "BP") {
   
   allGenes <- structure(rep(0.05, length(allGenes)), names = allGenes)
   
-  # gene2GO <- gene2GO %>% filter(CONTRAST == x)
+  gene2GO <- y %>% filter(COG_name == x)
   
   gene2GO <- split(strsplit(gene2GO$GOs, ";") , gene2GO$gene_id)
   
@@ -118,17 +116,24 @@ runTopGO <- function(x, y, Nodes = 20, onto = "BP") {
   return(out)
 }
 
-CONTRAST2GO <- gene2GO %>% distinct(COG_name) %>% pull()
+omit_single_genes <- gene2GO %>% 
+  group_by(COG_name) %>% 
+  summarise(ngo = sum(n), ngenes=n()) %>%
+  filter(ngenes == 1) %>% pull(COG_name) %>%
+  paste(collapse = "|")
 
-# Omit single gene_id
-patt <- "Cell wall/membrane/envelope biogenesis"
-CONTRAST2GO <- CONTRAST2GO[!grepl(patt, CONTRAST2GO)]
+CONTRAST2GO <- gene2GO %>% 
+  distinct(COG_name) %>% pull()
+
+CONTRAST2GO <- CONTRAST2GO[!grepl(omit_single_genes, CONTRAST2GO)]
 
 OUT <- lapply(CONTRAST2GO, function(x) runTopGO(x, gene2GO, Nodes = 25))
 
 print(data <- dplyr::bind_rows(OUT) %>% as_tibble())
+
+data %>% count(GROUP)
 # 
-# write_tsv(data, file = file.path(dir, "Boostrap_topGO.tsv"))
+write_tsv(data, file = file.path(dir, "COG2topGO.tsv"))
 
 str(GO.IDS <- data %>% distinct(GO.ID) %>% pull() %>% sort())
 
@@ -145,13 +150,70 @@ SEM <- SEMANTIC_SEARCH(GO.IDS, orgdb = orgdb, semdata = semdata)
 
 data <- data %>% left_join(SEM, by = c("GO.ID" = "go"))
 
-write_tsv(data, file = file.path(dir, "Boostrap_topGO_by_COG.tsv"))
+write_tsv(data, file = file.path(dir, "COG2topGO.tsv"))
 
 data %>%
-  mutate(classicKS = as.double(classicKS), 
-    elimKS = as.double(elimKS)) %>%
-  ggplot(aes(y = GROUP, x = parentTerm, fill = -log10(classicKS))) +
+  group_by(GROUP, parentTerm) %>%
+  summarise(score = sum(Annotated)) %>%
+  mutate(score = score/sum(score)) %>%
+  # mutate(classicKS = as.double(classicKS), 
+  #   elimKS = as.double(elimKS)) %>%
+  ggplot(aes(y = GROUP, x = parentTerm, fill = score)) +
   geom_tile(color = 'white', linewidth = 0.2) +
   # facet_grid(~ f1+f2, switch = "y", scales = "free_y") +
   theme_bw(base_family = "GillSans", base_size = 10) +
   theme(axis.text.x = element_text(angle = 90, size = 10, hjust = 1))
+
+# due to omit_single_genes
+# run semantic grouping
+
+cogs2GO <- gene2GO %>% 
+  mutate(GOs = strsplit(GOs, ";")) %>%
+  unnest(GOs) %>%
+  group_by(COG_name) %>%
+  summarise(across(GOs, .fns = paste_col)) 
+
+
+cogs2GO <- split(strsplit(cogs2GO$GOs, ";") , cogs2GO$COG_name)
+cogs2GO <- lapply(cogs2GO, unlist)
+
+OUT <- lapply(cogs2GO, function(x) SEMANTIC_SEARCH(x, semdata = semdata))
+
+print(DATA <- dplyr::bind_rows(OUT, .id = "COG_name") %>% as_tibble())
+
+write_tsv(DATA, file = file.path(dir, "COG2revigo.tsv"))
+
+DATA %>% distinct(parentTerm)
+
+DATA %>% 
+  count(COG_name, parentTerm) %>%
+  group_by(COG_name) %>%
+  mutate(size = n/sum(n)) %>% 
+  # filter(size > 0.2) %>%
+  ggplot(aes(y = parentTerm, x = size)) +
+  geom_col() +
+  facet_grid(COG_name ~., scales = "free", space = "free") +
+  geom_tile(color = 'white', linewidth = 0.2) +
+  # facet_grid(~ f1+f2, switch = "y", scales = "free_y") +
+  theme_bw(base_family = "GillSans", base_size = 10) +
+  theme(
+    strip.text.y = element_text(angle = 0, hjust = 1),
+    strip.background = element_rect(fill = 'grey95', color = 'white'),
+    # strip.placement = "outside",
+    axis.text.y = element_text(size = 5, hjust = 1),
+    axis.text.x = element_text(angle = 0, size = 5, hjust = 1)) +
+  ggsave(filename = 'COGs2revigo.png', 
+    path = dir, width = 10, height = 10, device = png, dpi = 300)
+
+DATA %>%
+  group_by(parentTerm) %>%
+  # summarise(size = sum(size)) %>%
+  mutate(size = size/sum(size)) %>%
+  ggplot(aes(y = parentTerm, x = size)) +
+  geom_col() +
+  facet_grid(COG_name ~., scales = "free", space = "free") +
+  geom_tile(color = 'white', linewidth = 0.2) +
+  # facet_grid(~ f1+f2, switch = "y", scales = "free_y") +
+  theme_bw(base_family = "GillSans", base_size = 10) +
+  theme(axis.text.x = element_text(angle = 90, size = 10, hjust = 1))
+
