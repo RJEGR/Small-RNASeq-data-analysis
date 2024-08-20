@@ -27,7 +27,7 @@ QUERYDB <- read_rds(list.files(path = dir,
 QUERYDB <- read_rds(list.files(path = dir, 
   pattern = "SEQUENCES_MERGED_DESEQ_RES_WGCNA.rds", full.names = T)) %>%
   filter( padj < 0.05  & abs(log2FoldChange) > 1) %>%
-  filter(CONTRAST == "CONTRAST_A") %>%
+  filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
   mutate(HPF = ifelse(sign(log2FoldChange) == -1, "pH 7.6", "pH 8.0"))
 
 QUERYDB %>% count(CONTRAST, HPF)
@@ -86,8 +86,8 @@ DF <- DB %>%
   mutate(preferred_name = factor(STRINGID_label, levels = unique(STRINGID_label))) %>%
   select(preferred_name, protein_protein, microRNA_protein)
 
-DF %>% 
-  ggplot(aes(protein_protein, microRNA_protein)) + geom_text(aes(label = preferred_name))
+# DF %>% 
+#   ggplot(aes(protein_protein, microRNA_protein)) + geom_text(aes(label = preferred_name))
 
 DF %>%
   pivot_longer(-preferred_name, values_to = "dregree") %>%
@@ -151,9 +151,9 @@ visNetwork::visNetwork(
     addEdges = data.frame(label = "Predicted association", color = "black"))
   # visEdges(arrows = 'from')
 
-visNetwork(nodes, edges, width = "100%") %>% 
-  visEdges(arrows = "to") %>% 
-  visHierarchicalLayout(direction = "DU") 
+# visNetwork(nodes, edges, width = "100%") %>% 
+#   visEdges(arrows = "to") %>% 
+#   visHierarchicalLayout(direction = "DU") 
 
 # Second ----
 
@@ -349,6 +349,8 @@ ggraph(graph, 'stress') +
 
 
 # Find relation between target net and stringnet -------
+# Subst only to degs
+
 m1 <- DB %>%
   distinct(MajorRNA, STRINGID) %>%
   drop_na(STRINGID) %>%
