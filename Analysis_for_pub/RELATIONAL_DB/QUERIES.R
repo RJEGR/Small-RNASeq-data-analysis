@@ -70,7 +70,7 @@ DEGS <- RES.P %>%
   mutate(HPF = ifelse(sign(log2FoldChange) == -1, "110 hpf", "24 hpf")) %>%
   distinct(MajorRNA, HPF, CONTRAST)
 
-DEGS %>% count(HPF, CONTRAST)
+DEGS %>% dplyr::count(HPF, CONTRAST)
 
 # JOIN LOW PH DEGS -----
 # 76 MIRS DEGS IN OA
@@ -124,6 +124,7 @@ data_text <- plotdf %>%
 # Find brach of interactions -----
 
 rbind(DEGS, DEGS_D) %>%
+  # filter(MajorRNA %in% query) %>%
   left_join(DB) %>% 
   drop_na(COG_name) %>% 
   distinct(MajorRNA, COG_name) %>%
@@ -222,6 +223,7 @@ which_contrast <- function(x) {
 
 
 TOPDF <- rbind(DEGS, DEGS_D) %>%
+  filter(MajorRNA %in% query) %>%
   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
   group_by(MajorRNA, HPF) %>%
   summarise(across(CONTRAST, .fns = which_contrast)) %>%
@@ -255,6 +257,7 @@ P <- TOPDF %>%
     axis.text.x = element_blank())
 
 P
+
 topplot <- TOPDF %>%
   mutate(HPF = factor(HPF)) %>%
   ggplot(aes(y = y, x = MajorRNA, color = HPF)) + # color = as.factor(hpf)
@@ -288,7 +291,7 @@ ps <- topplot/ plot_spacer() /P + plot_layout(heights = c(0.1, -0.1, 4))
 
 # ps + facet_grid(~ HPF, scales = "free", space = "free")
 
-ggsave(ps, filename = 'WGCNA2NOGS.png', path = dir, width = 10, height = 4, device = png, dpi = 300)
+ggsave(ps, filename = 'WGCNA2NOGS.png', path = dir, width = 6, height = 4, device = png, dpi = 300)
 
 
 # scale_col <- c("#cd201f", "#FFFC00","#00b489","#31759b")
@@ -338,15 +341,22 @@ query <- RES.P %>%
   summarise(across(CONTRAST, .fns = list), n = n()) %>% arrange(desc(n)) %>%
   filter(n == 1) %>% distinct(MajorRNA) %>% pull()
 
+query <- RES.P %>% 
+  filter(CONTRAST %in% c("CONTRAST_A", "CONTRAST_B")) %>%
+  distinct(MajorRNA) %>% pull()
+
+
+str(query)
+
 DB %>% mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>% distinct(COG_name) %>% arrange(COG_name)
 
 pdens <- RES.P %>% 
+  # filter(MajorRNA %in% query) %>%
   filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
   left_join(DB, by = "MajorRNA") %>% 
   drop_na(COG_name) %>%
   # if filter the intersected
-  # filter(MajorRNA %in% query) %>%
   # mutate(COG_name = ifelse(is.na(COG_name), "Unknown", COG_name)) %>%
   # mutate(COG_name = factor(COG_name, levels = order_n)) %>%
   mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>%
@@ -393,7 +403,7 @@ pdens<- pdens +
 #     size = 2.5, hjust = -0.1, vjust = 0, 
 #     family = "GillSans", position = position_dodge(width = 1))
 
-ggsave(pdens, filename = 'NOGS_dens_facet_padj.png', path = dir, width = 6, height = 8, device = png, dpi = 300)
+ggsave(pdens, filename = 'NOGS_dens_facet_A_B.png', path = dir, width = 6, height = 6, device = png, dpi = 300)
 
 # P +  plot_spacer() + pdens + plot_layout(widths = c(0.8, -0.05, 0.2))
 
@@ -444,6 +454,17 @@ RES.P %>%
   ggrepel::geom_text_repel(aes(label = MirGeneDB_ID), 
     size = 2.5, hjust = -0.1, vjust = 0, 
     family = "GillSans", position = position_dodge(width = 1), max.overlaps = 50)
+#
+
+RES.P %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  left_join(DB, by = "MajorRNA")
+
+DB %>%
+  drop_na(COG_name) %>%
+  filter(MajorRNA %in% query) %>%
+  count(MajorRNA, COG_name, sort = T) %>% vi
 
 # by wgcna module ----
 
