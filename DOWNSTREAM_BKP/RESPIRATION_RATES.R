@@ -37,7 +37,7 @@ df_stats <- .x[[1]]
 
 pHpalette <- c(`7.6`="#ad1f1f", `7.8`= "#abdda4",`8.0`= "#4575b4", `8`= "#4575b4")
 
-pHpalette <- c(`7.6`="black", `7.8`= "#abdda4",`8.0`= "gray68", `8`= "gray68")
+pHpalette <- c(`pH 7.6`="black", `7.8`= "#abdda4",`pH 8.0`= "gray68", `pH 8`= "gray68")
 
 
 
@@ -50,7 +50,7 @@ recode_hpf <- structure(c("B) 24 hpf", "C) 110 hpf"), names = c("24", "108"))
 df_stats %>% select(r_ind_adj) %>%
   # filter(pH != "7.8") %>%
   dplyr::mutate(hpf = dplyr::recode(hpf, !!!c("108" = "110"))) %>%
-  rstatix::get_summary_stats(type = 'mean_sd') # %>% view()
+  rstatix::get_summary_stats(type = 'mean_se') # %>% view()
 
 
 # 1) (REPLACED W/ DONUTS)
@@ -59,19 +59,30 @@ ylabs <- expression("RM (pmol"~O[2]~Ind^-1~h^-1*")")
 
 #ylabs <- expression("Tasa de resp. (pmol"~O[2]~Ind^-1~h^-1*")")
 
-lim <- c(-10, 140)
+lim <- c(-20, 100)
 
 breaks <- seq(0, lim[2], by = 20)
 
-df_stats %>% select(r_ind_adj) %>%
+DataViz <- 
+  df_stats %>% select(r_ind_adj) %>%
   filter(pH != "7.8") %>%
   dplyr::mutate(hpf = dplyr::recode(hpf, !!!c("108" = "110"))) %>%
-  rstatix::get_summary_stats(type = 'mean_sd') %>% 
+  rstatix::get_summary_stats(type = 'mean_se') %>% 
   mutate(facet = "A) Larval development") %>%
   # mutate(facet = "A) Desarrollo larval") %>%
-  mutate(ymin = mean-sd, ymax = mean+sd) %>%
+  mutate(ymin = mean-se, ymax = mean+se) %>%
+  dplyr::mutate(pH = dplyr::recode(pH, !!!recode_to))
+
+.stats %>% 
+  filter(group1 == "8" & group2 == "7.6")
+
+DataViz <- DataViz %>% 
+  mutate(star = ifelse(hpf == 24 & pH == "pH 7.6", "**", "")) %>%
+  mutate(star = ifelse(hpf == 110 & pH == "pH 7.6", "***", star))
+
+DataViz %>%
   ggplot(aes(x = hpf, y = mean, color = pH, group = pH)) +
-  facet_grid( ~ facet ) +
+  # facet_grid( ~ facet ) +
   geom_point(position = position_dodge(width = 0), size = 3, alpha = 0.5) +
   geom_errorbar(aes(ymin = ymin, ymax = ymax), 
     width = 0.1, position = position_dodge(width = 0)) +
@@ -80,17 +91,66 @@ df_stats %>% select(r_ind_adj) %>%
   labs(y = ylabs, x = "Time (hpf)") +
   scale_y_continuous(breaks = breaks, limits = lim) -> pleft1
 
+pleft1 + theme_bw(base_family = "GillSans", base_size = 14) + 
+  theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
+    panel.grid = element_blank(),
+    # panel.grid.minor.y = element_blank(),
+    legend.position = 'top',
+    legend.key.width = unit(0.2, "mm"),
+    legend.key.height = unit(0.2, "mm")) -> pleft1
+
+# add significant
+
+pleft1 <- pleft1 +
+  geom_text(aes(y = ymax + 2, label= star), 
+    size = 3.5, family = 'GillSans',fontface = "bold",
+    vjust= 0)
+
+
+ggsavepath <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
+
+
+ggsave(pleft1,
+  filename = 'oxygen_rate_facet_by_hpf.png', path = ggsavepath,
+  width = 3.5, height = 3,  device = png, dpi = 500)
+
+
+
+# OR BY BARS
+
+DataViz %>%
+  ggplot(aes(x = hpf, y = mean, color = pH, group = pH)) +
+  geom_col(position = position_dodge2(), linewidth = 0.7, alpha = 0.5, fill = "white") +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), 
+    width = 0.1, position = position_dodge(0.9)) +
+  scale_color_manual("", values = pHpalette) +
+  scale_fill_manual("", values = pHpalette) +
+  labs(y = ylabs, x = "Time (hpf)") +
+  scale_y_continuous(breaks = breaks, limits = c(0, 100)) -> pleft1
+
 
 
 pleft1 + theme_bw(base_family = "GillSans", base_size = 14) + 
   theme(strip.background = element_rect(fill = 'grey89', color = 'white'),
-    panel.border = element_blank(),
-    panel.grid.minor.y = element_blank(),
-    legend.position = "none") -> pleft1
+    panel.grid = element_blank(),
+    # panel.grid.minor.y = element_blank(),
+    legend.position = 'top',
+    legend.key.width = unit(0.2, "mm"),
+    legend.key.height = unit(0.2, "mm")) -> pleft1
 
-# ggsave(pleft,
-#   filename = 'oxygen_rate_facet_by_hpf.png', path = ggsavepath,
-#   width = 3, height = 2.5)
+# add significant
+
+pleft1 <- pleft1 +
+  geom_text(aes(y = ymax + 2, label= star), 
+    size = 3.5, family = 'GillSans',fontface = "bold",
+    vjust= 0)
+
+ggsavepath <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
+
+
+ggsave(pleft1,
+  filename = 'oxygen_rate_facet_by_hpf_bars.png', path = ggsavepath,
+  width = 3.25, height = 3.25,  device = png, dpi = 500)
 
 
 # 1) 
@@ -100,7 +160,7 @@ recode_to_pH <- structure(c("A) pH 8.0", "B) pH 7.8", "C) pH 7.6"), names = c("8
 donut_df <- df_stats %>% select(r_ind_adj) %>%
   # filter(pH != "7.8") %>%
   dplyr::mutate(hpf = dplyr::recode(hpf, !!!c("108" = "110"))) %>%
-  rstatix::get_summary_stats(type = 'mean_sd')
+  rstatix::get_summary_stats(type = 'mean_se')
   
 
 donut_df <- donut_df %>%
@@ -190,7 +250,7 @@ recode_to_x <- structure(c("pH 8.0", "pH 7.8", "pH 7.6"), names = c("8","7.8","7
 # ylabs <- expression("Metabolic rate (pmol"~O[2]~Ind^-1~h^-1*")")
 
 pbar <- DF %>%
-  summarise(mean = mean(y), sd = sd(y), n = n()) %>%
+  summarise(mean = mean(y), sd = se(y), n = n()) %>%
   dplyr::mutate(pH = dplyr::recode(pH, !!!recode_to_x)) %>%
   mutate(ymin = mean-sd, ymax = mean+sd, p.adj.signif = c("", "ns", "ns")) %>%
   mutate(facet = "D) Total oxygen consumed") %>%

@@ -22,7 +22,11 @@ split_blast <- function (x, hit = "BLASTP") {
   
   z <- strsplit(unlist(z), "\\^")
   
-  if (any(sapply(z, "[", 1) != sapply(z, "[", 2)))
+  col2 <- sapply(z, "[", 2)
+  
+  col2[is.na(col2)] <- "."
+  
+  if (any(sapply(z, "[", 1) != col2))
     print("WARNING: check different values in columns 1 and 2")
   
   NAME <- gsub("^RecName: Full=", "", sapply(z, "[", 6))

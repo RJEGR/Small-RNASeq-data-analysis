@@ -241,7 +241,7 @@ TARGETDB %>% distinct(gene_id, MajorRNA)
 
 DB %>% distinct(gene_id, MajorRNA) %>%
   left_join(distinct(MAPPER_DB, gene_id, GOs)) %>%
-  distinct(MajorRNA, GOs) %>%
+  distinct(MajorRNA, GOs) #%>%
   
 
 # 7.1) If want to bind: Gene Ontology processing ----

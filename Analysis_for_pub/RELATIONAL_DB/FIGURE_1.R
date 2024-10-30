@@ -12,7 +12,7 @@ library(tidyverse)
 # PANEL A: READ DISTRIUTION ----
 MTD <- read_tsv('~/Documents/MIRNA_HALIOTIS/METADATA.tsv')
 
-scale_col <- c("#cd201f", "#FFFC00","#00b489","#31759b")
+# scale_col <- c("#cd201f", "#FFFC00","#00b489","#31759b")
 
 recode_to <- c(`Control` = "pH 8.0", `Low` = "pH 7.6")
 
@@ -47,7 +47,7 @@ ylab <- "Reads (Millions)"
 recode_to <- c(`24 HPF`= "24 hpf", `110 HPF` = "110 hpf")
 
 width_col <- 0.8
-base_t_text_size <- 7
+base_t_text_size <- 6
 
 out %>% 
   dplyr::mutate(hpf = dplyr::recode_factor(hpf, !!!recode_to)) %>%
@@ -191,25 +191,30 @@ DVIZ <- DF %>% drop_na(DBsource) %>%
 scale_y_disc <- DVIZ %>% pull(label, name = Node_of_origin)
 
 pr <- DVIZ %>% 
+  mutate(facet = "% of known microRNAs") %>%
   ggplot(aes(y = Node_of_origin, x = pct)) +
-  # facet_grid(DBsource~ ., scales = "free_y", space = "free", switch = "y") +
-  theme_classic(base_family = "GillSans", base_size = 7) +
+  facet_wrap(~ facet, scales = "free_x",  switch = "x") +
   geom_col(fill = "grey89") +
-  labs(x = "% of known microRNAs", y = "") +
+  labs(x = "", y = "") +
   scale_y_discrete(labels = scale_y_disc) +
-  geom_text(aes(label=label), x = 0.01, hjust=0, size = 2.5, family = "GillSans") +
+  geom_text(aes(label=label), x = 0.01, hjust=0, size = 2, family = "GillSans") +
   scale_x_continuous(labels = scales::percent) +
+  theme_classic(base_family = "GillSans", base_size = 5) +
   theme(
-    # strip.background = element_rect(fill = 'grey89', color = 'white'),
-    legend.position = 'none',
-    panel.border = element_blank(),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    axis.ticks.y = element_blank(),
+    strip.text = element_text(color = "black",hjust = 1),
     strip.placement = "outside",
-    axis.line.y = element_blank(),
+    strip.background = element_blank(),
+    legend.position = 'none',
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.2, "cm"),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
     axis.text.y = element_blank(),
-    axis.text.x = element_text(size = 5))
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.text.x = element_text(size = 5),
+    # axis.line.x = element_blank(),
+    panel.grid.major = element_blank())
 
 pr
 
@@ -296,17 +301,54 @@ pd <- .KnownRNAsDB %>%
     # axis.line.x = element_blank(),
     panel.grid.major = element_blank())
 
+# Bind w/ escoresdf from STRUCVIZ.R
+pd <- .KnownRNAsDB %>%
+  left_join(escoresdf) %>%
+  mutate(x = ifelse(is.na(KnownRNAs), "Novel (47)", "Known (70)")) %>%
+  mutate(PRECISION = (UniqueReads+MajorRNAReads)/Reads) %>%
+  select(PRECISION, escore, x) %>%
+  pivot_longer(-x) %>% 
+  mutate(name = ifelse(name == "escore", "Minimum free-energy (MFE)", "microRNA Precision")) %>%
+  ggplot(aes(y = x, x = value)) + 
+  # facet_grid(x ~ ., scales = "free_y", space = "free", switch = "y") +
+  facet_wrap(~ name, nrow = 2, scales = "free_x",  switch = "x") +
+  labs(y = "", x = "") +
+  # xlim(0,1) +
+  ggridges::geom_density_ridges(
+    jittered_points = T,
+    position = ggridges::position_points_jitter(width = 0.05, height = 0),
+    point_shape = '|', point_size = 0.5, point_alpha = 0.5, alpha = 0.2) +
+  theme_classic(base_family = "GillSans", base_size = 5) +
+  theme(
+    strip.text = element_text(color = "black",hjust = 1),
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    legend.position = 'none',
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.2, "cm"),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.text.x = element_text(size = 5),
+    # axis.line.x = element_blank(),
+    panel.grid.major = element_blank())
+
+
+pd
 
 p1 <- pl +  plot_spacer() + pr + plot_layout(widths = c(0.3, -0.1, 1))
 
-ps <- pd +  plot_spacer() + p1 + plot_layout(widths = c(0.2, -0.05, 0.9))
+pss <- pd +  plot_spacer() + p1 + plot_layout(widths = c(0.2, -0.025, 0.9))
 
-ggsave(ps, filename = 'FIGURE_1_PANEL_B.png', path = path_out, 
+ggsave(pss, filename = 'FIGURE_1_PANEL_B.png', path = path_out, 
   width = 4.5, height = 2.5, device = png, dpi = 300)
 
-ps <- pd +  plot_spacer() + pr + plot_layout(widths = c(0.2, -0.035, 0.7))
+pss <- pd +  plot_spacer() + pr + plot_layout(nrow = 1, widths = c(2.2, -0.5, 2.5), guides = "collect")
 
-f1 <- bottom +  plot_spacer() + ps + plot_layout(widths = c(3, -0.3, 8))
+f1 <- bottom +  plot_spacer() + pss + plot_layout(widths = c(1.5, -0.15, 3))
+
 
 ggsave(f1, filename = 'FIGURE_1.png', path = path_out, 
-  width = 5.2, height = 2.5, device = png, dpi = 300)
+  width = 3.5, height = 2.5, device = png, dpi = 300)

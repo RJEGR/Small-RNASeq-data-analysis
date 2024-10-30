@@ -47,7 +47,7 @@ recode_to <- structure(c("24 HPF", "110 HPF", "Ctrl pH", "Low pH"), names = CONT
 
 out <- list()
 
-for (j in 1:length(CONTRAST)) {
+for (j in 1:length(CONTRAST[1:2])) {
   
   i <- j
   
@@ -68,9 +68,9 @@ for (j in 1:length(CONTRAST)) {
   # i.e. median of ratios (https://doi.org/10.1186/gb-2010-11-10-r106)
   # Details: https://hbctraining.github.io/DGE_workshop/lessons/02_DGE_count_normalization.html
   
-  cnts <- DESeq2::counts(dds, normalized = T, replaced = F)[query.genes,]
+  cnts <- DESeq2::counts(dds, normalized = F, replaced = F)[query.genes,]
   
-  # cnts <- DESeq2::varianceStabilizingTransformation(round(cnts))
+  cnts <- DESeq2::varianceStabilizingTransformation(round(cnts))
   
   
   DF <- cnts %>% as_tibble(rownames = "Name") %>% 
@@ -145,6 +145,23 @@ DF %>%
     # axis.text.y.right = element_text(angle = 0, hjust = 1, vjust = 0, size = 2.5),
     axis.text.y = element_text(angle = 0, size = 7),
     axis.text.x = element_text(angle = 0, size = 10)) -> p
+
+
+# or
+
+DF %>% filter(CONTRAST %in% 'CONTRAST_B') %>% ggplot(aes(y = count, x = Design, group = Family)) + facet_grid(Family~., scales = "free") + geom_jitter(position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +
+  stat_summary(fun.data = fun.data.trend, colour = "red", linewidth = 0.7, size = 0.7, alpha = 0.7) +
+  stat_summary(fun = mean, geom = "line", colour = "red")
+
+
+DF %>% filter(CONTRAST %in% 'CONTRAST_B') %>% 
+  ggplot(aes(y = count, x = Family)) + 
+  # facet_grid(Family~., scales = "free") + 
+  geom_point(aes(color = Design, group = Design), position = position_dodge(width = .5)) +
+  # geom_jitter(position=position_jitter(w=0.1,h=0), size = 1, alpha = 0.5) +
+  stat_summary(aes(group = Design),
+    fun.data = fun.data.trend, colour = "red", linewidth = 0.7, size = 0.7, alpha = 0.7, position = position_dodge(width = 0.5)) 
+
 
 
 # 
