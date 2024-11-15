@@ -101,7 +101,7 @@ print(MIRGENEDB <- read_tsv(paste0(wd, "/MIRGENEDB_2.1.tsv")))
 MIRGENEDB <- MIRGENEDB %>% 
   select(MirGeneDB_ID, `Node_of_origin_(family)` ) %>%
   distinct() %>% mutate(DBsource = "MIRGENEDB_2.1") %>%
-  rename("KnownRNAs" = "MirGeneDB_ID", "Node_of_origin" = "Node_of_origin_(family)")
+  dplyr::rename("KnownRNAs" = "MirGeneDB_ID", "Node_of_origin" = "Node_of_origin_(family)")
 
 dir <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
