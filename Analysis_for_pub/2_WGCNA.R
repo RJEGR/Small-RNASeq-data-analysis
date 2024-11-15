@@ -102,8 +102,7 @@ sft$fitIndices %>%
   mutate(name = ifelse(name %in% 'scale', title1, title2)) %>%
   ggplot(aes(y = Power, x = value)) +
   facet_grid(~name, scales = 'free_x', switch = "x") +
-  geom_text(aes(label = Power)) +
-  # geom_point() +
+  geom_text(aes(label = Power), size = 2) +
   geom_abline(slope = 0, intercept = softPower, linetype="dashed", alpha=0.5) +
   # geom_vline(xintercept = min(meanK), linetype="dashed", alpha=0.5) +
   labs(y = 'Soft Threshold (power)', x = '', 
@@ -217,9 +216,7 @@ plotTOM = dissTOM^7
 # Set diagonal to NA for a nicer plot
 diag(plotTOM) = NA
 # Call the plot function
-my_colors<- colorRampPalette(c("white", "black")) 
-
-TOMplot(plotTOM, dendro = geneTree, Colors = moduleColors, col = my_colors(100))
+TOMplot(plotTOM, dendro = geneTree, Colors = moduleColors)
 
 #
 
