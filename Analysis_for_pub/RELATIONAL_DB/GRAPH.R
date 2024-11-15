@@ -79,9 +79,10 @@ DF <- DB %>%
   mutate(SMPID = ifelse(!is.na(SMPID), "(*) ", "")) %>% 
   mutate(STRINGID_label = paste0(SMPID, STRINGID)) %>% 
   distinct(MajorRNA, STRINGID_label, STRINGID) %>%
-  count(STRINGID_label, STRINGID) %>% rename("preferred_name" = "STRINGID", "microRNA_protein" = "n") %>% 
+  dplyr::count(STRINGID_label, STRINGID) %>% 
+  dplyr::rename("preferred_name" = "STRINGID", "microRNA_protein" = "n") %>% 
   right_join(nodes, by = "preferred_name") %>%
-  rename("protein_protein" = "degree") %>%
+  dplyr::rename("protein_protein" = "degree") %>%
   arrange(desc(protein_protein)) %>%
   mutate(preferred_name = factor(STRINGID_label, levels = unique(STRINGID_label))) %>%
   select(preferred_name, protein_protein, microRNA_protein)
