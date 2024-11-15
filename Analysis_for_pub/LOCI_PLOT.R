@@ -98,6 +98,18 @@ col_recode <- structure(c("#FFC107", "#2196F3","red"),
 base_size_theme <- 9
 
 # Merge 
+# DF2 <- RES.P %>% 
+#   filter(CONTRAST != "CONTRAST_D") %>%
+#   select(MajorRNA, Contrast) %>% 
+#   distinct() %>% left_join(DB) %>%
+#   group_by(Contrast) %>%
+#   dplyr::count(biotype_best_rank) %>% 
+#   # mutate(Contrast = ifelse(grepl("CONTRAST_C_Control",Contrast), "24 hpf", Contrast)) %>%
+#   # mutate(Contrast = ifelse(grepl("CONTRAST_C_Competent",Contrast), "110 hpf", Contrast)) %>%
+#   # mutate(Contrast = ifelse(grepl("CONTRAST_B_Control",Contrast), "Acidification", Contrast)) %>%
+#   # mutate(Contrast = ifelse(grepl("CONTRAST_C",Contrast), "Development", Contrast)) %>%
+#   mutate(Frac = n/sum(n), col = Contrast) %>% 
+#   ungroup() %>% select(-Contrast)
 
 DF2 <- RES.P %>% 
   filter(CONTRAST != "CONTRAST_D") %>%
@@ -255,3 +267,18 @@ RES.P %>%
   theme_classic() +
   scale_color_manual("",values = col_recode) +
   scale_fill_manual("",values = col_recode)
+
+# 
+
+scale_col <- RES.P %>% distinct(WGCNA) %>% pull()
+
+RES.P %>% 
+  filter(CONTRAST == "CONTRAST_C") %>% 
+  left_join(DB) %>% dplyr::count(WGCNA, biotype_best_rank) %>% 
+  group_by(biotype_best_rank) %>%
+  mutate(n = n/sum(n)) %>%
+  arrange(biotype_best_rank) %>% ggplot(aes(y = n, x = biotype_best_rank, fill = WGCNA)) + 
+  geom_col() + 
+  # facet_grid(~ biotype_best_rank) +
+  # theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 5)) +
+  scale_fill_manual(values = structure(scale_col, names = scale_col))
