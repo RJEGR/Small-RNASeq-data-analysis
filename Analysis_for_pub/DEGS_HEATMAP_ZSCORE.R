@@ -10,12 +10,68 @@ library(DESeq2)
 
 library(tidyverse)
 
+wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
+
+print(.LOCIDB <- read_tsv(paste0(wd, "/RNA_LOCATION_DB.tsv")) %>%   filter(SRNAtype == "miR") )
+
+
+other_nc <- c("snRNA", "rRNA", "tRNA", "lncRNA", "srpRNA")
+other_intra <- c("exon", "UTR")
+
+.LOCIDB <- .LOCIDB %>% mutate(Chrom = gsub("^JALGQA010000", "", Chrom)) %>% 
+  mutate(Chrom = gsub(".1$", "", Chrom)) %>% 
+  # mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_nc, "Other ncRNA", biotype_best_rank)) %>%
+  mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_nc, "Intergenic", biotype_best_rank)) %>%
+  mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_intra, "Intragenic", biotype_best_rank))
+
+
+.LOCIDB <- .LOCIDB %>% distinct(MajorRNA, biotype_best_rank)
 
 dir <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024"
 
 
 print(DB <- read_tsv(file.path(dir, "LONGER_RELATIONAL_DB.tsv")))
 
+DF <- DB %>% 
+  drop_na(STRINGID) %>% 
+  mutate(STRINGID = strsplit(STRINGID, ";")) %>%
+  unnest(STRINGID) %>% 
+  mutate(SMPID = ifelse(!is.na(SMPID), "(*) ", "")) %>% 
+  mutate(STRINGID_label = paste0(SMPID, STRINGID)) %>%
+  mutate(Contrast = strsplit(Contrast, ";")) %>%
+  unnest(Contrast) %>%
+  left_join(.LOCIDB) %>%
+  filter(grepl("CONTRAST_C|CONTRAST_D", Contrast)) %>%
+  distinct(biotype_best_rank, Contrast, MajorRNA, STRINGID_label, STRINGID) %>%
+  dplyr::count(biotype_best_rank, Contrast, STRINGID_label, STRINGID) %>% 
+  dplyr::rename("preferred_name" = "STRINGID", "degree" = "n") %>% 
+  # dplyr::rename("protein_protein" = "degree") %>%
+  arrange(desc(degree)) %>%
+  mutate(preferred_name = factor(STRINGID_label, levels = unique(STRINGID_label)))
+
+recode_c <- c(
+  "CONTRAST_D_Control" = "24 hpf:pH 7.6",
+  "CONTRAST_D_Competent" = "110 hpf:pH 7.6",
+  "CONTRAST_C_Control" = "24 hpf:pH 8.0",
+  "CONTRAST_C_Competent" = "110 hpf:pH 8.0",
+  "CONTRAST_B_Low"= "110 hpf:pH 7.6",
+  "CONTRAST_A_Low"= "24 hpf:pH 7.6",
+  "CONTRAST_B_Control" = "110 hpf:pH 8.0")
+
+
+DF %>%
+  filter(grepl("CONTRAST_C", Contrast)) %>%
+  drop_na() %>%
+  mutate(Contrast = dplyr::recode_factor(Contrast, !!!recode_c)) %>%
+  separate(Contrast, into = c("hpf", "pH"), sep = ":") %>%
+  ggplot(aes(x = preferred_name, y = degree, group = pH, color = biotype_best_rank)) + 
+  geom_point(shape = 13) + 
+  # geom_step() +
+  facet_grid(hpf ~.) +
+  theme_classic(base_family = "GillSans", base_size = 12) +
+  theme(legend.position = 'top', 
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10))
 
 dds <- read_rds(list.files(path = dir, pattern = "DDS_DESEQ2.rds", full.names = T))
 
