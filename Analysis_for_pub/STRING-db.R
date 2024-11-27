@@ -142,6 +142,7 @@ write_tsv(df, file = file.path(dir, "gene2stringid_diamond_blastx.tsv"))
 
 # Lot of data per file when using best hit (all sequences source)
 # using only human (Model, 9606) and c. elegans (Model of larval development, 6239).
+# Start here ----
 dir <- "~/Documents/MIRNA_HALIOTIS/ENSEMBLE/calcif/"
 
 graph <- read_rds(file.path(dir, "protein_links_full_v12.rds"))
