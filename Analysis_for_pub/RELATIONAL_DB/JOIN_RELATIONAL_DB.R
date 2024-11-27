@@ -162,11 +162,18 @@ TARGETDB %>% distinct(gene_id, description) %>%
   
 # MIR LOCI
 
+other_nc <- c("snRNA", "rRNA", "tRNA", "lncRNA", "srpRNA", "Other ncRNA")
+other_intra <- c("exon", "UTR")
+
 dir <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
 print(.LOCIDB <- read_rds(paste0(dir, "RNA_LOCATION_MIR_DB.rds")))
 
-MajorRNA2Name <- .LOCIDB %>% distinct(MajorRNA, Name) %>%   dplyr::rename("query" = "Name")
+MajorRNA2Name <- .LOCIDB %>% distinct(MajorRNA, Name, biotype_best_rank, gene_id) %>%   dplyr::rename("query" = "Name", "Loci_geneid" = "gene_id")
+
+MajorRNA2Name <- MajorRNA2Name %>%
+  mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_nc, "Intergenic", biotype_best_rank)) %>%
+  mutate(biotype_best_rank = ifelse(biotype_best_rank %in% other_intra, "Intragenic", biotype_best_rank))
 
 # Replace ClusterID w/ MajorRNA
 
@@ -175,8 +182,8 @@ TARGETDB <- TARGETDB %>%
   unnest(query) %>%
   # distinct(gene_id, query) %>%
   mutate(query = gsub(".mature", "", query)) %>%
-  left_join(MajorRNA2Name) %>% select(-query) %>%
-  select(gene_id, MajorRNA, description)
+  left_join(MajorRNA2Name) %>% select(-query) #%>%
+  # select(gene_id, MajorRNA, description)
 
 # 5) JOIN DB -----
 # Example:
