@@ -703,3 +703,29 @@ data %>%
   geom_boxplot()
   # facet_grid(GROUP ~.) +
   # geom_path(group = 1)
+
+
+
+TOPDF %>%
+  left_join(WGCNA) %>%
+  left_join(DB) %>% drop_na(COG_name) %>% 
+  # distinct(MajorRNA, WGCNA, HPF, CONTRAST, COG_name, COG_category) %>% 
+  # ungroup() %>% count(WGCNA, HPF, CONTRAST, COG_name, COG_category)
+  # Filter by freq. of targeting
+  mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>%
+  # ungroup() %>%
+  # mutate(COG_name = factor(COG_name, levels = sort(decreasing = T, unique(COG_name)))) %>%
+  # mutate(MajorRNA = factor(MajorRNA, levels = xhc$labels[xhc$order])) %>%
+  ggplot(aes(fill = WGCNA, x = STRINGID, y = MajorRNAID)) +
+  geom_tile(color = 'white', size = 0.5, width = 0.7, height = 0.5, alpha = 0.7) +
+  # geom_point(aes(shape = CONTRAST, color = WGCNA), alpha = 0.5) +
+  # scale_shape_manual(values = c(19, 8)) +
+  scale_fill_manual("", values = col) +
+  scale_color_manual("", values = col) +
+  labs(x = "microRNA co-expression module", y = "") +
+  theme_bw(base_family = "GillSans", base_size = 10) +
+  theme(legend.position = 'none',
+    # axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90)
+    ) +
+  facet_grid(WGCNA ~COG_name , scales = "free", space = "free")
