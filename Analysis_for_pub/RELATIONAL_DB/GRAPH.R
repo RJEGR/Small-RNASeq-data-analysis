@@ -100,7 +100,21 @@ DF %>%
     axis.text.x = element_text(angle = 90, hjust = 1, size = 10))
 
 
+
+DF %>% 
+  arrange(desc(microRNA_protein)) %>%
+  # filter(preferred_name %in% connected_vertices) %>%
+  mutate(preferred_name = factor(preferred_name, levels = unique(preferred_name))) %>%
+  ggplot(aes(x = preferred_name, y = microRNA_protein)) + geom_point(shape = 13) + geom_step(group = 1) +
+  theme_classic(base_family = "GillSans", base_size = 10) +
+  theme(legend.position = 'none', 
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust = 1))
+
+
 DB <- DB %>% mutate(COG_name = ifelse(is.na(COG_name), description, COG_name))
+
+# If filtering
 
 nodes <- DB %>% 
   right_join(QUERYDB, by = "MajorRNA") %>%
@@ -111,6 +125,8 @@ nodes <- DB %>%
   summarise(across(HPF, .fns = paste_col)) %>%
   right_join(nodes, by = "gene_id") %>%
   left_join(WGCNA, by = "gene_id")
+
+# Then
 
 nodes <- data.frame(
   id = as.numeric(factor(nodes$Node)), 
@@ -140,6 +156,11 @@ edges <- data.frame(
 
 # edges$from <- nodes[edges$from,]$Node
 # edges$to <- nodes[edges$to,]$Node
+
+edges$from <- nodes[edges$from,]$Node
+edges$to <- nodes[edges$to,]$Node
+
+
 library(visNetwork)
 
 visNetwork::visNetwork(
