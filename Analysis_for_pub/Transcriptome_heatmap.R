@@ -1,6 +1,15 @@
 # Generate heatmap for suppl material
 # using transcriptome data
 # Also try calculate transcriptional noise from lm
+
+
+rm(list = ls());
+
+if(!is.null(dev.list())) dev.off()
+
+
+library(tidyverse)
+
 dir <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 print(TARGETDB <- read_rds(paste0(dir,"SRNA_FUNCTION_PREDICTED_LONG_EXPRESSED.rds")))
@@ -24,9 +33,9 @@ sum(keep_expressed <- keep_expressed > 1) # 131
 
 which_cols <- .TARGETDB %>% select_if(is.double) %>% colnames()
 
-.TARGETDB <- .TARGETDB %>%
+nrow(.TARGETDB <- .TARGETDB %>%
   group_by(gene_id, description) %>%
-  summarise_at(vars(all_of(which_cols)), sum) 
+  summarise_at(vars(all_of(which_cols)), sum))
 
 
 COUNT <- .TARGETDB %>%
@@ -35,7 +44,8 @@ COUNT <- .TARGETDB %>%
 
 rownames(COUNT) <- .TARGETDB$gene_id
 
-LIBRARY_ID <- names(COUNT)
+LIBRARY_ID <- colnames(COUNT)
+
 
 dir <- "~/Documents/MIRNA_HALIOTIS/"
 
@@ -43,9 +53,9 @@ wd <- paste0(dir, "RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/")
 
 Manifest <- read_csv(list.files(path = wd, pattern = "METADATA_RNASEQ.csv", full.names = T))
 
-colData[is.na(Manifest)] <- "Low CO2"
+Manifest[is.na(Manifest)] <- "Low CO2"
 
-Manifest <- Manifest[!grepl("Mantle", colData$Isolated),]
+Manifest <- Manifest[!grepl("Mantle", Manifest$Isolated),]
 
 Manifest <- Manifest %>% arrange(match(LIBRARY_ID, colnames(count)))
 
@@ -53,6 +63,14 @@ any(colnames(COUNT) == Manifest$LIBRARY_ID) # sanity check
 
 Manifest <- mutate_if(Manifest, is.character, as.factor)
 
+
+tmp.dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
+
+data.frame(COUNT) %>% 
+  as_tibble(rownames = 'gene_id') %>%
+  pivot_longer(cols = colnames(COUNT), values_to = 'Read_expression', names_to = "LIBRARY_ID") %>%
+  left_join(Manifest, by = "LIBRARY_ID") %>% filter(Read_expression > 0) %>%
+  write_tsv(file.path(tmp.dir, "Transcriptome_read_expression.tsv"))
 
 
 # PCA
@@ -75,8 +93,9 @@ PCA <- function(datExpr) {
   PCAvar <- data.frame(
     Eigenvalues = PCA$sdev,
     percentVar = percentVar,
-    Varcum = cumsum(percentVar),
-    Method = basename(f))
+    Varcum = cumsum(percentVar)
+    # Method = basename(f)
+    )
   
   return(list(PCAdf, PCAvar))
 }
@@ -139,7 +158,7 @@ p <- p +
 
 PCAdf[[2]] %>%
   # mutate(Method = dplyr::recode_factor(Method, !!!recode_to)) %>%
-  group_by(Method) %>%
+  # group_by(Method) %>%
   mutate(Dim = row_number()) %>%
   ggplot(., aes(y = percentVar, x = as.factor(Dim))) +
   geom_col(position = position_dodge2(width = 0.5), width = 0.5, fill = "black") + # fill = "gray78", color = "gray78"
@@ -163,13 +182,17 @@ PCAdf[[2]] %>%
 
 z_scores <- function(x) {(x-mean(x))/sd(x)}
 
+# Noise_score <- function(x) {1 - x/sum(x)}
+
 barplot(colSums(COUNT))
 
 M <- DESeq2::varianceStabilizingTransformation(round(COUNT))
 
-barplot(colSums(M))
+# barplot(colSums(M))
 
-M <- apply(COUNT, 1, z_scores)
+M <- apply(M, 2, z_scores)
+
+# M <- apply(M, 2, Noise_score);h <- heatmap(M, keep.dendro = T)
 
 h <- heatmap(t(M), keep.dendro = T)
 
@@ -182,9 +205,15 @@ plot(hc_genes)
 order_genes <- hc_genes$labels[h$rowInd]
 
 
+# DATA <- data.frame(M) %>% 
+#   as_tibble(rownames = 'LIBRARY_ID') %>%
+#   pivot_longer(cols = colnames(M), values_to = 'fill', names_to = "gene_id") %>%
+#   left_join(Manifest, by = "LIBRARY_ID") %>%
+#   mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = rev(hc_order)))
+
 DATA <- data.frame(M) %>% 
-  as_tibble(rownames = 'LIBRARY_ID') %>%
-  pivot_longer(cols = colnames(M), values_to = 'fill', names_to = "gene_id") %>%
+  as_tibble(rownames = 'gene_id') %>%
+  pivot_longer(cols = colnames(M), values_to = 'fill', names_to = "LIBRARY_ID") %>%
   left_join(Manifest, by = "LIBRARY_ID") %>%
   mutate(LIBRARY_ID = factor(LIBRARY_ID, levels = rev(hc_order)))
 
@@ -210,6 +239,7 @@ order_genes <- gsub(", transcript variant X*", "", order_genes)
 lo = floor(min(DATA$fill))
 up = ceiling(max(DATA$fill))
 mid = (lo + up)/2
+
 
 library(ggh4x)
 
@@ -265,6 +295,21 @@ dir_out <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 ggsave(P, filename = 'Target_transcriptome_heatmap.png', path = dir_out, 
   width = 8, height = 8, device = png, dpi = 300)
 
+# Prep summary table ----
+
+Noise_score <- function(x) {1 - x/sum(x)}
+
+M <- DESeq2::varianceStabilizingTransformation(round(COUNT))
+
+N <- which(rownames(COUNT) %in% "LOC124135816")
+COUNT[N,]
+barplot(Noise_score(COUNT[N,]))
+
+heatmap(apply(COUNT, 2, Noise_score))
+  
+tail(sort(rowSums(COUNT)))
+
+colSums(COUNT)
 
 
 # Trancriptome noise analysis

@@ -23,6 +23,20 @@ paste_col <- function(x) {
 
 dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 
+gene_read_exp_df <- read_tsv(file.path(dir, "Transcriptome_read_expression.tsv"))
+
+
+
+gene_read_exp_df %>% 
+  group_by(dpf,gene_id) %>%
+  summarise(Read_expression = sum(Read_expression)) %>%
+  ggplot(aes(y = gene_id, x = as.factor(dpf), fill = log10(Read_expression))) + geom_tile()
+
+
+gene_read_exp_df <- gene_read_exp_df %>% 
+  group_by(gene_id) %>%
+  summarise(Read_expression = sum(Read_expression)) 
+
 # Tag proteins important for acidification
 # PREPARING NODE SHAPE 
 
@@ -55,15 +69,6 @@ recode_to <- c(`CONTRAST_B_Low`= "110 hpf under 7.6",
   `CONTRAST_A_Low` = "24 hpf under 7.6", 
   `CONTRAST_A_Low;CONTRAST_B_Low` = "Both under pH 7.6"
   )
-
-# Combinations:
-
-# CONTRAST_A_Low                                  
-# 2 "CONTRAST_B_Low"="110 hpf under pH 7.6"                                  
-# 3 "CONTRAST_B_Control;CONTRAST_B_Low"="110 hpf"               
-# 4 "CONTRAST_A_Low;CONTRAST_B_Control" = "24 hpf under pH 7.6"               
-# 5 CONTRAST_A_Low;CONTRAST_B_Control;CONTRAST_B_Low
-# 6 "CONTRAST_B_Control" = ""  
 
 #Include
 
@@ -133,23 +138,34 @@ stringg <- stringg %>% activate("nodes") %>%
     pageRank = page_rank(.)$vector) 
 
 # BT <- BT %>% distinct(gene_id, microRNA_degree, Bilogical_pathway, HPF)
+# Bind info to nodes
+
+stringg <- stringg %>% activate("nodes") %>% left_join(gene_read_exp_df, by = "gene_id") 
 
 stringg <- stringg %>% activate("nodes") %>%  left_join(BT, by = "gene_id") 
 
-# Get edges connected to the specified node
+# stringg <- stringg %>% activate("nodes") %>% as_tibble()
 
-query <- c("RNF166") # "C1GALT1", "GCNT1", "ANKIB1"
+# Get edges connected to the specified node ----
 
-query <- QTARGETSDB %>% distinct(STRINGID) %>% pull()
+# QUERY <- c("MAP11") # RNF166
 
-str(node_id <- which(V(stringg)$preferred_name %in% query))
+QUERY <- QTARGETSDB %>% distinct(STRINGID) %>% pull()
 
-connected_edges <- incident(stringg, node_id)
+str(nodes_id <- which(V(stringg)$preferred_name %in% QUERY))
+
+common_connected_edges <- incident(stringg, nodes_id)
 
 # Get all neighbors of the specified node
-connected_vertices <- neighbors(stringg, node_id)
+common_vertices <- neighbors(stringg, nodes_id)
 print("Connected Vertices:")
-print(connected_vertices)
+print(common_vertices)
+
+# walk_paths <- all_shortest_paths(stringg, from = common_vertices)
+
+# data.frame(path = unique(unlist(walk_paths$res)))
+
+common_vertices <- V(stringg)$preferred_name[c(common_vertices)]
 
 all_neighbors_shortest_paths <- function(graph, v) {
   
@@ -178,8 +194,6 @@ all_neighbors_shortest_paths <- function(graph, v) {
   return(connected_vertices)
 }
 
-QUERY <- query[2]
-
 shortest_paths <- lapply(QUERY, function(x) {all_neighbors_shortest_paths(graph = stringg, v = x)})
 
 shortest_paths <- unlist(shortest_paths)
@@ -191,13 +205,20 @@ shortest_paths <- shortest_paths[!shortest_paths %in% QUERY]
 # SCheck
 any(shortest_paths %in% QUERY) # Must be false
 
+shortest_paths <- unique(shortest_paths)
+
+
+shortest_paths <- shortest_paths[!shortest_paths %in% common_vertices]
+
+# common_vertices <- common_vertices[!common_vertices %in% QUERY]
+
 # If decide walk the last path -----
 
 # Initialize a list to store secondary paths
 secondary_paths <- list()
 
 # Loop through each neighbor and find paths to other nodes
-for (neighbor in connected_vertices) {
+for (neighbor in common_vertices) {
   
   cat("Conected: ", neighbor, "\n")
   
@@ -233,19 +254,25 @@ str(connected_vertices <- unique(sort(secondary_paths$path)))
 
 # connected_vertices <- unique(sort(connected_vertices))
 
+as_adjacency_matrix(stringg, "upper")
+
 layout <- stringg %>% activate("nodes") %>% 
-  filter(preferred_name %in% c(shortest_paths, QUERY)) %>%
+  filter(degree > 0) %>%
+  # filter(preferred_name %in% QUERY[1]) %>%
   mutate(colNode = "Basal") %>%
-  mutate(colNode = ifelse(preferred_name %in% query, "Target", colNode)) %>%
+  mutate(colNode = ifelse(preferred_name %in% QUERY, "Target", colNode)) %>%
   mutate(colNode = ifelse(preferred_name %in% shortest_paths, "short_paths_target", colNode)) %>%
-  activate("edges") %>% filter(Evidence_size > 0) %>%
+  mutate(colNode = ifelse(preferred_name %in% common_vertices, "Common_vertices", colNode)) %>%
+  activate("edges") %>% 
+  mutate(Evidence_size = ifelse(Evidence_size > 0.15, Evidence_size, NA)) %>%
+  # filter(Evidence_size > 0.2) %>%
   create_layout(layout = 'auto')
   # create_layout(layout = 'linear')
 
 
 ggraph(layout) +
   geom_edge_link(aes(alpha = Evidence_size)) +
-  geom_node_point(aes(color = colNode, size = microRNA_degree+10, shape = HPF)) +
+  geom_node_point(aes(color = Bilogical_pathway, size = microRNA_degree+10, shape = colNode)) +
   geom_node_text(aes(label = preferred_name), repel = TRUE, family = "GillSans") +
   ggthemes::scale_color_calc() +
   # facet_nodes(~ Bilogical_pathway, scales = "free") +
@@ -255,3 +282,91 @@ ggraph(layout) +
 ggraph(stringg, layout = "matrix", sort.by = node_rank_traveller()) + 
   geom_edge_point() +
   geom_node_text(aes(label = preferred_name), repel = TRUE, family = "GillSans") 
+
+
+# Deal with spagetti plot
+
+# Calculate various network properties, adding them as attributes
+# to each node/vertex
+
+# stringg <- stringg %>% activate("nodes") %>% 
+#   mutate(betweenness = betweenness(.), degree = centrality_degree(),
+#     pageRank = page_rank(.)$vector) 
+
+graph <- stringg
+
+# take a while calculating membership
+
+V(graph)$comm <- membership(optimal.community(graph))
+
+# V(graph)$closeness <- centralization.closeness(graph)$res
+# V(graph)$betweenness <- centralization.betweenness(graph)$res
+# V(graph)$eigen <- centralization.evcent(graph)$vector
+
+
+# Re-generate dataframes for both nodes and edges, now containing
+# calculated network attributes
+
+node_list <- get.data.frame(graph, what = "vertices")
+
+
+names(node_list)
+names(node_list)[3] <- "name"
+
+# Determine a community for each edge. If two nodes belong to the
+# same community, label the edge with that community. If not,
+# the edge community value is 'NA'
+
+edge_list <- get.data.frame(graph, what = "edges") # %>%
+  # inner_join(node_list %>% select(name, comm), by = c("from" = "name")) %>%
+  # inner_join(node_list %>% select(name, comm), by = c("to" = "name")) %>%
+  # mutate(group = ifelse(comm.x == comm.y, comm.x, NA) %>% factor())
+
+
+edge_list$from <- node_list[edge_list$from,]$name
+edge_list$to <- node_list[edge_list$to,]$name
+
+# Create a character vector containing every node name
+all_nodes <- unique(sort(node_list$name))
+
+# Adjust the 'to' and 'from' factor levels so they are equal
+# to this complete list of node names
+plot_data <- edge_list %>% mutate(
+  to = factor(to, levels = all_nodes),
+  from = factor(from, levels = all_nodes))
+
+
+name_order <- (node_list %>% arrange(comm))$name
+
+# Reorder edge_list "from" and "to" factor levels based on
+# this new name_order
+plot_data <- edge_list %>% mutate(
+  to = factor(to, levels = name_order),
+  from = factor(from, levels = name_order))
+
+
+# plot
+query_nodes <- c("")
+query_nodes <- paste(query_nodes, collapse = "|")
+links_ <- c("from", "to")
+plot_data %>% filter_at(vars(all_of(links_)), any_vars(grepl(query_nodes, .)))
+
+plot_data %>%
+  filter_all()
+
+# Create the adjacency matrix plot
+ggplot(plot_data, aes(x = from, y = to)) +
+  geom_raster() +
+  theme_bw() +
+  # Because we need the x and y axis to display every node,
+  # not just the nodes that have connections to each other,
+  # make sure that ggplot does not drop unused factor levels
+  scale_x_discrete(drop = FALSE) +
+  scale_y_discrete(drop = FALSE) +
+  theme(
+    # Rotate the x-axis lables so they are legible
+    axis.text.x = element_text(angle = 270, hjust = 0),
+    # Force the plot into a square aspect ratio
+    aspect.ratio = 1,
+    # Hide the legend (optional)
+    legend.position = "none")

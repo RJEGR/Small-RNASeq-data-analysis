@@ -4,6 +4,7 @@
 # VIEW IF INTRAGENIC ARE CO-REGULATING HOST GENE == zero
 # VIEW IF TARGET IS COMMONLY EXPRESSED IN LARVAE DEV. == keep_expressed
 # CORRELATE AND VISUALIZE MIR AND GENE EXPRESSION (MUST MATCH NEGATIVE CORRELATION)
+## Include a boostrap of random correlations <---------
 # Graphical view of genomic location and regulation in genome = complicated!
 
 rm(list = ls())
@@ -38,6 +39,12 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 print(FUNCTIONAL_DB <- read_rds(paste0(wd,"SRNA_FUNCTION_PREDICTED_LONG_EXPRESSED.rds")))
 
+Mantle_sam <- c("SRR8956768", "SRR8956769")
+
+# remove mantle samples
+
+FUNCTIONAL_DB <- FUNCTIONAL_DB %>% dplyr::select(!starts_with(Mantle_sam)) 
+
 is_na <- function(x) ifelse(is.na(x), 0, x)
 
 keep_expressed <- FUNCTIONAL_DB %>% 
@@ -45,21 +52,24 @@ keep_expressed <- FUNCTIONAL_DB %>%
   mutate(across(where(is.double), ~is_na(.))) %>% 
   rowSums()
 
-FUNCTIONAL_DB <- FUNCTIONAL_DB[keep_expressed > 1,]
+print(FUNCTIONAL_DB <- FUNCTIONAL_DB[keep_expressed > 1,])
 
+nrow(FUNCTIONAL_DB <- FUNCTIONAL_DB %>%
+    group_by(gene_id, description) %>%
+    summarise_at(vars(all_of(which_cols)), sum))
 
 # Prepare miRNA_mRNA set -----
 
-wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/"
+wd1 <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/"
 
-gene2tr <- read_rds(paste0(wd, "genome_features.rds"))[[1]] %>% 
+gene2tr <- read_rds(paste0(wd1, "genome_features.rds"))[[1]] %>% 
   distinct(gene_id, transcript_id)
 
 
 Lines <- FUNCTIONAL_DB %>% distinct(gene_id) %>%
   left_join(gene2tr) %>%   distinct(transcript_id) %>% pull()
 
-writeLines(Lines, paste0(wd, "miRNA-mRNA.lines"))
+writeLines(Lines, paste0(wd1, "miRNA-mRNA.lines"))
 
 wd <- "~/Documents/MIRNA_HALIOTIS/SHORTSTACKS/ShortStack_20230315_out/"
 
@@ -74,13 +84,67 @@ MajorRNA2Name <- .LOCATION_DB %>% distinct(MajorRNA, Name) %>%   dplyr::rename("
 LOCATION_DB <- .LOCATION_DB %>%
   select(Name, MajorRNA, Locus, Reads, biotype_best_rank, gene_id) 
 
+# LociLines <- LOCATION_DB %>% distinct(gene_id) %>% drop_na() %>% left_join(gene2tr) %>%  distinct(transcript_id) %>% pull()
+
+LociLines <- .LOCATION_DB %>% 
+  drop_na(transcript_id) %>% 
+  mutate(transcript_id = strsplit(transcript_id, ";")) %>%
+  unnest(transcript_id) %>% distinct(transcript_id) %>% pull()
+
+writeLines(LociLines, paste0(wd1, "miRNA-Loci.lines"))
+
+# x correlates ----
+
+COUNT <- FUNCTIONAL_DB %>%
+  ungroup() %>%
+  select_if(is.double) %>% as("matrix")
+
+nrow(rownames(COUNT) <- FUNCTIONAL_DB$gene_id)
+
+dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
+
+print(DB <- read_tsv(file.path(dir, "LONGER_RELATIONAL_DB.tsv")))
+
+DB <- DB  %>% mutate(Seed = substr(MajorRNA, 2,8))
+
+MATRIX <- .LOCATION_DB %>% 
+  mutate(Seed = substr(MajorRNA, 2,8)) %>%
+  group_by(Seed) %>%
+  summarise(MicrornaRead = sum(UniqueReads)) %>%
+  left_join(distinct(DB, Seed, gene_id)) %>%
+  group_by(gene_id) %>%
+  summarise(MicrornaDegree = n(), MicrornaRead = sum(MicrornaRead)) %>%
+  arrange(desc(MicrornaDegree)) %>%
+  filter(gene_id %in% rownames(COUNT)) %>%
+  arrange(match(gene_id, rownames(COUNT)))
+
+M <- MATRIX %>% select_if(is.numeric) %>% as("matrix")
+
+rownames(M) <- MATRIX$gene_id
+
+identical(rownames(M), rownames(COUNT))
+
+WGCNA::cor(COUNT,M)
+
+FUNCTIONAL_DB
+
+MATRIX %>%
+  left_join()
+
+# heatmap(WGCNA::cor(COUNT,M))
+
+FUNCTIONAL_DB
+
+
 # 0 calculate distance between loci mirs ----
 
 # GenomicRanges::GRanges(LOCATION_DB)
 
 # 1) VIEW IF INTRAGENIC ARE CO-REGULATING HOST GENE =====
 
-sum(FUNCTIONAL_DB$gene_id %in% LOCATION_DB$gene_id)
+any(Lines %in% LociLines)
+
+any(FUNCTIONAL_DB$gene_id %in% LOCATION_DB$gene_id)
 
 FUNCTIONAL_DB %>%
   dplyr::select(!dplyr::starts_with("SRR")) %>%
