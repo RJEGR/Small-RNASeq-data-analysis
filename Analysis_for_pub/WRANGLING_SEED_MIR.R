@@ -25,6 +25,21 @@ SEEDDB <- DB %>%
   arrange(desc(Seed_degree))
 
 
+DB %>% 
+  mutate(Contrast = strsplit(Contrast, ";")) %>%
+  unnest(Contrast) %>%
+  mutate(Seed = substr(MajorRNA, 2,8)) %>%
+  distinct(Contrast, gene_id, Seed) %>%
+  group_by(Contrast, gene_id) %>%
+  summarise(across(Seed, .fns = paste_col), Seed_degree = n()) %>% 
+  arrange(desc(Seed_degree)) %>%
+  ggplot(aes(x = gene_id, y = Seed_degree, fill = Contrast)) + 
+  geom_col() + facet_grid(~ Contrast) + coord_flip()
+
+DB %>% 
+  distinct(Contrast, gene_id, MajorRNAID, STRINGID, biotype_best_rank) %>% 
+  group_by(Contrast,biotype_best_rank) %>% count(sort = T)
+
 DENSITYDB <- DB %>% 
   group_by(biotype_best_rank) %>%
   distinct(STRINGID, gene_id, MajorRNA) %>% 
