@@ -34,10 +34,38 @@ QUERYDB %>% count(CONTRAST, HPF)
 
 print(DB <- read_tsv(file.path(dir, "LONGER_RELATIONAL_DB.tsv")))
 
+
+# Processing biological themes Database
+
+print(BT <- read_tsv(file.path(dir, "Supplementary_tables - Biological_themes.tsv"), col_names = T))
+
+# BT <- BT %>% arrange(desc(microRNA_degree))
+
+BT <- BT %>% 
+  drop_na(Bilogical_pathway) %>% 
+  mutate(Bilogical_pathway = strsplit(Bilogical_pathway, ",")) %>%
+  unnest(Bilogical_pathway) %>% 
+  # mutate(SMPID = ifelse(!is.na(SMPID), "(*) ", "")) %>% 
+  # mutate(STRINGID_label = paste0(SMPID, STRINGID)) %>% 
+  # distinct(MajorRNA, STRINGID_label, STRINGID) %>%
+  dplyr::count(gene_id, sort = T) %>% 
+  dplyr::rename("N_pathways" = "n") %>% right_join(BT) # %>% 
+  # dplyr::rename("Node" = "gene_id")
+
+BT <- BT %>% mutate(Bilogical_pathway = ifelse(N_pathways > 1, "Wide", Bilogical_pathway))
+
+
+BT <- DB %>% distinct(gene_id, COG_name) %>% right_join(BT) %>% 
+  mutate(Bilogical_pathway = ifelse(is.na(Bilogical_pathway), COG_name, Bilogical_pathway)) %>%
+  select(-COG_name) %>% distinct()
+
+# BT <- BT %>% left_join(QTARGETSDB) %>% 
+#   mutate(HPF = ifelse(is.na(HPF), "Basal", as.character(HPF)))
+
+
 # Module info
 
 wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
-
 
 print(WGCNA <- read_rds(paste0(wd,"SRNA_FUNCTION_PREDICTED_LONG_EXPRESSED.rds")))
 
@@ -60,7 +88,7 @@ stringg <- stringg %>% activate("nodes") %>%
   mutate(betweenness = betweenness(.), degree = centrality_degree(),
     pageRank = page_rank(.)$vector) 
   
-nodes <- stringg %>% activate("nodes") %>% as_tibble()
+print(nodes <- stringg %>% activate("nodes") %>% as_tibble())
 edges <- stringg %>% activate("edges") %>% as_tibble()
 
 nodes %>% 
@@ -78,12 +106,12 @@ DF <- DB %>%
   unnest(STRINGID) %>% 
   mutate(SMPID = ifelse(!is.na(SMPID), "(*) ", "")) %>% 
   mutate(STRINGID_label = paste0(SMPID, STRINGID)) %>% 
-  distinct(MajorRNA, STRINGID_label, STRINGID) %>%
+  distinct(MajorRNAID, STRINGID_label, STRINGID) %>%
   dplyr::count(STRINGID_label, STRINGID) %>% 
   dplyr::rename("preferred_name" = "STRINGID", "microRNA_protein" = "n") %>% 
   right_join(nodes, by = "preferred_name") %>%
   dplyr::rename("protein_protein" = "degree") %>%
-  arrange(desc(protein_protein)) %>%
+  arrange(desc(microRNA_protein)) %>%
   mutate(preferred_name = factor(STRINGID_label, levels = unique(STRINGID_label))) %>%
   select(preferred_name, protein_protein, microRNA_protein)
 
@@ -116,25 +144,38 @@ DB <- DB %>% mutate(COG_name = ifelse(is.na(COG_name), description, COG_name))
 
 # If filtering
 
-nodes <- DB %>% 
-  right_join(QUERYDB, by = "MajorRNA") %>%
-  # distinct(gene_id, HPF, COG_name) %>%
-  # group_by(gene_id, COG_name) %>%
-  distinct(gene_id, HPF) %>%
-  group_by(gene_id) %>%
-  summarise(across(HPF, .fns = paste_col)) %>%
-  right_join(nodes, by = "gene_id") %>%
-  left_join(WGCNA, by = "gene_id")
+# nodes <- DB %>% 
+#   right_join(QUERYDB, by = "MajorRNA") %>%
+#   # distinct(gene_id, HPF, COG_name) %>%
+#   # group_by(gene_id, COG_name) %>%
+#   distinct(gene_id, HPF) %>%
+#   group_by(gene_id) %>%
+#   summarise(across(HPF, .fns = paste_col)) %>%
+#   right_join(nodes, by = "gene_id") %>%
+#   left_join(WGCNA, by = "gene_id")
+
+print(nodes <- stringg %>% activate("nodes") %>% as_tibble() %>% rowid_to_column())
+
+nodes <- BT %>% 
+  drop_na(STRINGID) %>% 
+  distinct(gene_id, STRINGID, Bilogical_pathway) %>% 
+  # dplyr::count(gene_id, sort = T)
+  left_join(nodes) %>% 
+  arrange(STRINGID, by = "gene_id")
+
+print(nodes)
 
 # Then
 
 nodes <- data.frame(
-  id = as.numeric(factor(nodes$Node)), 
+  id = nodes$rowid, 
   label = nodes$preferred_name,
-  group = nodes$HPF,
-  color = nodes$WGCNA_target, # shape
+  group = nodes$Bilogical_pathway,
+  # color = nodes$Bilogical_pathway, # OR shape (color must match palette labels)
   value = nodes$degree,
   nodes)
+
+edges <- stringg %>% activate("edges") %>% as_tibble()
 
 evidence <- data.frame(edges$fusion > 0,
 edges$neighborhood > 0,
@@ -157,20 +198,18 @@ edges <- data.frame(
 # edges$from <- nodes[edges$from,]$Node
 # edges$to <- nodes[edges$to,]$Node
 
-edges$from <- nodes[edges$from,]$Node
-edges$to <- nodes[edges$to,]$Node
-
 
 library(visNetwork)
 
 visNetwork::visNetwork(
   nodes = nodes,
-  edges = edges, width = "100%") %>%
+  edges = edges, width = "100%", height = "1000px") %>%
+  visIgraphLayout(layout = "layout_in_circle") %>%
   visInteraction(navigationButtons = T) %>%
-  visOptions(highlightNearest = T, nodesIdSelection = T, selectedBy = "COG_name") %>%
+  visOptions(highlightNearest = T, nodesIdSelection = T, selectedBy = "Bilogical_pathway") %>%
   visLegend(
-    useGroups = FALSE, addNodes = data.frame(label = "Protein", shape = "circle"), 
-    addEdges = data.frame(label = "Predicted association", color = "black"))
+    useGroups = T, addNodes = data.frame(label = "Protein", shape = "circle"), 
+    addEdges = data.frame(label = "STRING association", color = "black"))
   # visEdges(arrows = 'from')
 
 # visNetwork(nodes, edges, width = "100%") %>% 
