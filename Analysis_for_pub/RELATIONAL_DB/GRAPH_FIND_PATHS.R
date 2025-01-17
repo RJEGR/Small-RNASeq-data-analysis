@@ -26,7 +26,6 @@ dir <- "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024/"
 gene_read_exp_df <- read_tsv(file.path(dir, "Transcriptome_read_expression.tsv"))
 
 
-
 gene_read_exp_df %>% 
   group_by(dpf,gene_id) %>%
   summarise(Read_expression = sum(Read_expression)) %>%
@@ -152,6 +151,7 @@ stringg <- stringg %>% activate("nodes") %>%  left_join(BT, by = "gene_id")
 
 QUERY <- QTARGETSDB %>% distinct(STRINGID) %>% pull()
 
+
 str(nodes_id <- which(V(stringg)$preferred_name %in% QUERY))
 
 common_connected_edges <- incident(stringg, nodes_id)
@@ -198,7 +198,7 @@ shortest_paths <- lapply(QUERY, function(x) {all_neighbors_shortest_paths(graph 
 
 shortest_paths <- unlist(shortest_paths)
 
-any(shortest_paths %in% query) 
+any(shortest_paths %in% QUERY) 
 
 shortest_paths <- shortest_paths[!shortest_paths %in% QUERY]
 
