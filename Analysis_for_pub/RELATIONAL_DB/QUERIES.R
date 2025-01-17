@@ -98,7 +98,7 @@ order_n <- plotdf %>% group_by(COG_name) %>% tally(n, sort = T) %>% pull(COG_nam
 
 # sum(DEGS_D$MajorRNA %in% DEGS$MajorRNA)
 
-recode_to <- structure(c("pH 8.0","pH 7.6"), names = c("CONTRAST_C", "CONTRAST_D"))
+recode_to <- structure(c("pH 8.0","pH 7.6", "24 hpf", "110 hpf"), names = c("CONTRAST_C", "CONTRAST_D", "CONTRAST_A", "CONTRAST_B"))
 
 
 plotdf <- DEGS_D %>% 
@@ -223,7 +223,7 @@ which_contrast <- function(x) {
 
 
 TOPDF <- rbind(DEGS, DEGS_D) %>%
-  filter(MajorRNA %in% query) %>%
+  # filter(MajorRNA %in% query) %>%
   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!rev(recode_to))) %>%
   group_by(MajorRNA, HPF) %>%
   summarise(across(CONTRAST, .fns = which_contrast)) %>%
@@ -324,6 +324,8 @@ plotdf %>%
     hjust = -0.1, vjust = 0, 
     family = "GillSans", position = position_dodge(width = 1)) -> p
 
+
+
 # p
 
 # ggsave(p, filename = 'NOGS.png', path = dir, width = 8, height = 8, device = png, dpi = 300)
@@ -395,7 +397,391 @@ pdens <- pdens +
 pdens<- pdens + 
   facet_grid(~ CONTRAST) 
 
+# PLOT maain pub figure -----
 
+MajorRNALevs <- RES %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  select(log2FoldChange, MajorRNA, CONTRAST) %>% 
+  pivot_wider(names_from = CONTRAST, values_from = log2FoldChange) %>% arrange(desc(`pH 8.0`)) %>% pull(MajorRNA)
+
+
+RES %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  drop_na(MajorRNA) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  # select(log2FoldChange, MajorRNA, CONTRAST) %>%
+  mutate(MajorRNA = factor(MajorRNA, levels = MajorRNALevs)) %>%
+  # pivot_wider(names_from = CONTRAST, values_from = log2FoldChange) %>% arrange(desc(`pH 8.0`)) %>% 
+  ggplot(aes(x = MajorRNA, y = log2FoldChange, color = CONTRAST, group = CONTRAST)) +
+  geom_line(orientation = "x") +
+  # geom_point(shape = 21, size = 1, stroke = 1.2, fill = "white") +
+  scale_color_manual(values = c("gray86","black")) +
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  theme(legend.position = "top",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm")) +
+  guides(color=guide_legend(title = "", nrow = 1), fill = "none") +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.5) +
+  annotate("text", x = 10, y = 12, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 10, y = -5, label = "110 hpf", family = "GillSans") +
+  labs(x = "") +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) -> P
+
+# ggsave(P, filename = 'log2FC_distribution.png', path = dir, width = 12, height = 6, device = png, dpi = 300)
+
+
+SIGNMIRS <- RES.P %>%  filter(!CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>% 
+  distinct(MajorRNA, MirGeneDB_ID) %>% pull(MajorRNA, name = MirGeneDB_ID)
+
+
+DB %>% 
+  drop_na(COG_name) %>%
+  mutate(MajorRNA = factor(MajorRNA, levels = MajorRNALevs)) %>%
+  mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>%
+  mutate(COG_name = factor(COG_name, levels = sort(decreasing = T, unique(COG_name)))) %>%
+  count(MajorRNA, COG_name, COG_category, sort = T) %>%
+    group_by(MajorRNA) %>% mutate(Frac = n / sum(n)) %>% 
+  # summarise(sum(Frac)) # Sanity check
+  filter(Frac > 0.15) %>%
+  mutate(MajorRNACol = ifelse(MajorRNA %in% SIGNMIRS, "black", "gray86")) %>%
+  ggplot() +
+  geom_tile(aes(fill = MajorRNACol, y = COG_name, x = MajorRNA), 
+    color = 'white', size = 0.7, width = 1, height = 0.5) +
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  scale_fill_manual(values = c("black", "gray86")) +
+  guides(color=guide_legend(title = "", nrow = 1), fill = "none") +
+  labs(y = "NOGS Category") +
+  theme(
+    # legend.position = "bottom",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm")) +
+  theme(axis.text.x = element_text(angle = 90, size = 8, hjust = 1, vjust = 0.5, color = "gray"),
+    axis.text.y = element_text(size = 8)) -> P2
+
+# P2
+
+P2 <- P2 + scale_x_discrete(breaks = SIGNMIRS, labels = names(SIGNMIRS))
+
+# ggsave(P, filename = 'log2FC_distribution_.png', path = dir, width = 12, height = 6, device = png, dpi = 300)
+
+library(patchwork)
+
+ps <- P/ plot_spacer() /P2 + plot_layout(heights = c(3.5, -0.9, 6))
+
+ggsave(ps, filename = 'log2FC_distribution_COG.png', path = dir, width = 11.5, height = 6.5, device = png, dpi = 600)
+
+# CORRELATION ----
+
+library(infotheo)
+library(MASS)
+
+
+RES %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>% view()
+  select(log2FoldChange,padj, MajorRNA, MirGeneDB_ID, CONTRAST) %>% 
+  # !Note: here invert log2FoldChange for sort  24 and 110 hpf in the plot
+  # mutate(log2FoldChange = log2FoldChange*-1) %>%
+  mutate(Annotation = ifelse(grepl("Cluster", MirGeneDB_ID), "Novel", "Known")) %>%
+  pivot_wider(names_from = CONTRAST, values_from = c(log2FoldChange, padj)) %>%
+  arrange(desc(MajorRNA)) %>% view()
+  # discretize()
+  # mutinformation("pH 7.6", "pH 8.0")
+
+RES %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  select(log2FoldChange, MajorRNA, MirGeneDB_ID, CONTRAST) %>% 
+  # !Note: here invert log2FoldChange for sort  24 and 110 hpf in the plot
+  # mutate(log2FoldChange = log2FoldChange*-1) %>%
+  pivot_wider(names_from = CONTRAST, values_from = log2FoldChange) %>%
+  mutate(Contrast = ifelse(MajorRNA %in% SIGNMIRS[1:3], "24 hpf", "110 hpf")) %>%
+  mutate(col = ifelse(MajorRNA %in% SIGNMIRS, "OA", "")) %>%
+  mutate(MirGeneDB_ID = ifelse(MajorRNA %in% SIGNMIRS, MirGeneDB_ID, NA)) %>%
+  ggplot(aes(`pH 8.0`,`pH 7.6`)) +
+  # ggplot(aes(`24 hpf`,`110 hpf`)) +
+  geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.5) +
+  geom_smooth(se = FALSE, method = lm, color = "black", linewidth = 0.5) +
+  ggpubr::stat_cor(method = "pearson", cor.coef.name = "R", p.accuracy = 0.001) +
+  geom_point(aes(colour = Contrast), shape = 21, size = 1, stroke = 1.2, fill = "white") +
+  scale_y_reverse() +
+  scale_x_reverse() +
+  ggrepel::geom_text_repel(aes(label = MirGeneDB_ID), 
+    size = 3.5, hjust = -0.1, vjust = 0, 
+    family = "GillSans", position = position_dodge(width = 1), max.overlaps = 50) +
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  # scale_color_manual(values = c("gray86","black")) +
+  theme(legend.position = "top",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm"))
+
+
+col_recode <- structure(c("#FFC107", "#2196F3","red"), 
+  names = c("Intergenic", "Intragenic", "Other ncRNA"))
+
+
+
+RES %>% 
+  filter(CONTRAST %in% c("CONTRAST_A","CONTRAST_B")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  mutate(col = ifelse(padj < 0.05 & abs(log2FoldChange) > 1, "OA", "ns")) %>%
+  mutate(MirGeneDB_ID = ifelse(col == "OA", MirGeneDB_ID, NA)) %>%
+  left_join(DB %>% distinct(MajorRNA, biotype_best_rank)) %>%
+  mutate(biotype_best_rank = ifelse(col == "OA", biotype_best_rank, NA)) %>%
+  ggplot(aes(log2(baseMeanA),log2(baseMeanB), group = CONTRAST)) +
+  facet_wrap(~ CONTRAST, nrow = 2) +
+  geom_smooth(se = FALSE, method = lm, color = "black", linewidth = 0.5) +
+  ggpubr::stat_cor(method = "pearson", cor.coef.name = "R", p.accuracy = 0.001) +
+  geom_point(aes(color = biotype_best_rank), shape = 21, size = 1, stroke = 1.2, fill = "white") +
+  labs(x = "log2(Base Mean) - pH 8.0", y = "log2(Base Mean) - pH 7.6") +
+  # scale_y_reverse() +
+  ggrepel::geom_text_repel(
+    aes(label = MirGeneDB_ID),
+    size = 2.5, hjust = 1, vjust = 1,
+    family = "GillSans", max.overlaps = 50) + 
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  # scale_color_manual(values = c("gray86","black")) +
+  scale_color_manual("",values = col_recode) +
+  scale_fill_manual("",values = col_recode) +
+  theme(legend.position = "top",
+    # strip.background = element_rect(fill = 'grey89', color = 'white'),
+    strip.text = element_text(color = "black",hjust = 1),
+    strip.background = element_blank(),
+    # panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm")) -> P
+
+P
+
+ggsave(P, filename = 'BaseMean_COR.png', path = dir, width = 5, height = 7, device = png, dpi = 600)
+
+
+# Plot functional categories ----
+
+QUERIES <- RES %>% 
+  filter(CONTRAST %in% c("CONTRAST_A","CONTRAST_B")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 1) %>% 
+  distinct(MajorRNA, MirGeneDB_ID) %>%
+  pull(MajorRNA, name = MirGeneDB_ID)
+
+# library(ggalluvial)
+
+
+LONGDB <- DB %>% 
+  filter(MajorRNA %in% QUERIES) %>%
+  drop_na(COG_name) %>%
+  mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>%
+  mutate(COG_name = factor(COG_name, levels = sort(decreasing = T, unique(COG_name)))) %>%
+  mutate(MajorRNAID = factor(MajorRNAID, levels = rev(names(QUERIES)))) %>%
+  count(STRINGID, biotype_best_rank, MajorRNAID, COG_name, sort = T) %>% # Tentative include STRINGID col
+  group_by(MajorRNAID) %>% mutate(Frac = n / sum(n)) %>% 
+  # summarise(sum(Frac)) # Sanity check
+  filter(Frac > 0.15) %>% ungroup() %>%
+  mutate(Contrast = ifelse(MajorRNAID %in% names(QUERIES[1:3]), "24 hpf", "110 hpf")) %>%
+  select(biotype_best_rank, Contrast, MajorRNAID, STRINGID, COG_name, n)
+
+# https://jtr13.github.io/cc21fall1/parallel-coordinates-plot-cheatsheet.html
+
+library(GGally)
+
+col_recode <- structure(c("#FFC107", "#2196F3","red"), 
+  names = c("Intergenic", "Intragenic", "Other ncRNA"))
+
+
+p1 <- ggparcoord(LONGDB, columns = 2:5,groupColumn = "biotype_best_rank", 
+  splineFactor = 2, alphaLines = 0.5, showPoints = T) +
+  scale_color_manual("",values = col_recode) +
+  scale_fill_manual("",values = col_recode) 
+  
+p1
+# SCALES_DF <- p1$data %>% pivot_wider(names_from = variable, values_from = value)
+
+nrow(SCALES_DF <- p1$data %>% filter(variable == "MajorRNAID") %>% distinct(value))
+
+LONGDB %>%
+  distinct(MajorRNAID) %>%  
+  cbind(SCALES_DF)
+  mutate(x = 1, y = scale(as.integer(factor(MajorRNAID))))
+
+# replace scale with values from  p1$data$value (see ggparcoord funct)
+
+p2 <- p1 + geom_text(data = LONGDB %>%
+      select(MajorRNAID) %>%  distinct() %>%
+      mutate(x = 2, y = scale(as.integer(factor(MajorRNAID)))),
+    aes(x = x, y = y, label = MajorRNAID),
+    hjust = 0, # -1
+    vjust = 3,
+    inherit.aes = FALSE, family = "GillSans")
+
+
+p3 <- p2 + 
+  geom_text(data = LONGDB %>%
+      select(STRINGID) %>% distinct() %>%
+      mutate(x = 3,
+        y = scale(as.integer(factor(STRINGID)))),
+    aes(x = x, y = y, label = STRINGID),
+    # hjust = 0,
+    hjust = 0, # -1
+    vjust = 3,
+    inherit.aes = FALSE, family = "GillSans") 
+
+p3 + 
+  geom_text(data = LONGDB %>%
+    select(COG_name) %>% distinct() %>%
+    mutate(x = 4,
+      y = scale(as.integer(factor(COG_name)))),
+  aes(x = x, y = y, label = COG_name),
+    hjust = 0, # -1
+    vjust = 3,
+  inherit.aes = FALSE, family = "GillSans") +
+  # geom_point(aes(size = n)) +
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  # scale_color_manual(values = c("gray86","black")) +
+  theme(legend.position = "top",
+    # strip.background = element_rect(fill = 'grey89', color = 'white'),
+    strip.text = element_text(color = "black",hjust = 1),
+    strip.background = element_blank(),
+    # panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm")) +
+  scale_x_discrete("",breaks = c("MajorRNAID", "STRINGID","COG_name"), position = "top")
+
+
+
+# 
+# LONGDB %>%
+#   ggplot(aes(x = COG_name, stratum = stratum, alluvium = alluvium,
+#       label = stratum)) +
+#   geom_alluvium() +
+#   geom_stratum() + geom_text(stat = "stratum")
+# 
+
+LONGDB %>% 
+  ggplot() +
+  geom_line(aes(x = x, y = y)) +
+  theme_minimal()
+
+DB %>% 
+  filter(MajorRNA %in% QUERIES) %>%
+  drop_na(COG_name) %>%
+  mutate(MajorRNA = factor(MajorRNA, levels = MajorRNALevs)) %>%
+  mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>%
+  mutate(COG_name = factor(COG_name, levels = sort(decreasing = F, unique(COG_name)))) %>%
+  count(MajorRNAID, COG_name, COG_category, sort = T) %>%
+  group_by(MajorRNAID) %>% mutate(Frac = n / sum(n)) %>% #view()
+  # summarise(sum(Frac)) # Sanity check
+  filter(Frac > 0.15) %>%
+  ggplot(aes(y = MajorRNAID, x = 1)) +
+  geom_point(aes(size = n)) +
+  facet_wrap(COG_name ~ ., scales = "free_y", ncol = 1) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 10, hjust = 1),
+    strip.text = element_text(color = "black",hjust = 1))
+
+
+
+
+DATAVIZ <- RES.P %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  left_join(DB, by = "MajorRNA") %>% 
+  drop_na(COG_name) %>%
+  mutate(COG_name = paste0(COG_category, ", ",COG_name)) %>%
+  mutate(COG_name = factor(COG_name, levels = sort(decreasing = F, unique(COG_name)))) %>%
+  # !Note: here invert log2FoldChange for sort  24 and 110 hpf in the plot
+  mutate(log2FoldChange = log2FoldChange*-1) %>%
+  filter(abs(log2FoldChange) > 2) 
+
+DATAVIZ %>%
+  ggplot(aes(y = COG_name, x = log2FoldChange, color = CONTRAST)) +
+  geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+  ggridges::geom_density_ridges(
+    alpha = 0,
+    jittered_points = F,
+    position = ggridges::position_points_jitter(width = 0.5, height = 0),
+    point_shape = '|', point_size = 1, point_alpha = 1) +
+  scale_color_manual(values = c("gray","black")) +
+  labs(y = "Nested Orthologous Gene Group (NOGS)") +
+  theme_bw(base_size = 12, base_family = "GillSans") +
+  theme(legend.position = "top",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm")) +
+  guides(color=guide_legend(title = "", nrow = 1), fill = "none") +
+  annotate("text", x = -9, y = 21, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 9, y = 21, label = "110 hpf", family = "GillSans") +
+  annotate("text", x = 0, y = 22, label = "")  +
+  xlim(-20, 20) 
+
+
+
+DATAVIZ %>%
+  ggplot(aes(log2FoldChange, color = CONTRAST)) +
+  # facet_wrap(~ COG_name, ncol = 3) +
+  stat_ecdf(geom="line") +
+  scale_color_manual(values = c("gray","black")) +
+  geom_vline(xintercept = 0, linetype = "dashed", size = 0.5)
+
+DATAVIZ %>%
+  ggplot(aes(log2FoldChange, color = CONTRAST)) +
+  facet_wrap(~ COG_name, ncol = 3) +
+  stat_ecdf(geom="line") +
+  scale_color_manual(values = c("gray","black")) +
+  geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+  annotate("text", x = -9, y = 0.9, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 9, y = 0.9, label = "110 hpf", family = "GillSans") +
+  # labs(y = "Nested Orthologous Gene Group (NOGS)") +
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  theme(legend.position = "top",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm"))
+
+
+DATAVIZ %>%
+  ggplot(aes(log2FoldChange, after_stat(density), color = CONTRAST)) +
+  facet_wrap(~ COG_name, ncol = 3) +
+  # stat_ecdf()
+  geom_density() +
+  geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+  annotate("text", x = -8, y = 0.8, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 5, y = 0.8, label = "110 hpf", family = "GillSans") +
+  scale_color_manual(values = c("gray","black")) +
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  theme(legend.position = "top",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm")) +
+  ylim(0, 1) 
+
+
+DATAVIZ %>%
+  ggplot(aes(x = log2FoldChange, y = -log10(padj), color = CONTRAST)) +
+  geom_point() +
+  facet_wrap(~ COG_name) 
+
+
+DATAVIZ %>%
+  mutate(wrap = sign(log2FoldChange)) %>%
+  ggplot(aes(x = log2FoldChange, y = COG_name, color = CONTRAST)) +
+  geom_boxplot() 
+  # facet_wrap(~ wrap)
 
 # pdens +
 #   geom_text(data = data_text,
