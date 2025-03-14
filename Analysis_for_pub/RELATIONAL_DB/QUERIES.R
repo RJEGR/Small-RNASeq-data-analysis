@@ -496,7 +496,7 @@ RES %>%
 RES %>% 
   filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
-  select(log2FoldChange, MajorRNA, MirGeneDB_ID, CONTRAST) %>% 
+  dplyr::select(log2FoldChange, MajorRNA, MirGeneDB_ID, CONTRAST) %>% 
   # !Note: here invert log2FoldChange for sort  24 and 110 hpf in the plot
   # mutate(log2FoldChange = log2FoldChange*-1) %>%
   pivot_wider(names_from = CONTRAST, values_from = log2FoldChange) %>%
@@ -565,6 +565,47 @@ P
 
 ggsave(P, filename = 'BaseMean_COR.png', path = dir, width = 5, height = 7, device = png, dpi = 600)
 
+
+
+# correlate by treatment
+x_label <- expression(log[2]~"fold-change (pH 8.0)")
+y_label <- expression(log[2]~"fold-change (pH 7.6)")
+
+
+RES %>% 
+  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  dplyr::select(log2FoldChange, MajorRNA, MirGeneDB_ID, CONTRAST) %>% 
+  # !Note: here invert log2FoldChange for sort  24 and 110 hpf in the plot
+  # mutate(log2FoldChange = log2FoldChange*-1) %>%
+  pivot_wider(names_from = CONTRAST, values_from = log2FoldChange) %>%
+  left_join(DB %>% distinct(MajorRNA, biotype_best_rank)) %>%
+  mutate(MirGeneDB_ID = ifelse(MajorRNA %in% SIGNMIRS, MirGeneDB_ID, NA)) %>%
+  ggplot(aes(`pH 8.0`,`pH 7.6`)) +
+  # ggplot(aes(`24 hpf`,`110 hpf`)) +
+  geom_vline(xintercept = 0, linetype = "dashed", size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.5) +
+  geom_smooth(se = FALSE, method = lm, color = "black", linewidth = 0.5) +
+  ggpubr::stat_cor(method = "pearson", cor.coef.name = "R", p.accuracy = 0.001) +
+  geom_point(aes(colour = biotype_best_rank), shape = 21, size = 1.5, stroke = 1.2, fill = "white") +
+  scale_y_reverse(limits = c(10,-10)) +
+  scale_x_reverse(limits = c(10,-10)) +
+  scale_color_manual("",values = col_recode) +
+  scale_fill_manual("",values = col_recode) +
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  labs(y = y_label, x = x_label) +
+  theme(legend.position = "top",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm")) +
+  # annotate("text", x = -9, y = 21, label = "24 hpf", family = "GillSans") +
+  annotate("text", x = 1, y = 7, label = "24 hpf", family = "GillSans", angle = 90) +
+  annotate("text", x = -1, y = -7, label = "110 hpf", family = "GillSans",  angle = 90) +
+  ggrepel::geom_text_repel(
+    aes(label = MirGeneDB_ID),
+    size = 2.5, hjust = 1, vjust = 1,
+    family = "GillSans", max.overlaps = 50)
 
 # Plot functional categories ----
 

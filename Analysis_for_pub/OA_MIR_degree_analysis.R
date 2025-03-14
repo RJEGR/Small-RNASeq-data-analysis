@@ -284,6 +284,13 @@ ggsave(ps, filename = 'WGCNA2NOGS.png', path = dir, width = 6, height = 4, devic
 
 # Visualice network
 
+DB %>% filter(MajorRNA %in% QUERIES) %>%
+  distinct(STRINGID, gene_id, MajorRNA, MajorRNAID) %>%
+  mutate(fill = 1) %>%
+  ggplot(aes(fill = fill, gene_id, MajorRNAID)) +
+  geom_hex()
+
+
 dir <- "~/Documents/MIRNA_HALIOTIS/ENSEMBLE/calcif/"
 
 print(stringg <- read_rds(file.path(dir, "protein_links_full_v12.rds")))
