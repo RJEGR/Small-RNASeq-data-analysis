@@ -326,7 +326,7 @@ plotdf %>%
 
 
 
-# p
+p
 
 # ggsave(p, filename = 'NOGS.png', path = dir, width = 8, height = 8, device = png, dpi = 300)
 
@@ -399,23 +399,30 @@ pdens<- pdens +
 
 # PLOT maain pub figure -----
 
+
+SIGNMIRS <- RES.P %>%  filter(!CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>% 
+  distinct(MajorRNA, MirGeneDB_ID) %>% pull(MajorRNA, name = MirGeneDB_ID)
+
+
 MajorRNALevs <- RES %>% 
   filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
   mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
   select(log2FoldChange, MajorRNA, CONTRAST) %>% 
+  filter(MajorRNA %in% SIGNMIRS) %>%
   pivot_wider(names_from = CONTRAST, values_from = log2FoldChange) %>% arrange(desc(`pH 8.0`)) %>% pull(MajorRNA)
 
 
 RES %>% 
-  filter(CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
+  filter(!CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>%
   drop_na(MajorRNA) %>%
-  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  filter(MajorRNA %in% SIGNMIRS) %>%
+  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>% #View()
   # select(log2FoldChange, MajorRNA, CONTRAST) %>%
   mutate(MajorRNA = factor(MajorRNA, levels = MajorRNALevs)) %>%
   # pivot_wider(names_from = CONTRAST, values_from = log2FoldChange) %>% arrange(desc(`pH 8.0`)) %>% 
   ggplot(aes(x = MajorRNA, y = log2FoldChange, color = CONTRAST, group = CONTRAST)) +
   geom_line(orientation = "x") +
-  # geom_point(shape = 21, size = 1, stroke = 1.2, fill = "white") +
+  geom_point(shape = 21, size = 1, stroke = 1.2, fill = "white") +
   scale_color_manual(values = c("gray86","black")) +
   theme_bw(base_size = 14, base_family = "GillSans") +
   theme(legend.position = "top",
@@ -423,19 +430,60 @@ RES %>%
     panel.grid.minor = element_blank(),
     legend.key.width = unit(0.2, "cm"),
     legend.key.height = unit(0.12, "cm")) +
+  ylim(-5, 5) +
   guides(color=guide_legend(title = "", nrow = 1), fill = "none") +
   geom_hline(yintercept = 0, linetype = "dashed", size = 0.5) +
-  annotate("text", x = 10, y = 12, label = "24 hpf", family = "GillSans") +
-  annotate("text", x = 10, y = -5, label = "110 hpf", family = "GillSans") +
+  annotate("text", x = 4, y = 3.5, label = "pH 8.0", family = "GillSans") +
+  annotate("text", x = 4, y = -3.5, label = "pH 7.6", family = "GillSans") +
   labs(x = "") +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) -> P
+
+P
 
 # ggsave(P, filename = 'log2FC_distribution.png', path = dir, width = 12, height = 6, device = png, dpi = 300)
 
 
-SIGNMIRS <- RES.P %>%  filter(!CONTRAST %in% c("CONTRAST_C", "CONTRAST_D")) %>% 
-  distinct(MajorRNA, MirGeneDB_ID) %>% pull(MajorRNA, name = MirGeneDB_ID)
+print(BT <- read_tsv(file.path(dir, "Supplementary_tables - Biological_themes.tsv"), col_names = T))
 
+BT <- BT %>% select(-STRINGID)
+
+col_recode <- structure(c("#FFC107", "#2196F3","red"),
+  names = c("Intergenic", "Intragenic", "Other ncRNA"))
+
+
+
+DB %>% 
+  distinct(MajorRNA, gene_id, biotype_best_rank) %>%
+  right_join(BT, by = "gene_id") %>%
+  filter(MajorRNA %in% SIGNMIRS) %>%
+  drop_na(Bilogical_pathway) %>%
+  mutate(MajorRNA = factor(MajorRNA, levels = MajorRNALevs)) %>%
+  count(MajorRNA, Bilogical_pathway, biotype_best_rank, sort = T) %>%
+  group_by(MajorRNA) %>% mutate(Frac = n / sum(n)) %>%
+  # summarise(sum(Frac)) # Sanity check
+  filter(Frac > 0.15) %>%
+  # mutate(MajorRNACol = ifelse(MajorRNA %in% SIGNMIRS, "black", "gray86")) %>%
+  ggplot() +
+  # geom_tile(aes(fill = MajorRNACol, y = Bilogical_pathway, x = MajorRNA), 
+  #   color = 'white', size = 0.7, width = 1, height = 0.5) +
+  geom_point(aes(size = Frac, y = Bilogical_pathway, x = MajorRNA, color = biotype_best_rank)) +
+  theme_bw(base_size = 14, base_family = "GillSans") +
+  scale_color_manual("",values = col_recode) +
+  scale_fill_manual("",values = col_recode) +
+  guides(color=guide_legend(title = "", nrow = 2), fill = "none", size = guide_legend(title = "")) +
+  labs(y = "", x = "") +
+  theme(
+    legend.position = "bottom",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.key.width = unit(0.2, "cm"),
+    legend.key.height = unit(0.12, "cm")) +
+  theme(axis.text.x = element_text(angle = 90, size = 8, hjust = 1, vjust = 0.5, color = "gray"),
+    axis.text.y = element_text(size = 8)) + 
+  scale_x_discrete(breaks = SIGNMIRS, labels = names(SIGNMIRS)) -> P2
+
+
+P2
 
 DB %>% 
   drop_na(COG_name) %>%
@@ -461,11 +509,7 @@ DB %>%
     legend.key.width = unit(0.2, "cm"),
     legend.key.height = unit(0.12, "cm")) +
   theme(axis.text.x = element_text(angle = 90, size = 8, hjust = 1, vjust = 0.5, color = "gray"),
-    axis.text.y = element_text(size = 8)) -> P2
-
-# P2
-
-P2 <- P2 + scale_x_discrete(breaks = SIGNMIRS, labels = names(SIGNMIRS))
+    axis.text.y = element_text(size = 8)) + scale_x_discrete(breaks = SIGNMIRS, labels = names(SIGNMIRS))
 
 # ggsave(P, filename = 'log2FC_distribution_.png', path = dir, width = 12, height = 6, device = png, dpi = 300)
 
@@ -473,7 +517,7 @@ library(patchwork)
 
 ps <- P/ plot_spacer() /P2 + plot_layout(heights = c(3.5, -0.9, 6))
 
-ggsave(ps, filename = 'log2FC_distribution_COG.png', path = dir, width = 11.5, height = 6.5, device = png, dpi = 600)
+ggsave(ps, filename = 'log2FC_distribution_biolPath.png', path = dir, width = 6.5, height = 6, device = png, dpi = 600)
 
 # CORRELATION ----
 
@@ -563,7 +607,7 @@ RES %>%
 
 P
 
-ggsave(P, filename = 'BaseMean_COR.png', path = dir, width = 5, height = 7, device = png, dpi = 600)
+ggsave(P, filename = 'BaseMean_COR.png', path = dir, width = 6, height = 7, device = png, dpi = 600)
 
 
 
