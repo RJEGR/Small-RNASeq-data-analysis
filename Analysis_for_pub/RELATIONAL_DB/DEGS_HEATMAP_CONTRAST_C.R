@@ -208,8 +208,8 @@ TOPDF <- RES.P %>%
 col <- RES.P %>% distinct(WGCNA) %>% pull(WGCNA, name = WGCNA)
 
 LEFTP <- TOPDF %>%
-  mutate(HPF = factor(HPF)) %>%
-  ggplot(aes(x = y, y = MajorRNA, color = WGCNA)) + # color = as.factor(hpf)
+  # mutate(HPF = factor(HPF)) %>%
+  ggplot(aes(x = y, y = MajorRNA, color = WGCNA)) +
   # facet_grid(~ HPF, scales = "free", space = "free") +
   ggh4x::scale_y_dendrogram(hclust = hc_mirs, position = 'left', labels = NULL) +
   # guides(y.sec = guide_axis_manual(labels = order_mirs, 
@@ -218,7 +218,31 @@ LEFTP <- TOPDF %>%
   scale_shape_manual(values = c(15,19, 8)) +
   theme_bw(base_family = "GillSans", base_size = 10) +
   # scale_color_manual(values = c("grey79", "black")) +
-  scale_color_manual(values = col) +
+  scale_color_manual(values = col) 
+
+
+# Instead of WGCNA, use intergenic and intragenic coloring
+
+TOPDF <- DATA %>% distinct(MajorRNA) %>% 
+  left_join(distinct(DB, MajorRNA, biotype_best_rank)) %>%
+  filter(!MajorRNA %in% "UCGGUGGGACUUUCGUUCGUCU" | biotype_best_rank != "Intergenic") %>%
+  mutate(y = 0.35)
+
+
+col_recode <- structure(c("#FFC107", "#2196F3","red"), 
+  names = c("Intergenic", "Intragenic", "Other ncRNA"))
+
+LEFTP <- TOPDF %>%
+  ggplot(aes(x = y, y = MajorRNA, color = biotype_best_rank)) + 
+  geom_point(size =0.3, shape = 15) +
+  ggh4x::scale_y_dendrogram(hclust = hc_mirs, position = 'left', labels = NULL) +
+  # scale_shape_manual(values = c(15,19, 8)) +
+  theme_bw(base_family = "GillSans", base_size = 10) +
+  scale_color_manual(values = col_recode) +
+  theme(axis.text.y = element_blank())
+  
+  
+LEFTP <- LEFTP +
   guides(color=guide_legend(title = "", nrow = 1), 
     shape = guide_legend(title = "", nrow = 1)) +
   theme(legend.position = 'none',
@@ -226,6 +250,7 @@ LEFTP <- TOPDF %>%
     plot.background = element_rect(fill='transparent', color = 'transparent'),
     panel.grid.minor = element_blank(),
     axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
     # axis.text.y = element_blank(),
     axis.text.x = element_blank(),
     axis.title = element_blank(),
@@ -233,8 +258,12 @@ LEFTP <- TOPDF %>%
 
 library(patchwork)
 
-ps <- LEFTP + plot_spacer() + P + 
-  plot_layout(nrow = 1, widths = c(1, -0.9999, 7)) +
+ps <- P + plot_spacer() + LEFTP + 
+  plot_layout(nrow = 1, widths = c(7, -0.9999, 1)) +
   theme(plot.margin = unit(c(.2,.2,.2,0), "cm"))
+  
+# ps <- LEFTP + plot_spacer() + P + 
+#   plot_layout(nrow = 1, widths = c(1, -0.9999, 7)) +
+#   theme(plot.margin = unit(c(.2,.2,.2,0), "cm"))
 
-ggsave(ps, filename = 'DEGS_HEATMAP_CONTRAST_C.png', path = dir, width = 3.5, height = 5, device = png, dpi = 500)
+ggsave(ps, filename = 'DEGS_HEATMAP_CONTRAST_C.png', path = dir, width = 3, height = 5, device = png, dpi = 500)
