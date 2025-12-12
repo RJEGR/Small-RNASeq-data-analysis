@@ -41,7 +41,7 @@ DF1 <- DB %>%
   filter(MajorRNA %in% QUERIES_PHCONTROL) %>%
   # mutate(STRINGID = ifelse(is.na(STRINGID), gene_id, STRINGID)) %>% 
   distinct(STRINGID, gene_id, MajorRNA, MajorRNAID) %>%
-  count(STRINGID, gene_id, sort = T) %>%
+  dplyr::count(STRINGID, gene_id, sort = T) %>%
   dplyr::rename("MIR_degree" = "n")
 
 
@@ -161,7 +161,10 @@ DataViz %>%
 P1 <- P1 + 
   # theme(axis.text.y = element_blank(), axis.ticks.x = element_blank()) +
   guides(color=guide_legend(title = "", nrow = 1), fill = "none") +
-  scale_x_continuous("MicroRNA density",labels = scales::percent)
+  scale_x_continuous("MicroRNA density",labels = scales::percent, limits = c(-1, 1))
+
+
+P1
 
 # of to stack 100% bars per bio.theme?
 
@@ -175,7 +178,7 @@ DataViz %>%
   ggplot(aes(y = Label, color = name, x = value)) +
   ggforce::facet_col(~ Contrast, space = "free", scales = "free_y") +
   # geom_point(shape = 21, size = 1, stroke = 1.2, fill = "white", position = position_dodge(width = 0.5)) +
-  geom_col()
+  geom_col(position = position_dodge()) 
 
 
 
@@ -230,7 +233,7 @@ RES %>%
   drop_na(MajorRNA) %>%
   mutate(HPF = ifelse(log2FoldChange > 0, "24 hpf", "110 hpf")) %>%
   mutate(HPF = factor(HPF, levels = c("24 hpf", "110 hpf"))) %>%
-  mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
+  # mutate(CONTRAST = dplyr::recode_factor(CONTRAST, !!!recode_to)) %>%
   filter(MajorRNA %in% QUERIES) %>%
   select(log2FoldChange, MajorRNA, CONTRAST, HPF) %>%
   left_join(DB, by = "MajorRNA") %>%
