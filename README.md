@@ -1,8 +1,6 @@
 <img width="1900" alt="image" src="https://github.com/RJEGR/Small-RNASeq-data-analysis/assets/24900266/25f02637-e9a2-4911-ab58-421c72ad6c44">
 
-[![Zenodo](https://zenodo.org/badge/77959541.svg)](https://doi.org/10.5281/zenodo.20589774)
 [![Zenodo](https://zenodo.org/badge//DOI/10.5281/zenodo.77959541.svg)](https://doi.org/10.5281/zenodo.20589774)
-[![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.3891931.svg)](https://doi.org/10.5281/zenodo.3891931)
 
 
 # Markdown for microRNA analysis
