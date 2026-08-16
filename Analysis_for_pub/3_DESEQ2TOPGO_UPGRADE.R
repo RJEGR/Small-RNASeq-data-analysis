@@ -156,7 +156,7 @@ for (i in LOOP) {
   
   genes2GO <- CONTRAST2GO %>% 
     filter(CONTRAST %in% i) %>%
-    group_by(MajorRNA) %>% sample_n(1) 
+    group_by(MajorRNA) %>% slice_min(pvalue, n = 1, with_ties = FALSE)
   
   p <- genes2GO %>% pull(log2FoldChange, name = MajorRNA)
   
@@ -288,7 +288,7 @@ cat("\nUsing ",length(query.names), " QUERY Names...\n")
 
 
 query.p <- RES.P %>% 
-  group_by(MajorRNA) %>% sample_n(1) %>% 
+  group_by(MajorRNA) %>% slice_min(pvalue, n = 1, with_ties = FALSE) %>%
   pull(pvalue, name = MajorRNA)
 
 query.p <- query.p[match(query.names, names(query.p))]
@@ -351,7 +351,7 @@ str(query.names <- query.names[query.names %in% names(SRNA2GO)])
 cat("\nUsing ",length(query.names), " QUERY Names...\n")
 
 query.p <- RES.P %>% 
-  group_by(MajorRNA) %>% sample_n(1) %>% 
+  group_by(MajorRNA) %>% slice_min(pvalue, n = 1, with_ties = FALSE) %>%
   pull(pvalue, name = MajorRNA)
 
 query.p <- query.p[match(query.names, names(query.p))]
@@ -395,7 +395,7 @@ str(query.names <- query.names[query.names %in% names(SRNA2GO)])
 cat("\nUsing ",length(query.names), " QUERY Names...\n")
 
 query.p <- RES.P %>% 
-  group_by(Name) %>% sample_n(1) %>% 
+  group_by(Name) %>% slice_min(pvalue, n = 1, with_ties = FALSE) %>%
   pull(pvalue, name = Name)
 
 query.p <- query.p[match(query.names, names(query.p))]
@@ -440,7 +440,7 @@ str(query.names <- query.names[query.names %in% names(SRNA2GO)])
 cat("\nUsing ",length(query.names), " QUERY Names...\n")
 
 query.p <- RES.P %>% 
-  group_by(Name) %>% sample_n(1) %>% 
+  group_by(Name) %>% slice_min(pvalue, n = 1, with_ties = FALSE) %>%
   pull(pvalue, name = Name)
 
 query.p <- query.p[match(query.names, names(query.p))]
