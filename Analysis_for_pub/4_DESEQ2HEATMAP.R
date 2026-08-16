@@ -347,7 +347,10 @@ str(GO.ID <- rbind(TOPGO_INTERSECTED, TOPGO_EXCLUSIVE) %>% distinct(GO.ID) %>% p
 
 WHICH_DB <- "org.Ce.eg.db"
 
-BiocManager::install(WHICH_DB)
+# install only when the annotation package is absent, so sourcing this script
+# does not modify the user's library on every run
+
+if (!requireNamespace(WHICH_DB, quietly = TRUE)) BiocManager::install(WHICH_DB)
 
 GOSEM <- GOSemSim::godata(WHICH_DB, ont="BP")
 
