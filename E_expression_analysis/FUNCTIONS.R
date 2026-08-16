@@ -314,11 +314,17 @@ GOenrichment <- function(query.p, query.names, gene2GO, cons = T, onto = "BP", N
   }
   
   
-  allRes <- runtopGO(topGOdata, topNodes = Nodes, conservative = cons)
+  allRes <- runtopGO(topGOdata, topNodes = topNodes, conservative = cons)
   
   # make p adjustable
   
-  p.adj.ks <- p.adjust(allRes$classicKS , method="BH")
+  # GenTable returns p-values as character and reports small ones as "< 1e-30".
+  # Coercing directly would turn the most significant terms into NA, so strip the
+  # bound operator first and adjust on the numeric value.
+
+  ks.numeric <- as.numeric(sub("^[[:space:]]*<[[:space:]]*", "", allRes$classicKS))
+
+  p.adj.ks <- p.adjust(ks.numeric, method="BH")
   
   allRes <- cbind(allRes, p.adj.ks)
   
