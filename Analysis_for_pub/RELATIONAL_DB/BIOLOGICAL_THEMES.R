@@ -10,7 +10,9 @@
 # Idealy, using only miRNA:mRNA transcripts (~ 170 transcripts)
 # Additionally, blast miRNA:mRNA transcripts to biomineralization-genes database
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 

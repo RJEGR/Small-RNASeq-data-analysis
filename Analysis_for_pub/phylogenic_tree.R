@@ -8,7 +8,9 @@
 # Estimate specificity of clade-specific miRNa detection as Kang et al., 2018 (mirtrace)
 # To estimate how many reads are likely to be ientified as clade-specific miRNAs by chance, a binomial model is adopted. 
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 
