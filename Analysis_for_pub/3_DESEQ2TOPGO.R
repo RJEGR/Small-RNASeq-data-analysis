@@ -41,9 +41,14 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/FUNCTIONAL_MIR_ANNOT/"
 
 print(.SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
 
-url <- "https://raw.githubusercontent.com/RJEGR/Cancer_sete_T_assembly/main/functions.R"
+# Load helpers from this repository. These were previously fetched over HTTP from
+# another repository's default branch, so the code that ran was not the code in
+# the checkout, and the fetched copy silently replaced the local GOenrichment()
+# with one that still carries the p.adjust and topNodes defects.
 
-source(url)
+FUNCTIONS <- if (file.exists("Analysis_for_pub/FUNCTIONS.R")) "Analysis_for_pub/FUNCTIONS.R" else "FUNCTIONS.R"
+
+source(FUNCTIONS)
 
 # Mature are you functional strand used in DE
 
