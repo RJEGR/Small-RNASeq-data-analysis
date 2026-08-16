@@ -353,8 +353,13 @@ get_res <- function(dds, contrast, alpha_cutoff = 0.1) {
   res = results(dds, contrast, alpha = alpha_cutoff)
   
   
-  baseMeanA <- rowMeans(DESeq2::counts(dds,normalized=F)[,keepA])
-  baseMeanB <- rowMeans(DESeq2::counts(dds,normalized=F)[,keepB])
+  # Group means must be size-factor normalized to be comparable with each other
+  # and with log2FoldChange. Sequencing depth differs between groups by up to
+  # 3.3x in this design, and the direction of that imbalance varies by contrast,
+  # so raw means can point the opposite way from the fold change they accompany.
+
+  baseMeanA <- rowMeans(DESeq2::counts(dds,normalized=TRUE)[,keepA])
+  baseMeanB <- rowMeans(DESeq2::counts(dds,normalized=TRUE)[,keepB])
   
   
   # sdA <- apply(DESeq2::counts(dds,normalized=TRUE)[,keepA], 1, sd)
