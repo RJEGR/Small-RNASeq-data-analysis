@@ -3,7 +3,9 @@
 # OR ONLY IN EXCLUSIVE MIRS
 # COMPARISON FROM CONTRAST C AND D SHOW HOW REGULATORY NETWORK DURING DEVELOPMENT (AT 110 HPF) CHANGES IN REPONSE TO LOW PH
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 

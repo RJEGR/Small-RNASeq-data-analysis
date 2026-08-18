@@ -11,7 +11,9 @@
 # NEGATIVE LFC == UP EXPRESSED IN CONTROL (OR sampleA)
 # view baseMeanA and baseMeanB to contrast the expression values
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 
@@ -23,9 +25,14 @@ wd <-  "~/Documents/MIRNA_HALIOTIS/MIRNA_PUB_2024"
 
 RES <- read_tsv(list.files(path = wd, pattern = "DESEQ_RES.tsv", full.names = T)) # %>% mutate(log2FoldChange = log2FoldChange * -1)
 
-url <- "https://raw.githubusercontent.com/RJEGR/Cancer_sete_T_assembly/main/functions.R"
+# Load helpers from this repository. These were previously fetched over HTTP from
+# another repository's default branch, so the code that ran was not the code in
+# the checkout, and the fetched copy silently replaced the local GOenrichment()
+# with one that still carries the p.adjust and topNodes defects.
 
-source(url)
+FUNCTIONS <- if (file.exists("Analysis_for_pub/FUNCTIONS.R")) "Analysis_for_pub/FUNCTIONS.R" else "FUNCTIONS.R"
+
+source(FUNCTIONS)
 
 CONTRAST <- RES %>% distinct(CONTRAST) %>% pull()
 

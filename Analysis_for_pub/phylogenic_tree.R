@@ -8,7 +8,9 @@
 # Estimate specificity of clade-specific miRNa detection as Kang et al., 2018 (mirtrace)
 # To estimate how many reads are likely to be ientified as clade-specific miRNAs by chance, a binomial model is adopted. 
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 
@@ -571,10 +573,16 @@ plot(ape::read.tree(f))
 
 # SEARCH MOTIF CONSERVATION USING MEME OR OTHER R PACKAGE FOR MIRS
 #  https://omarwagih.github.io/ggseqlogo/#installation
-devtools::install_github("omarwagih/ggseqlogo")
+# installed only when absent, so sourcing this script does not modify the user's
+# library on every run. Both are still pulled from the default branch rather than
+# a tagged release or commit, so the installed version is not reproducible; pin a
+# ref here once the required versions are known.
+
+if (!requireNamespace("ggseqlogo", quietly = TRUE)) devtools::install_github("omarwagih/ggseqlogo")
 
 # or http://yulab-smu.top/ggmsa/articles/ggmsa.html (maybe or not)
-devtools::install_github("YuLab-SMU/ggmsa")
+
+if (!requireNamespace("ggmsa", quietly = TRUE)) devtools::install_github("YuLab-SMU/ggmsa")
 miRNA_sequences <- system.file("extdata", "seedSample.fa", package = "ggmsa")
 
 miRNA_sequences <- Biostrings::readRNAStringSet(miRNA_sequences)

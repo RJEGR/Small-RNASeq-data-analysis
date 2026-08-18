@@ -3,7 +3,9 @@
 # Considering using non-model orgs. result in low info per link
 # So, let use a single mondel organism to retrieve protein-links
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 

@@ -1,7 +1,9 @@
 
 # RICARDO GOMEZ-REYES
 # DESEQ2REVIGO
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 
@@ -24,9 +26,12 @@ semdata <- read_rds(paste0(wd, orgdb, ".rds"))
 
 print(.SRNA2GO <- read_tsv(paste0(wd, "SRNA_REGULATORY_FUNCTION_DB.tsv")))
 
-URL <- "https://raw.githubusercontent.com/RJEGR/Small-RNASeq-data-analysis/master/FUNCTIONS.R"
+# Load helpers from this checkout rather than from the master branch over HTTP,
+# so local edits to FUNCTIONS.R are not silently overridden at runtime.
 
-source(URL)
+FUNCTIONS <- if (file.exists("Analysis_for_pub/FUNCTIONS.R")) "Analysis_for_pub/FUNCTIONS.R" else "FUNCTIONS.R"
+
+source(FUNCTIONS)
 
 SRNA2GO <- .SRNA2GO %>%
   filter(predicted == "BOTH") %>%

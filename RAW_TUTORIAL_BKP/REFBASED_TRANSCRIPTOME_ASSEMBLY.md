@@ -73,7 +73,7 @@ which fasterq-dump # a replacement for the much older fastq-dump tool.
 # 3) For best performance, obtain an API Key from NCBI, and place the following line in your .bash_profile and .zshrc configuration files:
 
 # export NCBI_API_KEY=unique_api_key
-echo "NCBI_API_KEY=74e0e4bf2d8eaa3bb742c46316dbafe12909" >> $HOME/.bash_profile
+echo "NCBI_API_KEY=XXXXXX" >> $HOME/.bash_profile
 
 # Test
 

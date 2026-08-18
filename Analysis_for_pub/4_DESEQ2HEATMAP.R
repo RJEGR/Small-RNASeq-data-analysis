@@ -4,7 +4,9 @@
 # 2.1) TOP LEGEND INCLUDE EXPERIMENTAL DESIGN
 # 2.2) LEFT OR RIGHT LABEL INCLUDE SEMANTIC SIMILARITY GROUPING
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 
@@ -347,7 +349,10 @@ str(GO.ID <- rbind(TOPGO_INTERSECTED, TOPGO_EXCLUSIVE) %>% distinct(GO.ID) %>% p
 
 WHICH_DB <- "org.Ce.eg.db"
 
-BiocManager::install(WHICH_DB)
+# install only when the annotation package is absent, so sourcing this script
+# does not modify the user's library on every run
+
+if (!requireNamespace(WHICH_DB, quietly = TRUE)) BiocManager::install(WHICH_DB)
 
 GOSEM <- GOSemSim::godata(WHICH_DB, ont="BP")
 

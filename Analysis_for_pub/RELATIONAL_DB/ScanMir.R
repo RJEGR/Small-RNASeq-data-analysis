@@ -8,7 +8,9 @@
 # Run model to calculate targeting efficacy
 # Para construir tu modelo debes remplazar el objeto dummyKdData() por una tabla de valores kd reportados para los microRNAs que identifique en el abulon
 
-rm(list = ls());
+# rm(list = ls());
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 

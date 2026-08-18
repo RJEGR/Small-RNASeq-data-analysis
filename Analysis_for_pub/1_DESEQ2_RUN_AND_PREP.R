@@ -5,7 +5,9 @@
 # 4) SAVE AS RDATA FILE 
 # 
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 
@@ -207,7 +209,10 @@ RES <- RES %>%
 
 RES <- RES %>% dplyr::mutate(MirGeneDB_ID = ifelse(!grepl("^[U|A|C|G]", MirGeneDB_ID), MirGeneDB_ID, Name))
 
-# RES <- RES %>% mutate(Name = ifelse(grepl("^MIR", MirGeneDB_ID), MirGeneDB_ID, Name))
+# Required to reproduce the published Name column: verified to give an exact
+# 468/468 match against SEQUENCES_MERGED_DESEQ_RES.tsv, versus 196/468 without it.
+
+RES <- RES %>% mutate(Name = ifelse(grepl("^MIR", MirGeneDB_ID), MirGeneDB_ID, Name))
 
 write_tsv(RES, file = file.path(path_out, "SEQUENCES_MERGED_DESEQ_RES.tsv"))
 

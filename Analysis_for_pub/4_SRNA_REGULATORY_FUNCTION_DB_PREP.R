@@ -6,7 +6,9 @@
 # 3) FILTER IDS FROM EXPRESSION MATRIX (gene_count_matrix.csv)
 # 4) CORRELATE MIRS EXPRESSION W/ TARGET GENE FOUND IN TRANSCRIPTOME
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 

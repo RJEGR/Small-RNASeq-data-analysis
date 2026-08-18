@@ -5,7 +5,9 @@
 # i.e REHACER EL ARCHIVO DE SECUENCIAS USANDO EL GTF ADECUADO (LISTO)
 # /home/rvazquez/RNA_SEQ_ANALYSIS/ASSEMBLY/STRINGTIE/REFBASED_MODE/ANNOTATION
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 

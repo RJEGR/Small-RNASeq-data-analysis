@@ -6,7 +6,9 @@
 # Bind target db (description, gene_id, etc.) to SEQUENCES_MERGED
 # Calculate revigo or topgo for every gene_id (ex. LOC124150425)
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 

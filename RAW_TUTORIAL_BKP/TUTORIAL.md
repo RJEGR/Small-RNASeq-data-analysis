@@ -251,9 +251,6 @@ dansr \
 
 ### MANATEE (problemas de ejecucion debido a IntervalTree)
 
-> corre bien con la cuenta rvazquez@200.23.162.234
->
-> Pass: Temporal2022
 >
 > revisar manatee_20230217.log (error con el formato de annotation)
 

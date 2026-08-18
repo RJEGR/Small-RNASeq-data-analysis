@@ -3,7 +3,9 @@
 # FIND transcrip/geneid in target analysis (RNAHybrid OR targetscan)
 # 
 
-rm(list = ls())
+# rm(list = ls())
+# disabled: clearing the global environment makes scripts non-composable -- sourcing
+# two in sequence wipes the other's state, including helpers. Restart R instead.
 
 if(!is.null(dev.list())) dev.off()
 
@@ -113,9 +115,12 @@ wd <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/"
 gene2tr <- read_rds(paste0(wd, "genome_features.rds"))[[1]] %>% 
   distinct(gene_id, transcript_id)
 
-url <- "https://raw.githubusercontent.com/RJEGR/Small-RNASeq-data-analysis/master/FUNCTIONS.R"
+# Load helpers from this checkout rather than from the master branch over HTTP,
+# so local edits to FUNCTIONS.R are not silently overridden at runtime.
 
-source(url)
+FUNCTIONS <- if (file.exists("Analysis_for_pub/FUNCTIONS.R")) "Analysis_for_pub/FUNCTIONS.R" else "FUNCTIONS.R"
+
+source(FUNCTIONS)
 
 ref_path <- "/Users/cigom/Documents/MIRNA_HALIOTIS/ENSEMBLE/ANNOTATIONS/trino"
 

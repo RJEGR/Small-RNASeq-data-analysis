@@ -316,11 +316,17 @@ GOenrichment <- function(query.p, query.names, gene2GO, cons = T, onto = "BP", N
   }
   
   
-  allRes <- runtopGO(topGOdata, topNodes = Nodes, conservative = cons)
+  allRes <- runtopGO(topGOdata, topNodes = topNodes, conservative = cons)
   
   # make p adjustable
   
-  p.adj.ks <- p.adjust(allRes$classicKS , method="BH")
+  # GenTable returns p-values as character and reports small ones as "< 1e-30".
+  # Coercing directly would turn the most significant terms into NA, so strip the
+  # bound operator first and adjust on the numeric value.
+
+  ks.numeric <- as.numeric(sub("^[[:space:]]*<[[:space:]]*", "", allRes$classicKS))
+
+  p.adj.ks <- p.adjust(ks.numeric, method="BH")
   
   allRes <- cbind(allRes, p.adj.ks)
   
@@ -347,8 +353,13 @@ get_res <- function(dds, contrast, alpha_cutoff = 0.1) {
   res = results(dds, contrast, alpha = alpha_cutoff)
   
   
-  baseMeanA <- rowMeans(DESeq2::counts(dds,normalized=F)[,keepA])
-  baseMeanB <- rowMeans(DESeq2::counts(dds,normalized=F)[,keepB])
+  # Group means must be size-factor normalized to be comparable with each other
+  # and with log2FoldChange. Sequencing depth differs between groups by up to
+  # 3.3x in this design, and the direction of that imbalance varies by contrast,
+  # so raw means can point the opposite way from the fold change they accompany.
+
+  baseMeanA <- rowMeans(DESeq2::counts(dds,normalized=TRUE)[,keepA])
+  baseMeanB <- rowMeans(DESeq2::counts(dds,normalized=TRUE)[,keepB])
   
   
   # sdA <- apply(DESeq2::counts(dds,normalized=TRUE)[,keepA], 1, sd)
